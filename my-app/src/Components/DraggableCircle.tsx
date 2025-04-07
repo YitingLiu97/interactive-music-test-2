@@ -16,11 +16,13 @@ type Props = {
 }
 
 export default function DraggableCircle({ boundingBox }: Props) {
-  const [dragging, SetDragging] = useState<boolean>(false);
-  const [position, setPosition] = useState<Circle>({ x: 0, y: 0 });
   const [mounted, setMounted] = useState(false);
+  const [dragging, setDragging] = useState<boolean>(false);
+  const [position, setPosition] = useState<Circle>({ x: 0, y: 0 });
+  const circleSize = 50;
+  
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (dragging) {
@@ -33,7 +35,7 @@ export default function DraggableCircle({ boundingBox }: Props) {
       }
     }
     function handleMouseUp() {
-      SetDragging(false);
+      setDragging(false);
     }
 
     if (dragging) {
@@ -45,49 +47,49 @@ export default function DraggableCircle({ boundingBox }: Props) {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [dragging]);
-
+  }, [dragging, boundingBox]);
 
   function onMouseDown() {
-    SetDragging(true);
-    console.log("set dragging to be true");
+    setDragging(true);
   }
-  function onMouseUp() {
-    SetDragging(false);
-    console.log("set dragging to be false");
+  if (!mounted) return null;
+  
+  // function onMouseDown() {
+  //   setDragging(true);
+  //   console.log("set dragging to be true");
+  // }
+  // function onMouseUp() {
+  //   setDragging(false);
+  //   console.log("set dragging to be false");
 
-  }
-  function onMouseMove(x: number, y: number) {
-    if (dragging) {
+  // }
+  // function onMouseMove(x: number, y: number) {
+  //   if (dragging) {
 
-      const boxWidth = 300;
-      const boxHeight = 300;
-      const circleSize = 50;
+  //     const boxWidth = 300;
+  //     const boxHeight = 300;
+  //     const circleSize = 50;
 
-      let newX = Math.min(Math.max(0, x), boxWidth - circleSize);
-      let newY = Math.min(Math.max(0, y), boxHeight - circleSize);
+  //     let newX = Math.min(Math.max(0, x), boxWidth - circleSize);
+  //     let newY = Math.min(Math.max(0, y), boxHeight - circleSize);
 
-      setPosition({ x: newX, y: newY });
-      console.log(`set position to be ${x} and ${y}`);
-    }
-  }
+  //     setPosition({ x: newX, y: newY });
+  //     console.log(`set position to be ${x} and ${y}`);
+  //   }
+  // }
 
   return (
-    <>
-      <div onMouseUp={onMouseUp} onMouseDown={onMouseDown} onMouseMove={(e) => onMouseMove(e.clientX, e.clientY)} >
-
-        <div style={{
-          width: 50,
-          height: 50,
-          borderRadius: "50%",
-          backgroundColor: "red",
-          position: "absolute",
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: "grab"
-        }}>
-
-        </div>
-      </div>
-    </>
-  )
+      <div
+      onMouseDown={onMouseDown}
+      style={{
+        width: circleSize,
+        height: circleSize,
+        borderRadius: "50%",
+        backgroundColor: "red",
+        position: "absolute",
+        transform: `translate(${position.x}px, ${position.y}px)`,
+        cursor: dragging ? "grabbing" : "grab"
+      }}
+    />
+  );
 }
