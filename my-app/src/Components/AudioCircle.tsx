@@ -34,6 +34,7 @@ export default function AudioCircle({ boundingBox }: Props) {
     // }, [loaded]);
 
 
+
     function onMouseDown() {
         setDragging(true);
         if (!loaded || playerRef.current) return;
@@ -41,6 +42,14 @@ export default function AudioCircle({ boundingBox }: Props) {
         playerRef.current = true;
         console.log("audio should be playing");
         setPan(0);
+    }
+
+    function stopAudio(){
+        if(playerRef.current)
+        {
+            playerRef.current=false;
+        }
+        stop();
     }
 
     function onMouseUp() {
