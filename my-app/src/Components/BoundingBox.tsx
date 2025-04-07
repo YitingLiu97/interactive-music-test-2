@@ -1,6 +1,6 @@
 'use client'
 import React from "react"
-import DraggableCircle from "./DraggableCircle"
+import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react"
 
 export default function BoundingBox() {
@@ -42,7 +42,7 @@ export default function BoundingBox() {
 
             }}
         >
-            <DraggableCircle boundingBox={size} />
+            <AudioCircle boundingBox={size} />
         </div>
     )
 }

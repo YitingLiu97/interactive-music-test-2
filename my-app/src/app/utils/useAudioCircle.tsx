@@ -7,9 +7,7 @@ export function useAudioCircle(audioUrl: string) {
     const volumeRef = useRef<Tone.Volume | null>(null);
     const panRef = useRef<Tone.Panner | null>(null);
     const [loaded, setLoaded] = useState<boolean>(false);
-    // const [pan, setPan] = useState<number>(0);
-    // const [volume, setVolume] = useState<number>(0);
-   
+
     function play(){
         playerRef.current?.start();
     }
@@ -63,5 +61,4 @@ export function useAudioCircle(audioUrl: string) {
         setPan,
         setVolume
     }
-
 }

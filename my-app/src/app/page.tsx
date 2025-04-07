@@ -1,11 +1,11 @@
-import AudioUI from "@/Components/AudioUI";
+import AudioUI from "@/Components/AudioCircle";
 import BoundingBox from "@/Components/BoundingBox";
-import DraggableCircle from "@/Components/DraggableCircle";
+import AudioCircle from "@/Components/AudioCircle";
+
 export default function Home() {
   return (
     <div >
        <BoundingBox/>
-       <AudioUI/>
     </div>
   );
 }

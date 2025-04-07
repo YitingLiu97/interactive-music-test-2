@@ -20,7 +20,6 @@ export default function CircleUI({ xPercent,
     color = "red", 
 }: Props) {
     const circleSize = 50;
-
     return (
         <div
             onMouseDown={onMouseDown}
