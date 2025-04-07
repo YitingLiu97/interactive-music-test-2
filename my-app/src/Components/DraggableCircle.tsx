@@ -1,7 +1,8 @@
 'use client'
 import React from "react"
 import { useState, useEffect } from "react";
-
+import { AdjustPanning, AdjustVolume } from "@/app/utils/audio";
+import { mapRange } from "@/app/utils/math";
 type BoundingBox = {
   x: number,
   y: number
@@ -30,10 +31,15 @@ export default function DraggableCircle({ boundingBox }: Props) {
 
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - -marginPercent;
         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
-        const boundedXPercent = Math.round(Math.min(Math.max(0, xPercent), maxXPercent)*100)/100;
-        const boundedYPercent = Math.round(Math.min(Math.max(0, yPercent), maxYPercent)*100)/100;
+        const boundedXPercent = Math.round(Math.min(Math.max(0, xPercent), maxXPercent) * 100) / 100;
+        const boundedYPercent = Math.round(Math.min(Math.max(0, yPercent), maxYPercent) * 100) / 100;
         setPosition({ xPercent: boundedXPercent, yPercent: boundedYPercent });
-      }
+        const pan = mapRange(boundedXPercent, 0, 100, -1, 1);
+        const vol = mapRange(boundedYPercent, 0, 100, -30, 0); // in dB
+    
+        AdjustPanning(pan);
+        AdjustVolume(vol);
+       }
     }
     function handleMouseUp() {
       setDragging(false);
