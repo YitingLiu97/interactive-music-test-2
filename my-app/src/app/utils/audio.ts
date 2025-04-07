@@ -5,7 +5,6 @@ let panner: Tone.Panner;
 let volume: Tone.Volume;
 
 export async function setupPlayer(url:string){
-
     await Tone.start();
     player = new Tone.Player(url).toDestination();
     player.autostart = false;
