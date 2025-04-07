@@ -2,11 +2,6 @@
 import React from "react"
 import { useState, useEffect } from "react";
 
-type Circle = {
-  x: number,
-  y: number
-}
-
 type BoundingBox = {
   x: number,
   y: number
@@ -18,20 +13,26 @@ type Props = {
 export default function DraggableCircle({ boundingBox }: Props) {
   const [mounted, setMounted] = useState(false);
   const [dragging, setDragging] = useState<boolean>(false);
-  const [position, setPosition] = useState<Circle>({ x: 0, y: 0 });
+  const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>({
+    xPercent: 50,
+    yPercent: 50
+  });
   const circleSize = 50;
-  
+  const marginPercent = 1;
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (dragging) {
-        const boxWidth = boundingBox.x;
-        const boxHeight = boundingBox.y;
-        const circleSize = 50;
-        let newX = Math.min(Math.max(0, e.clientX), boxWidth - circleSize);
-        let newY = Math.min(Math.max(0, e.clientY), boxHeight - circleSize);
-        setPosition({ x: newX, y: newY });
+        const xPercent = (e.clientX / boundingBox.x) * 100;
+        const yPercent = (e.clientY / boundingBox.y) * 100;
+
+        const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - -marginPercent;
+        const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
+        const boundedXPercent = Math.round(Math.min(Math.max(0, xPercent), maxXPercent)*100)/100;
+        const boundedYPercent = Math.round(Math.min(Math.max(0, yPercent), maxYPercent)*100)/100;
+        setPosition({ xPercent: boundedXPercent, yPercent: boundedYPercent });
       }
     }
     function handleMouseUp() {
@@ -53,33 +54,9 @@ export default function DraggableCircle({ boundingBox }: Props) {
     setDragging(true);
   }
   if (!mounted) return null;
-  
-  // function onMouseDown() {
-  //   setDragging(true);
-  //   console.log("set dragging to be true");
-  // }
-  // function onMouseUp() {
-  //   setDragging(false);
-  //   console.log("set dragging to be false");
-
-  // }
-  // function onMouseMove(x: number, y: number) {
-  //   if (dragging) {
-
-  //     const boxWidth = 300;
-  //     const boxHeight = 300;
-  //     const circleSize = 50;
-
-  //     let newX = Math.min(Math.max(0, x), boxWidth - circleSize);
-  //     let newY = Math.min(Math.max(0, y), boxHeight - circleSize);
-
-  //     setPosition({ x: newX, y: newY });
-  //     console.log(`set position to be ${x} and ${y}`);
-  //   }
-  // }
 
   return (
-      <div
+    <div
       onMouseDown={onMouseDown}
       style={{
         width: circleSize,
@@ -87,7 +64,7 @@ export default function DraggableCircle({ boundingBox }: Props) {
         borderRadius: "50%",
         backgroundColor: "red",
         position: "absolute",
-        transform: `translate(${position.x}px, ${position.y}px)`,
+        transform: `translate(${(position.xPercent * boundingBox.x) / 100}px, ${(position.yPercent * boundingBox.y) / 100}px)`,
         cursor: dragging ? "grabbing" : "grab"
       }}
     />
