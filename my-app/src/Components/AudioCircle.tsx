@@ -25,16 +25,22 @@ export default function AudioCircle({ boundingBox }: Props) {
     const marginPercent = 10;
 
     const playerRef = useRef(false);
-    useEffect(() => {
-        if (!loaded || playerRef.current) return;
-        play();
-        playerRef.current = true;
-        setPan(0);
-    }, [loaded]);
+    // useEffect(() => {
+    //     if (!loaded || playerRef.current) return;
+    //     // play();
+    //     playerRef.current = true;
+    //     console.log("audio should be playing");
+    //     setPan(0);
+    // }, [loaded]);
 
 
     function onMouseDown() {
         setDragging(true);
+        if (!loaded || playerRef.current) return;
+         play();
+        playerRef.current = true;
+        console.log("audio should be playing");
+        setPan(0);
     }
 
     function onMouseUp() {
@@ -55,8 +61,8 @@ export default function AudioCircle({ boundingBox }: Props) {
             yPercent: boundedYPercent
         });
 
-        setPan(mapRange(xPercent, 0, 100, -1, 1));
-        setVolume(mapRange(yPercent, 0, 100, -30, 0));
+        setPan(mapRange(boundedXPercent, 0, 100, -1, 1));
+        setVolume(mapRange(boundedYPercent, 0, 100, -30, 0));
     }
 
     useEffect(() => {

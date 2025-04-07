@@ -12,7 +12,8 @@ type Props = {
     boundingBox: BoundingBox;
     color?: string;
 }
-export default function CircleUI({ xPercent,
+export default function CircleUI({ 
+    xPercent,
     yPercent,
     onMouseDown,
     isDragging,

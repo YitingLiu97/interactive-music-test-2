@@ -18,6 +18,7 @@ export function useAudioCircle(audioUrl: string) {
 
     function setPan(value: number){
         if (panRef.current) panRef.current.pan.value = value; // value from -1 to 1
+        console.log("set panning is "+ value);
     }
 
     function setVolume(value: number)
