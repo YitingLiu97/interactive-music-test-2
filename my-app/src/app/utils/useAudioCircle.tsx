@@ -7,13 +7,39 @@ export function useAudioCircle(audioUrl: string) {
     const volumeRef = useRef<Tone.Volume | null>(null);
     const panRef = useRef<Tone.Panner | null>(null);
     const [loaded, setLoaded] = useState<boolean>(false);
-
+    const [isPlaying, setIsPlaying] = useState<boolean>(false);
+    const [isLooping, setIsLooping] = useState<boolean>(false);
+    
     function play(){
         playerRef.current?.start();
+        setIsPlaying(true);
+    }
+
+    // not sure if this is correct 
+    function pause(){
+
+        if(isPlaying){
+            playerRef.current?.stop();
+        }
+        setIsPlaying(false);
+
+        // or 
+        if(isPlaying){
+            Tone.Transport.pause();
+        }
+    }
+    function toggleLoop(){
+        if (playerRef.current) {
+            playerRef.current.loop = !playerRef.current.loop;
+            setIsLooping(playerRef.current.loop);
+          }
+          
     }
 
     function stop(){
         playerRef.current?.stop();
+        setIsPlaying(false);
+
     }
 
     function setPan(value: number){
@@ -58,8 +84,10 @@ export function useAudioCircle(audioUrl: string) {
     return {
         loaded,
         play,
+        pause,
         stop,
+        toggleLoop,
         setPan,
-        setVolume
+        setVolume,
     }
 }
