@@ -5,22 +5,26 @@ type BoundingBox = {
     y: number
 }
 type Props = {
-    xPercent: number,
+    xPercent: number;
     yPercent: number;
+    circleSize?: number;
     onMouseDown: () => void;
     isDragging: boolean;
     boundingBox: BoundingBox;
     color?: string;
+    opacity: number;
 }
+// circle UI shuold also change the sizes 
 export default function CircleUI({ 
     xPercent,
     yPercent,
+    circleSize,
     onMouseDown,
     isDragging,
     boundingBox,
     color = "red", 
+    opacity
 }: Props) {
-    const circleSize = 50;
     return (
         <div
             onMouseDown={onMouseDown}
@@ -33,6 +37,7 @@ export default function CircleUI({
                 transform: `translate(${(xPercent * boundingBox.x) / 100}px, ${(yPercent * boundingBox.y) / 100}px)`,
                 cursor: isDragging ? "grabbing" : "grab",
                 transition: isDragging ? "none" : "transform 0.1s ease",
+                opacity:`${opacity}`,
             }}
         />
     );
