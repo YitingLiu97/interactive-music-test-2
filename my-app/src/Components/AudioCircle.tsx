@@ -3,16 +3,18 @@ import React, { useEffect, useState, useRef } from "react";
 import { useAudioCircle } from "@/app/utils/useAudioCircle";
 import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
-
+import * as Tone from "tone";
 type BoundingBox = {
     x: number,
     y: number
 }
 type Props = {
     boundingBox: BoundingBox;
+    audioUrl: string;
 }
-export default function AudioCircle({ boundingBox }: Props) {
-    const audioUrl = "/resources/DeanTown.mp3";
+export default function AudioCircle({ boundingBox, audioUrl }: Props) {
+    // const audioUrl = "/resources/DeanTown.mp3";
+    const hasPlayedRef = useRef<boolean>(false);
     const { play, stop, setPan, setVolume, loaded } = useAudioCircle(audioUrl);
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>(
@@ -25,29 +27,39 @@ export default function AudioCircle({ boundingBox }: Props) {
     const marginPercent = 10;
 
     const playerRef = useRef(false);
-    // useEffect(() => {
-    //     if (!loaded || playerRef.current) return;
-    //     // play();
-    //     playerRef.current = true;
-    //     console.log("audio should be playing");
-    //     setPan(0);
-    // }, [loaded]);
+    useEffect(() => {
+        if (!loaded || playerRef.current === null || hasPlayedRef.current) return;
+        console.log("React useEffect loaded changed:", loaded);
+        console.log("About to play. loaded:", loaded, "playerRef:", playerRef.current);
+
+        play();
+        hasPlayedRef.current = true;
+        console.log("playerRef.current is " + playerRef.current);
+
+    }, [loaded]);
 
 
-
+    function initPlayer(){
+        Tone.start();
+        play();
+    }
     function onMouseDown() {
+        if (!loaded) return;
+        Tone.start();
         setDragging(true);
+      
+        console.log("audio url is " + audioUrl);
+        console.log("playerRef.current is " + playerRef.current);
         if (!loaded || playerRef.current) return;
-         play();
+        play();
         playerRef.current = true;
         console.log("audio should be playing");
         setPan(0);
     }
 
-    function stopAudio(){
-        if(playerRef.current)
-        {
-            playerRef.current=false;
+    function stopAudio() {
+        if (playerRef.current) {
+            playerRef.current = false;
         }
         stop();
     }
@@ -75,6 +87,7 @@ export default function AudioCircle({ boundingBox }: Props) {
     }
 
     useEffect(() => {
+        document.addEventListener("click",initPlayer);
         window.addEventListener("mousedown", onMouseDown);
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
@@ -89,14 +102,15 @@ export default function AudioCircle({ boundingBox }: Props) {
 
     return (
         <>
-        <CircleUI 
-        xPercent={position.xPercent}
-        yPercent={position.yPercent}
-        onMouseDown = {onMouseDown}
-        isDragging = {dragging}
-        boundingBox = {boundingBox}
-        color= "yellow"
-        />
+            <CircleUI
+                xPercent={position.xPercent}
+                yPercent={position.yPercent}
+                onMouseDown={onMouseDown}
+                isDragging={dragging}
+                boundingBox={boundingBox}
+                color="yellow"
+            />
+        
         </>
     );
 }

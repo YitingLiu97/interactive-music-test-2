@@ -40,9 +40,8 @@ export default function BoundingBox() {
                 overflow: "hidden",
                 backgroundColor: "#f0f0f0"
 
-            }}
-        >
-            <AudioCircle boundingBox={size} />
+            }}>
+            <AudioCircle boundingBox={size} audioUrl="/resources/DeanTown.mp3" />
         </div>
     )
 }
