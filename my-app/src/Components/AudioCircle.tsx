@@ -4,6 +4,7 @@ import { useAudioCircle } from "@/app/utils/useAudioCircle";
 import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
 import * as Tone from "tone";
+import { Button } from "@radix-ui/themes";
 type BoundingBox = {
     x: number,
     y: number
@@ -87,7 +88,6 @@ export default function AudioCircle({ boundingBox, audioUrl }: Props) {
     }
 
     useEffect(() => {
-        document.addEventListener("click",initPlayer);
         window.addEventListener("mousedown", onMouseDown);
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
@@ -110,7 +110,8 @@ export default function AudioCircle({ boundingBox, audioUrl }: Props) {
                 boundingBox={boundingBox}
                 color="yellow"
             />
-        
+        <Button onClick={initPlayer}>Start</Button>
+        <Button onClick={stopAudio}>Stop</Button>
         </>
     );
 }
