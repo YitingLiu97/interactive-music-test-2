@@ -14,7 +14,7 @@ type Props = {
     audioUrl: string;
     color: string;
 }
-export default function AudioCircle({ boundingBox, audioUrl, color}: Props) {
+export default function AudioCircle({ boundingBox, audioUrl, color }: Props) {
     // const audioUrl = "/resources/DeanTown.mp3";
     const hasPlayedRef = useRef<boolean>(false);
     const { play, stop, setPan, setVolume, loaded } = useAudioCircle(audioUrl);
@@ -25,7 +25,7 @@ export default function AudioCircle({ boundingBox, audioUrl, color}: Props) {
             yPercent: 50
         });
 
-    const [circleSize,setCircleSize] = useState<number>(50);
+    const [circleSize, setCircleSize] = useState<number>(50);
     const marginPercent = 10;
 
     const playerRef = useRef(false);
@@ -83,7 +83,7 @@ export default function AudioCircle({ boundingBox, audioUrl, color}: Props) {
             xPercent: boundedXPercent,
             yPercent: boundedYPercent
         });
-        
+
         setCircleSize(mapRange(boundedYPercent, 0, 100, 10, 100))
         setPan(mapRange(boundedXPercent, 0, 100, -1, 1));
         setVolume(mapRange(boundedYPercent, 0, 100, -30, 0));
@@ -112,13 +112,13 @@ export default function AudioCircle({ boundingBox, audioUrl, color}: Props) {
                 isDragging={dragging}
                 boundingBox={boundingBox}
                 color={color}
-                opacity={position.yPercent/100+0.2}
+                opacity={position.yPercent / 100 + 0.2}
             />
-            <Button onClick={initPlayer} style={{
-                    backgroundColor: "black",
-                    margin: "0 auto",
-                }}>Start</Button>
-            <Button onClick={stopAudio}>Stop</Button>
+            {/* <Button onClick={initPlayer} style={{
+                backgroundColor: "black",
+                margin: "0 auto",
+            }}>Start</Button>
+            <Button onClick={stopAudio}>Stop</Button> */}
         </>
     );
 }
