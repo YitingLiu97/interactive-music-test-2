@@ -25,7 +25,6 @@ export default function BoundingBox() {
             window.removeEventListener("resize", updateSize);
         };
 
-
     }, [mounted]);
 
     if (!mounted) return null;
@@ -41,7 +40,7 @@ export default function BoundingBox() {
                 backgroundColor: "#f0f0f0"
 
             }}>
-            <AudioCircle boundingBox={size} audioUrl="/resources/DeanTown.mp3" />
-        </div>
+            <AudioCircle boundingBox={size} audioUrl="/resources/piano.mp3" color="red"  />
+            </div>
     )
 }

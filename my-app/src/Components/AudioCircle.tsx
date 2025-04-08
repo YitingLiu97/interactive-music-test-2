@@ -12,16 +12,17 @@ type BoundingBox = {
 type Props = {
     boundingBox: BoundingBox;
     audioUrl: string;
+    color: string;
 }
-export default function AudioCircle({ boundingBox, audioUrl }: Props) {
+export default function AudioCircle({ boundingBox, audioUrl, color }: Props) {
     // const audioUrl = "/resources/DeanTown.mp3";
     const hasPlayedRef = useRef<boolean>(false);
     const { play, stop, setPan, setVolume, loaded } = useAudioCircle(audioUrl);
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>(
         {
-            xPercent: 0,
-            yPercent: 0
+            xPercent: 50,
+            yPercent: 50
         });
 
     const circleSize = 50;
@@ -108,7 +109,7 @@ export default function AudioCircle({ boundingBox, audioUrl }: Props) {
                 onMouseDown={onMouseDown}
                 isDragging={dragging}
                 boundingBox={boundingBox}
-                color="yellow"
+                color={color}
             />
         <Button onClick={initPlayer}>Start</Button>
         <Button onClick={stopAudio}>Stop</Button>
