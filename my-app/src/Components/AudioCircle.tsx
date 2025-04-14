@@ -5,19 +5,17 @@ import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
 import * as Tone from "tone";
 import { Button } from "@radix-ui/themes";
-type BoundingBox = {
-    x: number,
-    y: number
-}
+import { BoundingBox, AudioControlRef } from "@/app/types/audioType";
 type Props = {
     boundingBox: BoundingBox;
     audioUrl: string;
     color: string;
+    audioRef?: React.RefObject<AudioControlRef>;
 }
-export default function AudioCircle({ boundingBox, audioUrl, color }: Props) {
+export default function AudioCircle({ boundingBox, audioUrl, color,audioRef  }: Props) {
     // const audioUrl = "/resources/DeanTown.mp3";
     const hasPlayedRef = useRef<boolean>(false);
-    const { play, stop, setPan, setVolume, loaded } = useAudioCircle(audioUrl);
+    const { play, stop, pause, setPan, setVolume, loaded, toggleLoop } = useAudioCircle(audioUrl);
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>(
         {
@@ -29,6 +27,28 @@ export default function AudioCircle({ boundingBox, audioUrl, color }: Props) {
     const marginPercent = 10;
 
     const playerRef = useRef(false);
+    useEffect(() => {
+        if (audioRef && 'current' in audioRef) {
+            audioRef.current = {
+                play: () => {
+                    Tone.start();
+                    play();
+                    playerRef.current = true;
+                },
+                pause: () => {
+                    pause(); // Using pause instead of stop for better UX
+                    playerRef.current = false;
+                },
+                stop: () => {
+                    stop(); 
+                    playerRef.current = false;
+                },
+                toggle: () => {
+                    toggleLoop();
+                }
+            };
+        }
+    }, [audioRef, play, pause, toggleLoop]);
     useEffect(() => {
         if (!loaded || playerRef.current === null || hasPlayedRef.current) return;
         console.log("React useEffect loaded changed:", loaded);
@@ -49,23 +69,14 @@ export default function AudioCircle({ boundingBox, audioUrl, color }: Props) {
         if (!loaded) return;
         Tone.start();
         setDragging(true);
-
-        console.log("audio url is " + audioUrl);
-        console.log("playerRef.current is " + playerRef.current);
-        if (!loaded || playerRef.current) return;
+  if (!loaded || playerRef.current) return;
         play();
         playerRef.current = true;
         console.log("audio should be playing");
         setPan(0);
     }
 
-    function stopAudio() {
-        if (playerRef.current) {
-            playerRef.current = false;
-        }
-        stop();
-    }
-
+  
     function onMouseUp() {
         setDragging(false);
     }

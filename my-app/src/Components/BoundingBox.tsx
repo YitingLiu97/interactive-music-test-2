@@ -3,7 +3,8 @@ import React from "react"
 import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react"
 import AudioInterface from "./AudioInterface";
-import { useAudioCircle } from "@/app/utils/useAudioCircle";
+import { AudioControlRef, BoundingBox as BoundingBoxType } from "@/app/types/audioTypes";
+
 interface AudioInfo {
     audioUrl: string;
     circleColor?: string;
@@ -13,10 +14,7 @@ export default function BoundingBox() {
     const boxRef = useRef<HTMLDivElement>(null);
     const [size, setSize] = useState({ x: 100, y: 100 });
     const [mounted, setMounted] = useState<boolean>(false);
-    const [resize, setResize] = useState<number>(50);
-    const [alltracks, setAllTracks] = useState<string[]>();
-    const [singleTrack, setSingleTrack] = useState<string>();
-
+  
      const audioInfos: AudioInfo[] = [
         {
             audioUrl: "/resources/piano.mp3",
@@ -35,37 +33,50 @@ export default function BoundingBox() {
         }
     ];
 
+    const audioRefs = useRef<React.RefObject<AudioControlRef>[]>([]);
+    useEffect(() => {
+        // Create a ref for each audio track
+        if( audioRefs.current){
+            audioInfos.forEach(() => {
+                audioRefs.current.push(React.createRef<AudioControlRef>());
+            });            console.log("Created refs for", audioInfos.length, "audio tracks");
+       
+        }
+         }, []);
+
     useEffect(() => setMounted(true), []);
-
-    // in this case, should i add a ref for the tracks instead 
-    // and how can i push the array when i hav ethe use state? 
-    function initPlayerforAll(){
-        audioInfos.forEach(track=>{
-            useAudioCircle(track.audioUrl).play;
-            alltracks?.push(track.audioUrl);
-        })
-    }
-
     // audio logic 
     function playAll() {
-        audioInfos.forEach(track=>{
-            useAudioCircle(track.audioUrl).play;
-        })
+        console.log("Play all triggered, refs:", audioRefs.current.length);
+        audioRefs.current.forEach((ref, index) => {
+            if (ref.current && ref.current.play) {
+                console.log(`Playing track ${index}`);
+                ref.current.play();
+            } else {
+                console.log(`Ref ${index} is not ready`);
+            }
+        });
     }
 
     function pauseAll(){
-        audioInfos.forEach(track=>{
-            useAudioCircle(track.audioUrl).pause;
-        })
+        console.log("Pause all triggered");
+        audioRefs.current.forEach((ref, index) => {
+            if (ref.current && ref.current.stop) {
+                console.log(`Stopping track ${index}`);
+                ref.current.stop();
+            }
+        });
     }
 
     function toggleAll(){
-        // for looping 
-        audioInfos.forEach(track=>{
-            useAudioCircle(track.audioUrl).toggleLoop;
-        })
+        console.log("Toggle loop triggered");
+        audioRefs.current.forEach((ref, index) => {
+            if (ref.current && ref.current.toggle) {
+                console.log(`Toggling loop for track ${index}`);
+                ref.current.toggle();
+            }
+        });
     }
-
 
     useEffect(() => {
         function updateSize() {
@@ -87,7 +98,7 @@ export default function BoundingBox() {
 
     if (!mounted) return null;
 
-    return (
+   return (
         <div
             ref={boxRef}
             style={{
@@ -96,10 +107,35 @@ export default function BoundingBox() {
                 position: "relative",
                 overflow: "hidden",
                 backgroundColor: "#f0f0f0"
-
             }}>
-            <AudioCircle boundingBox={size} audioUrl="/resources/piano.mp3" color="red" />
-            <AudioInterface trackListName="air traffic noise" authorName="alex ruthmann" onPlayAll={playAll} onPauseAll={pauseAll} onToggleAll={toggleAll} />
+            {/* For now, just render one AudioCircle with its ref */}
+            <AudioCircle 
+                boundingBox={size} 
+                audioUrl="/resources/piano.mp3" 
+                color="red"
+                audioRef={audioRefs.current[0]}
+            />
+            
+            {/* When you're ready to add more circles, you can use this */}
+            {/* 
+            {audioInfos.map((info, index) => (
+                <AudioCircle 
+                    key={index}
+                    boundingBox={size} 
+                    audioUrl={info.audioUrl} 
+                    color={info.circleColor}
+                    audioRef={audioRefs.current[index]}
+                />
+            ))}
+            */}
+            
+            <AudioInterface 
+                trackListName="air traffic noise" 
+                authorName="alex ruthmann" 
+                onPlayAll={playAll} 
+                onPauseAll={pauseAll} 
+                onToggleAll={toggleAll} 
+            />
         </div>
     )
 }
