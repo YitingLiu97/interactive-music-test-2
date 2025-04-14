@@ -1,20 +1,18 @@
 'use client'
 import React from "react"
-type BoundingBox = {
-    x: number,
-    y: number
-}
+import { BoundingBox } from "@/app/types/audioTypes";
+
 type Props = {
     xPercent: number;
     yPercent: number;
     circleSize?: number;
-    onMouseDown: () => void;
+    onMouseDown: (e: MouseEvent) => void;
     isDragging: boolean;
     boundingBox: BoundingBox;
     color?: string;
     opacity: number;
 }
-// circle UI shuold also change the sizes 
+
 export default function CircleUI({ 
     xPercent,
     yPercent,
@@ -37,7 +35,9 @@ export default function CircleUI({
                 transform: `translate(${(xPercent * boundingBox.x) / 100}px, ${(yPercent * boundingBox.y) / 100}px)`,
                 cursor: isDragging ? "grabbing" : "grab",
                 transition: isDragging ? "none" : "transform 0.1s ease",
-                opacity:`${opacity}`,
+                opacity: `${opacity}`,
+                zIndex: isDragging ? 10 : 1, // Higher z-index when dragging
+                boxShadow: isDragging ? "0 0 10px rgba(255, 255, 255, 0.5)" : "none", // Visual feedback when dragging
             }}
         />
     );

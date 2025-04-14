@@ -61,8 +61,9 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
 
     }, [loaded]);
 
-    function onMouseDown() {
-        if (!loaded) return;
+    function onMouseDown(e: MouseEvent) {
+            // Prevent event from propagating to other circles
+        e.stopPropagation(); if (!loaded) return;
         Tone.start();
         setDragging(true);
         if (!loaded || playerRef.current) return;
@@ -77,6 +78,7 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
         setDragging(false);
     }
     function onMouseMove(e: MouseEvent) {
+        e.stopPropagation();
         if (!dragging) return;
         let xPercent = e.clientX / boundingBox.x * 100;
         let yPercent = e.clientY / boundingBox.y * 100;
@@ -93,8 +95,15 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
         });
 
         setCircleSize(mapRange(boundedYPercent, 0, 100, 10, 100))
-        setPan(mapRange(boundedXPercent, 0, 100, -1, 1));
-        setVolume(mapRange(boundedYPercent, 0, 100, -30, 0));
+        const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
+        const volumeValue = mapRange(boundedYPercent, 0, 100, -30, 0);
+        
+        console.log(`Setting pan for ${audioUrl} to ${panValue}`);
+        console.log(`Setting volume for ${audioUrl} to ${volumeValue}`);
+        
+        setPan(panValue);
+        setVolume(volumeValue);
+    
     }
 
     useEffect(() => {
