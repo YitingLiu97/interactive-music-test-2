@@ -64,11 +64,9 @@ export default function BoundingBox() {
         function updateSize() {
             if (boxRef.current) {
                 const rect = boxRef.current.getBoundingClientRect();
-                // Make the bounding box smaller to not overlap with the interface
-                // Subtract the height of the audio interface (around 130px) plus some margin
-                setSize({ 
+                   setSize({ 
                     x: rect.width, 
-                    y: rect.height - 150 // Reserve space for the audio interface
+                    y: rect.height 
                 });
                 console.log("Size updated:", rect.width, rect.height - 150);
             }
