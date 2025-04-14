@@ -2,238 +2,180 @@
 import { useState, useEffect, useRef } from "react";
 import * as Tone from "tone";
 
-export function useAudioCircle(url: string) {
-    const [loaded, setLoaded] = useState<boolean>(false);
-    const [isLooping, setIsLooping] = useState<boolean>(false);
-    const playerRef = useRef<Tone.Player | null>(null);
-    const pannerRef = useRef<Tone.Panner | null>(null);
-    const volumeRef = useRef<Tone.Volume | null>(null);
-    const isPlayingRef = useRef<boolean>(false);
+export function useAudioCircle(audioUrl: string) {
+  const [loaded, setLoaded] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
+  const [currentVolume, setCurrentVolume] = useState(0);
+  const [currentPan, setCurrentPan] = useState(0);
+
+  // Use refs to keep track of player instances to prevent multiple instances
+  const playerRef = useRef<Tone.Player | null>(null);
+  const pannerRef = useRef<Tone.Panner | null>(null);
+  const volumeRef = useRef<Tone.Volume | null>(null);
+
+  // Initialize audio components
+  useEffect(() => {
+    // Clean up any existing players first
+    if (playerRef.current) {
+      playerRef.current.dispose();
+    }
+    if (pannerRef.current) {
+      pannerRef.current.dispose();
+    }
+    if (volumeRef.current) {
+      volumeRef.current.dispose();
+    }
+
+    // Create new audio components
+    try {
+      // Create a volume node
+      const volumeNode = new Tone.Volume(0).toDestination();
+      volumeRef.current = volumeNode;
+
+      // Create a panner node
+      const pannerNode = new Tone.Panner(0).connect(volumeNode);
+      pannerRef.current = pannerNode;
+
+      // Create player with fixed settings
+      const player = new Tone.Player({
+        url: audioUrl,
+        loop: false,
+        autostart: false,
+        playbackRate: 1.0, // Ensure normal playback rate
+        onload: () => {
+          console.log(`Audio loaded: ${audioUrl}`);
+          setLoaded(true);
+        }
+      }).connect(pannerNode);
+      
+      playerRef.current = player;
+    } catch (error) {
+      console.error("Error initializing audio:", error);
+    }
+
+    // Cleanup function
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.stop();
+        playerRef.current.dispose();
+      }
+      if (pannerRef.current) {
+        pannerRef.current.dispose();
+      }
+      if (volumeRef.current) {
+        volumeRef.current.dispose();
+      }
+    };
+  }, [audioUrl]); // Only recreate when audioUrl changes
+
+  // Play function
+  const play = () => {
+    if (!playerRef.current || !loaded) return;
     
-    // Debug state to see volume in UI
-    const [currentVolume, setCurrentVolume] = useState<number>(-15);
-    const [currentPan, setCurrentPan] = useState<number>(0);
-
-    useEffect(() => {
-        // Create audio nodes only once
-        if (!playerRef.current) {
-            console.log("Creating new player for:", url);
-            
-            // Create the player
-            const player = new Tone.Player({
-                url,
-                loop: isLooping,
-                onload: () => {
-                    console.log("Audio loaded successfully:", url);
-                    setLoaded(true);
-                },
-                onerror: (e) => {
-                    console.error("Error loading audio:", e);
-                }
-            });
-
-            // Make sure we're using the correct version of Tone.js
-            console.log("Tone.js version:", Tone.version);
-
-            // Create the effect nodes BEFORE connecting anything
-            const volume = new Tone.Volume(-15);
-            const panner = new Tone.Panner(0);
-            
-            // Log what we have
-            console.log("Created nodes:", {
-                player: player !== null,
-                panner: panner !== null,
-                volume: volume !== null
-            });
-            
-            // IMPORTANT: Disconnect first in case there are existing connections
-            player.disconnect();
-            
-            // Build the audio chain step by step with logging
-            console.log("Connecting player → panner");
-            player.connect(panner);
-            
-            console.log("Connecting panner → volume");
-            panner.connect(volume);
-            
-            console.log("Connecting volume → destination");
-            volume.toDestination();
-            
-            // Store refs
-            playerRef.current = player;
-            pannerRef.current = panner;
-            volumeRef.current = volume;
-            
-            // Initial state
-            setCurrentVolume(-15);
-            setCurrentPan(0);
-            
-            console.log(`Audio chain created for ${url}`);
-        }
-
-        // Cleanup function
-        return () => {
-            if (playerRef.current) {
-                try {
-                    if (isPlayingRef.current) {
-                        playerRef.current.stop();
-                    }
-                    playerRef.current.dispose();
-                } catch (e) {
-                    console.error("Error cleaning up player:", e);
-                }
-                playerRef.current = null;
-            }
-            if (pannerRef.current) {
-                pannerRef.current.dispose();
-                pannerRef.current = null;
-            }
-            if (volumeRef.current) {
-                volumeRef.current.dispose();
-                volumeRef.current = null;
-            }
-        };
-    }, [url, isLooping]);
-
-    // Set loop state when it changes
-    useEffect(() => {
-        if (playerRef.current) {
-            playerRef.current.loop = isLooping;
-            console.log(`Loop state for ${url} set to:`, isLooping);
-        }
-    }, [isLooping, url]);
-
-    const play = () => {
-        if (!playerRef.current || !loaded) {
-            console.log(`Cannot play ${url}, player not ready or loaded:`, loaded);
-            return;
-        }
-
-        try {
-            // Initialize volume and pan before playing
-            if (volumeRef.current) {
-                volumeRef.current.volume.value = currentVolume;
-                console.log(`Initial volume set to ${currentVolume}dB`);
-            }
-            
-            if (pannerRef.current) {
-                pannerRef.current.pan.value = currentPan;
-                console.log(`Initial pan set to ${currentPan}`);
-            }
-            
-            // Ensure the audio context is running
-            Tone.start();
-            
-            // Check current context state
-            console.log("Audio context state:", Tone.context.state);
-            
-            // Check the player state before playing
-            const state = playerRef.current.state;
-            console.log(`Current player state for ${url}:`, state);
-            
-            if (state === "started") {
-                console.log(`Player for ${url} is already playing`);
-                return;
-            }
-            
-            // Start the player
-            console.log(`Starting player for ${url}, loop:`, isLooping);
-            playerRef.current.start();
-            isPlayingRef.current = true;
-        } catch (e) {
-            console.error("Error playing:", e);
-        }
-    };
-
-    const pause = () => {
-        if (!playerRef.current) return;
+    // Make sure Tone.js is started
+    if (Tone.context.state !== "running") {
+      Tone.start();
+    }
+    
+    // Only start if not already playing
+    if (!isPlaying) {
+      try {
+        playerRef.current.start();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error("Error playing audio:", error);
         
+        // If there was an error (like already started), try restarting
         try {
-            // Only stop if we're actually playing
-            if (playerRef.current.state === "started") {
-                console.log(`Pausing player for ${url}`);
-                playerRef.current.stop();
-                isPlayingRef.current = false;
-            } else {
-                console.log(`Cannot pause ${url}, not playing:`, playerRef.current.state);
-            }
-        } catch (e) {
-            console.error("Error pausing:", e);
+          playerRef.current.stop();
+          playerRef.current.start();
+          setIsPlaying(true);
+        } catch (innerError) {
+          console.error("Could not restart audio:", innerError);
         }
-    };
+      }
+    }
+  };
 
-    const stop = () => {
-        if (!playerRef.current) return;
-        
-        try {
-            // Only stop if we're actually playing
-            if (playerRef.current.state === "started") {
-                console.log(`Stopping player for ${url}`);
-                playerRef.current.stop();
-                isPlayingRef.current = false;
-            } else {
-                console.log(`Cannot stop ${url}, not playing:`, playerRef.current.state);
-            }
-        } catch (e) {
-            console.error("Error stopping:", e);
-        }
-    };
+  // Stop function
+  const stop = () => {
+    if (!playerRef.current || !loaded) return;
+    
+    try {
+      playerRef.current.stop();
+      setIsPlaying(false);
+    } catch (error) {
+      console.error("Error stopping audio:", error);
+    }
+  };
 
-    const toggleLoop = () => {
-        setIsLooping(!isLooping);
-        console.log(`Toggling loop for ${url} to:`, !isLooping);
-    };
+  // Pause function (Tone.js doesn't have native pause, so we implement it)
+  const pause = () => {
+    if (!playerRef.current || !loaded) return;
+    
+    try {
+      playerRef.current.stop();
+      setIsPlaying(false);
+    } catch (error) {
+      console.error("Error pausing audio:", error);
+    }
+  };
 
-    const setPan = (value: number) => {
-        if (pannerRef.current) {
-            // Try setting with different methods
-            try {
-                // Method 1: Using the value property
-                pannerRef.current.pan.value = value;
-                
-            
-                // Log success
-                console.log(`Pan set for ${url}: requested=${value}, actual=${pannerRef.current.pan.value}`);
-                
-                // Update our state for debugging
-                setCurrentPan(value);
-            } catch (e) {
-                console.error("Error setting pan:", e);
-            }
-        } else {
-            console.log(`Pan node not available for ${url}`);
-        }
-    };
+  // Set pan function
+  const setPan = (value: number) => {
+    if (!pannerRef.current) return;
+    
+    // Ensure value is between -1 and 1
+    const clampedValue = Math.max(-1, Math.min(value, 1));
+    
+    try {
+      pannerRef.current.pan.value = clampedValue;
+      setCurrentPan(clampedValue);
+    } catch (error) {
+      console.error("Error setting pan:", error);
+    }
+  };
 
-    const setVolume = (value: number) => {
-        if (volumeRef.current) {
-            try {
-                // Method 1: Using the value property
-                volumeRef.current.volume.value = value;
-                
-                console.log(`Volume set for ${url}: requested=${value}dB, actual=${volumeRef.current.volume.value}dB`);
-                
-                // Update our state
-                setCurrentVolume(value);
-            } catch (e) {
-                console.error("Error setting volume:", e);
-            }
-        } else {
-            console.log(`Volume node not available for ${url}`);
-        }
-    };
+  // Set volume function
+  const setVolume = (value: number) => {
+    if (!volumeRef.current) return;
+    
+    // Volume in dB, typically between -60 (silent) and 0 (full)
+    const clampedValue = Math.max(-60, Math.min(value, 0));
+    
+    try {
+      volumeRef.current.volume.value = clampedValue;
+      setCurrentVolume(clampedValue);
+    } catch (error) {
+      console.error("Error setting volume:", error);
+    }
+  };
 
-    return {
-        play,
-        pause,
-        stop,
-        toggleLoop,
-        setPan,
-        setVolume,
-        loaded,
-        isLooping,
-        // Expose current values for debugging
-        currentVolume,
-        currentPan
-    };
+  // Toggle loop function
+  const toggleLoop = () => {
+    if (!playerRef.current) return;
+    
+    try {
+      const newLoopState = !isLooping;
+      playerRef.current.loop = newLoopState;
+      setIsLooping(newLoopState);
+    } catch (error) {
+      console.error("Error toggling loop:", error);
+    }
+  };
+
+  return {
+    play,
+    stop,
+    pause,
+    setPan,
+    setVolume,
+    toggleLoop,
+    loaded,
+    isPlaying,
+    isLooping,
+    currentVolume,
+    currentPan
+  };
 }

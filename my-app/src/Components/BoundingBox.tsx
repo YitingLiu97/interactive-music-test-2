@@ -8,64 +8,75 @@ import { AudioControlRef } from "@/app/types/audioType";
 interface AudioInfo {
     audioUrl: string;
     circleColor: string;
-    instrumentName?:string;
+    instrumentName?: string;
 }
 
 export default function BoundingBox() {
     const boxRef = useRef<HTMLDivElement>(null);
     const [size, setSize] = useState({ x: 100, y: 100 });
     const [mounted, setMounted] = useState<boolean>(false);
+    const [audioRefsCreated, setAudioRefsCreated] = useState(false);
 
     const audioInfos: AudioInfo[] = [
         {
             audioUrl: "/resources/piano.mp3",
             circleColor: "red",
-            instrumentName:"piano"
-
+            instrumentName: "piano"
         },
         {
             audioUrl: "/resources/bass.mp3",
             circleColor: "purple",
-            instrumentName:"bass"
-
+            instrumentName: "bass"
         },
         {
             audioUrl: "/resources/drums.mp3",
             circleColor: "gray",
-            instrumentName:"drums"
-
-        }
-        ,
+            instrumentName: "drums"
+        },
         {
             audioUrl: "/resources/timp.mp3",
             circleColor: "brown",
-            instrumentName:"timp"
-
-        }
-        ,
+            instrumentName: "timp"
+        },
         {
             audioUrl: "/resources/pedal-steel.mp3",
             circleColor: "blue",
-            instrumentName:"pedal-steel"
-
-
+            instrumentName: "pedal-steel"
         }
     ];
 
-    const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>([]);
+    // Initialize the refs array with the correct length first
+    const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>(
+        Array(audioInfos.length).fill(null).map(() => React.createRef<AudioControlRef>())
+    );
+
+    // This useEffect will run only once after component mounts
     useEffect(() => {
-        // Create a ref for each audio track
-        if (audioRefs.current) {
-            audioInfos.forEach(() => {
-                audioRefs.current.push(React.createRef<AudioControlRef>());
-            });
-            console.log("Created refs for", audioInfos.length, "audio tracks");
+        setMounted(true);
+        setAudioRefsCreated(true);
+    }, []);
 
+    // Update size when mounted or on resize
+    useEffect(() => {
+        function updateSize() {
+            if (boxRef.current) {
+                const rect = boxRef.current.getBoundingClientRect();
+                setSize({ x: rect.width, y: rect.height });
+                console.log("Size updated:", rect.width, rect.height);
+            }
         }
-    });
+        
+        if (mounted) {
+            updateSize();
+            window.addEventListener("resize", updateSize);
+            
+            return () => {
+                window.removeEventListener("resize", updateSize);
+            };
+        }
+    }, [mounted]);
 
-    useEffect(() => setMounted(true), []);
-    // audio logic 
+    // Audio control functions
     function playAll() {
         console.log("Play all triggered, refs:", audioRefs.current.length);
         audioRefs.current.forEach((ref, index) => {
@@ -98,24 +109,8 @@ export default function BoundingBox() {
         });
     }
 
-    useEffect(() => {
-        function updateSize() {
-            if (boxRef.current) {
-                const rect = boxRef.current.getBoundingClientRect();
-                setSize({ x: rect.width, y: rect.height });
-                console.log("Size updated:", rect.width, rect.height);
-
-            }
-        }
-        updateSize();
-        window.addEventListener("resize", updateSize);
-
-        return () => {
-            window.removeEventListener("resize", updateSize);
-        };
-
-    }, [mounted]);
-
+    // Don't render anything on the server, only render on client
+    // This avoids hydration errors completely
     if (!mounted) return null;
 
     return (
@@ -127,20 +122,12 @@ export default function BoundingBox() {
                 position: "relative",
                 overflow: "hidden",
                 backgroundColor: "#f0f0f0"
-            }}>
-            {/* For now, just render one AudioCircle with its ref */}
-            {/* <AudioCircle
-                startPoint={{ x: 0.5, y: 0.5 }}
-                boundingBox={size}
-                audioUrl="/resources/bass.mp3"
-                color="red"
-                audioRef={audioRefs.current[0]}
-            /> */}
-
-            {audioInfos.map((info, index) => (
+            }}
+        >
+            {audioRefsCreated && audioInfos.map((info, index) => (
                 <AudioCircle
                     key={index}
-                    startPoint={{ x: 0.3, y: 0.3 * index + 0.2 }}
+                    startPoint={{ x: 0.3, y: 0.3 }}
                     boundingBox={size}
                     audioUrl={info.audioUrl}
                     color={info.circleColor}
@@ -157,5 +144,5 @@ export default function BoundingBox() {
                 onToggleAll={toggleAll}
             />
         </div>
-    )
+    );
 }
