@@ -4,7 +4,6 @@ import { useAudioCircle } from "@/app/utils/useAudioCircle";
 import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
 import * as Tone from "tone";
-import { Button } from "@radix-ui/themes";
 import { BoundingBox, AudioControlRef, StartPoint } from "@/app/types/audioType";
 type Props = {
     startPoint: StartPoint;
@@ -15,9 +14,7 @@ type Props = {
     audioRef?: React.RefObject<AudioControlRef | null>;
 
 }
-export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, audioRef,instrumentName }: Props) {
-    // const audioUrl = "/resources/DeanTown.mp3";
-    const hasPlayedRef = useRef<boolean>(false);
+export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, audioRef, instrumentName }: Props) {
     const { play, stop, pause, setPan, setVolume, loaded, toggleLoop, currentVolume, currentPan } = useAudioCircle(audioUrl);
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>(
@@ -30,6 +27,10 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
     const marginPercent = 10;
 
     const playerRef = useRef(false);
+
+    const xPercent = position.xPercent;
+    const yPercent = position.yPercent;
+   
     useEffect(() => {
         if (audioRef && 'current' in audioRef) {
             audioRef.current = {
@@ -47,7 +48,7 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                 stop: () => {
                     stop(); // Using pause instead of stop for better UX
                     playerRef.current = false;
-                }, 
+                },
                 pause: () => {
                     pause(); // Using pause instead of stop for better UX
                     playerRef.current = false;
@@ -57,17 +58,18 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                 }
             };
         }
-    }, [audioRef, play, pause, toggleLoop]);
+    }, [audioRef, play, pause, toggleLoop,position.xPercent, position.yPercent, setPan, setVolume,stop
+    ]);
 
     useEffect(() => {
         if (loaded) {
             const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
             const volumeValue = mapRange(position.yPercent, 0, 100, -30, 0);
-            
+
             console.log(`Setting initial volume/pan for ${audioUrl}`);
             console.log(`Position: x=${position.xPercent}%, y=${position.yPercent}%`);
             console.log(`Calculated: vol=${volumeValue}dB, pan=${panValue}`);
-            
+
             setPan(panValue);
             setVolume(volumeValue);
         }
@@ -75,7 +77,7 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
 
     function onMouseDown(e: React.MouseEvent) {
         // Prevent event from propagating to other circles
-        e.stopPropagation(); 
+        e.stopPropagation();
         if (!loaded) return;
         Tone.start();
         setDragging(true);
@@ -92,37 +94,36 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
     }
 
     function onMouseMove(e: MouseEvent) {
-        e.stopPropagation(  );
+        e.stopPropagation();
         if (!dragging) return;
         console.log("on mouse move");
 
-        let xPercent = e.clientX / boundingBox.x * 100;
-        let yPercent = e.clientY / boundingBox.y * 100;
+       
 
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
 
-      const boundedXPercent = Math.round(Math.min(Math.max(0, xPercent), maxXPercent) * 100) / 100;
+        const boundedXPercent = Math.round(Math.min(Math.max(0, xPercent), maxXPercent) * 100) / 100;
         const boundedYPercent = Math.round(Math.min(Math.max(0, yPercent), maxYPercent) * 100) / 100;
 
-       // Update the circle size based on vertical position
-       setCircleSize(mapRange(boundedYPercent, 0, 100, 10, 100));
-        
-       // Set pan and volume for THIS specific audio only
-       const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
-       const volumeValue = mapRange(boundedYPercent, 0, 100, -30, 0);
-       
-       // Log the values
-       console.log(`${audioUrl} - Position: x=${boundedXPercent.toFixed(1)}%, y=${boundedYPercent.toFixed(1)}%`);
-       console.log(`${audioUrl} - Setting: vol=${volumeValue.toFixed(1)}dB, pan=${panValue.toFixed(2)}`);
-       
-       setPosition({
-        xPercent: boundedXPercent,
-        yPercent: boundedYPercent
-       })
-       // Set the values
-       setPan(panValue);
-       setVolume(volumeValue);
+        // Update the circle size based on vertical position
+        setCircleSize(mapRange(boundedYPercent, 0, 100, 10, 100));
+
+        // Set pan and volume for THIS specific audio only
+        const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
+        const volumeValue = mapRange(boundedYPercent, 0, 100, -30, 0);
+
+        // Log the values
+        console.log(`${audioUrl} - Position: x=${boundedXPercent.toFixed(1)}%, y=${boundedYPercent.toFixed(1)}%`);
+        console.log(`${audioUrl} - Setting: vol=${volumeValue.toFixed(1)}dB, pan=${panValue.toFixed(2)}`);
+
+        setPosition({
+            xPercent: boundedXPercent,
+            yPercent: boundedYPercent
+        })
+        // Set the values
+        setPan(panValue);
+        setVolume(volumeValue);
     }
 
     useEffect(() => {
@@ -136,7 +137,7 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
             window.removeEventListener("mouseup", onMouseUp);
         }
 
-    }, [dragging])
+    })
 
     return (
         <>
@@ -149,11 +150,11 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                 boundingBox={boundingBox}
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
-                instrumentName={instrumentName}            />
+                instrumentName={instrumentName} />
 
 
-               {/* Debug overlay to show current volume and pan */}
-               <div
+            {/* Debug overlay to show current volume and pan */}
+            <div
                 style={{
                     position: 'absolute',
                     top: `${(position.yPercent * boundingBox.y) / 100 - 20}px`,

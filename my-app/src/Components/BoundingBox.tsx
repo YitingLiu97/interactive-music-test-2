@@ -3,7 +3,7 @@ import React from "react"
 import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react"
 import AudioInterface from "./AudioInterface";
-import { AudioControlRef, BoundingBox as BoundingBoxType } from "@/app/types/audioType";
+import { AudioControlRef } from "@/app/types/audioType";
 
 interface AudioInfo {
     audioUrl: string;
@@ -62,7 +62,7 @@ export default function BoundingBox() {
             console.log("Created refs for", audioInfos.length, "audio tracks");
 
         }
-    }, []);
+    });
 
     useEffect(() => setMounted(true), []);
     // audio logic 

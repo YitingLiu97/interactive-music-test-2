@@ -93,7 +93,7 @@ export function useAudioCircle(url: string) {
                 volumeRef.current = null;
             }
         };
-    }, [url]);
+    }, [url, isLooping]);
 
     // Set loop state when it changes
     useEffect(() => {
