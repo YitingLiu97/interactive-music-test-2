@@ -7,7 +7,7 @@ import { AudioControlRef, BoundingBox as BoundingBoxType } from "@/app/types/aud
 
 interface AudioInfo {
     audioUrl: string;
-    circleColor?: string;
+    circleColor: string;
 }
 
 export default function BoundingBox() {
@@ -27,7 +27,7 @@ export default function BoundingBox() {
 
         },
         {
-            audioUrl: "/resources/druims.mp3",
+            audioUrl: "/resources/drums.mp3",
             circleColor: "gray"
 
         }
@@ -109,25 +109,25 @@ export default function BoundingBox() {
                 backgroundColor: "#f0f0f0"
             }}>
             {/* For now, just render one AudioCircle with its ref */}
-            <AudioCircle 
+            {/* <AudioCircle 
                 boundingBox={size} 
                 audioUrl="/resources/piano.mp3" 
                 color="red"
                 audioRef={audioRefs.current[0]}
-            />
+            /> */}
             
-            {/* When you're ready to add more circles, you can use this */}
-            {/* 
+            {/* When you're ready to add more circles, you can use this */} */}
+         
             {audioInfos.map((info, index) => (
                 <AudioCircle 
                     key={index}
+                    startPoint={{x: 0.3, y: 0.3*index+0.2}}
                     boundingBox={size} 
                     audioUrl={info.audioUrl} 
                     color={info.circleColor}
                     audioRef={audioRefs.current[index]}
                 />
             ))}
-            */}
             
             <AudioInterface 
                 trackListName="air traffic noise" 
