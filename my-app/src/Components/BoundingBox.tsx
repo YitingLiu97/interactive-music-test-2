@@ -3,8 +3,7 @@ import React from "react"
 import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react"
 import AudioInterface from "./AudioInterface";
-import { AudioControlRef, BoundingBox as BoundingBoxType } from "@/app/types/audioTypes";
-
+import { AudioControlRef,BoundingBox as BoundingBoxType  } from "@/app/types/audioType";
 interface AudioInfo {
     audioUrl: string;
     circleColor: string;
@@ -33,13 +32,14 @@ export default function BoundingBox() {
         }
     ];
 
-    const audioRefs = useRef<React.RefObject<AudioControlRef>[]>([]);
+    const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>([]);
     useEffect(() => {
         // Create a ref for each audio track
         if( audioRefs.current){
             audioInfos.forEach(() => {
                 audioRefs.current.push(React.createRef<AudioControlRef>());
-            });            console.log("Created refs for", audioInfos.length, "audio tracks");
+            });            
+            console.log("Created refs for", audioInfos.length, "audio tracks");
        
         }
          }, []);
@@ -109,16 +109,15 @@ export default function BoundingBox() {
                 backgroundColor: "#f0f0f0"
             }}>
             {/* For now, just render one AudioCircle with its ref */}
-            {/* <AudioCircle 
-                boundingBox={size} 
-                audioUrl="/resources/piano.mp3" 
+            <AudioCircle 
+   startPoint={{x: 0.5, y:0.5}}
+   boundingBox={size} 
+                   audioUrl="/resources/drums.mp3" 
                 color="red"
                 audioRef={audioRefs.current[0]}
-            /> */}
+            />
             
-            {/* When you're ready to add more circles, you can use this */} */}
-         
-            {audioInfos.map((info, index) => (
+            {/* {audioInfos.map((info, index) => (
                 <AudioCircle 
                     key={index}
                     startPoint={{x: 0.3, y: 0.3*index+0.2}}
@@ -127,7 +126,7 @@ export default function BoundingBox() {
                     color={info.circleColor}
                     audioRef={audioRefs.current[index]}
                 />
-            ))}
+            ))} */}
             
             <AudioInterface 
                 trackListName="air traffic noise" 

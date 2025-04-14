@@ -11,12 +11,13 @@ type Props = {
     boundingBox: BoundingBox;
     audioUrl: string;
     color: string;
-    audioRef?: React.RefObject<AudioControlRef>;
+    audioRef?: React.RefObject<AudioControlRef | null>;
+
 }
 export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, audioRef }: Props) {
     // const audioUrl = "/resources/DeanTown.mp3";
     const hasPlayedRef = useRef<boolean>(false);
-    const { play, stop, pause, setPan, setVolume, loaded, toggleLoop } = useAudioCircle(audioUrl);
+    const { play, stop, pause, setPan, setVolume, loaded, toggleLoop, currentVolume, currentPan } = useAudioCircle(audioUrl);
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>(
         {
@@ -35,13 +36,19 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                     Tone.start();
                     play();
                     playerRef.current = true;
-                },
-                pause: () => {
-                    pause(); // Using pause instead of stop for better UX
-                    playerRef.current = false;
+
+                    // Set volume and pan again when playing starts
+                    const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
+                    const volumeValue = mapRange(position.yPercent, 0, 100, -30, 0);
+                    setPan(panValue);
+                    setVolume(volumeValue);
                 },
                 stop: () => {
-                    stop();
+                    stop(); // Using pause instead of stop for better UX
+                    playerRef.current = false;
+                }, 
+                pause: () => {
+                    pause(); // Using pause instead of stop for better UX
                     playerRef.current = false;
                 },
                 toggle: () => {
@@ -50,20 +57,25 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
             };
         }
     }, [audioRef, play, pause, toggleLoop]);
+
     useEffect(() => {
-        if (!loaded || playerRef.current === null || hasPlayedRef.current) return;
-        console.log("React useEffect loaded changed:", loaded);
-        console.log("About to play. loaded:", loaded, "playerRef:", playerRef.current);
+        if (loaded) {
+            const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
+            const volumeValue = mapRange(position.yPercent, 0, 100, -30, 0);
+            
+            console.log(`Setting initial volume/pan for ${audioUrl}`);
+            console.log(`Position: x=${position.xPercent}%, y=${position.yPercent}%`);
+            console.log(`Calculated: vol=${volumeValue}dB, pan=${panValue}`);
+            
+            setPan(panValue);
+            setVolume(volumeValue);
+        }
+    }, [loaded, audioUrl, position.xPercent, position.yPercent, setPan, setVolume]);
 
-        play();
-        hasPlayedRef.current = true;
-        console.log("playerRef.current is " + playerRef.current);
-
-    }, [loaded]);
-
-    function onMouseDown(e: MouseEvent) {
-            // Prevent event from propagating to other circles
-        e.stopPropagation(); if (!loaded) return;
+    function onMouseDown(e: React.MouseEvent) {
+        // Prevent event from propagating to other circles
+        e.stopPropagation(); 
+        if (!loaded) return;
         Tone.start();
         setDragging(true);
         if (!loaded || playerRef.current) return;
@@ -77,44 +89,48 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
     function onMouseUp() {
         setDragging(false);
     }
+
     function onMouseMove(e: MouseEvent) {
-        e.stopPropagation();
+        e.stopPropagation(  );
         if (!dragging) return;
+        console.log("on mouse move");
+
         let xPercent = e.clientX / boundingBox.x * 100;
         let yPercent = e.clientY / boundingBox.y * 100;
 
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
 
-        const boundedXPercent = Math.min(Math.max(0, xPercent), maxXPercent);
-        const boundedYPercent = Math.min(Math.max(0, yPercent), maxYPercent);
+      const boundedXPercent = Math.round(Math.min(Math.max(0, xPercent), maxXPercent) * 100) / 100;
+        const boundedYPercent = Math.round(Math.min(Math.max(0, yPercent), maxYPercent) * 100) / 100;
 
-        setPosition({
-            xPercent: boundedXPercent,
-            yPercent: boundedYPercent
-        });
-
-        setCircleSize(mapRange(boundedYPercent, 0, 100, 10, 100))
-        const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
-        const volumeValue = mapRange(boundedYPercent, 0, 100, -30, 0);
+       // Update the circle size based on vertical position
+       setCircleSize(mapRange(boundedYPercent, 0, 100, 10, 100));
         
-        console.log(`Setting pan for ${audioUrl} to ${panValue}`);
-        console.log(`Setting volume for ${audioUrl} to ${volumeValue}`);
-        
-        setPan(panValue);
-        setVolume(volumeValue);
-    
+       // Set pan and volume for THIS specific audio only
+       const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
+       const volumeValue = mapRange(boundedYPercent, 0, 100, -30, 0);
+       
+       // Log the values
+       console.log(`${audioUrl} - Position: x=${boundedXPercent.toFixed(1)}%, y=${boundedYPercent.toFixed(1)}%`);
+       console.log(`${audioUrl} - Setting: vol=${volumeValue.toFixed(1)}dB, pan=${panValue.toFixed(2)}`);
+       
+       setPosition({
+        xPercent: boundedXPercent,
+        yPercent: boundedYPercent
+       })
+       // Set the values
+       setPan(panValue);
+       setVolume(volumeValue);
     }
 
     useEffect(() => {
         if (dragging) {
-            window.addEventListener("mousedown", onMouseDown);
             window.addEventListener("mousemove", onMouseMove);
             window.addEventListener("mouseup", onMouseUp);
 
         }
         return () => {
-            window.removeEventListener("mousedown", onMouseDown);
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
         }
@@ -133,11 +149,25 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
             />
-            {/* <Button onClick={initPlayer} style={{
-                backgroundColor: "black",
-                margin: "0 auto",
-            }}>Start</Button>
-            <Button onClick={stopAudio}>Stop</Button> */}
+
+
+               {/* Debug overlay to show current volume and pan */}
+               <div
+                style={{
+                    position: 'absolute',
+                    top: `${(position.yPercent * boundingBox.y) / 100 - 20}px`,
+                    left: `${(position.xPercent * boundingBox.x) / 100 + circleSize}px`,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    color: 'white',
+                    padding: '2px 5px',
+                    borderRadius: '3px',
+                    fontSize: '10px',
+                    pointerEvents: 'none', // Don't interfere with mouse events
+                    display: dragging ? 'block' : 'none' // Only show when dragging
+                }}
+            >
+                Vol: {currentVolume.toFixed(1)}dB | Pan: {currentPan.toFixed(2)}
+            </div>
         </>
     );
 }

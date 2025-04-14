@@ -1,12 +1,11 @@
 'use client'
 import React from "react"
-import { BoundingBox } from "@/app/types/audioTypes";
-
+import { BoundingBox } from "@/app/types/audioType";
 type Props = {
     xPercent: number;
     yPercent: number;
     circleSize?: number;
-    onMouseDown: (e: MouseEvent) => void;
+    onMouseDown: (e: React.MouseEvent) => void;
     isDragging: boolean;
     boundingBox: BoundingBox;
     color?: string;
