@@ -16,6 +16,8 @@ export function useAudioCircle(url: string) {
         if (!playerRef.current) {
             const player = new Tone.Player({
                 url,
+                loop: isLooping,
+                autostart: false,
                 onload: () => {
                     console.log("Audio loaded:", url);
                     setLoaded(true);
@@ -44,7 +46,9 @@ export function useAudioCircle(url: string) {
                 try{
                     if(isPlayingRef.current){
                         playerRef.current.stop();
-                    }
+                        playerRef.current.dispose();
+                    }                    
+
                 } catch (e){
                     console.error("Error stopping player:", e);
 
@@ -71,43 +75,60 @@ export function useAudioCircle(url: string) {
     }, [isLooping, url]);
 
     const play = () => {
-        if (playerRef.current && loaded) {
-            try {
-                console.log(`Playing ${url}, loop: ${isLooping}`);
-                if (!isPlayingRef.current) {
+        if (!playerRef.current || !loaded) {
+            console.log(`Cannot play ${url}, player not ready or loaded:`, loaded);
+            return;
+        }
+        
+        try {
+               
                     Tone.start();
-                    playerRef.current.start();
-                    isPlayingRef.current = true;
-                }
-            } catch (e) {
-                console.error("Error playing:", e);
-            }
-        } else {
-            console.log(`Cannot play ${url}, loaded: ${loaded}`);
+                    const state = playerRef.current.state;
+                    console.log(`Current player state for ${url}:`, state);
+                    
+                    if (state === "started") {
+                        console.log(`Player for ${url} is already playing`);
+                        return;
+                    }
+                    // Start the player
+            console.log(`Starting player for ${url}, loop:`, isLooping);
+            playerRef.current.start();
+            isPlayingRef.current = true;
+        } catch (e) {
+            console.error("Error playing:", e);
         }
     };
 
     const pause = () => {
-        if (playerRef.current && loaded && isPlayingRef.current) {
-            try {
-                console.log(`Pausing ${url}`);
+        if (!playerRef.current) return;
+        try {
+            // Only stop if we're actually playing
+            if (playerRef.current.state === "started") {
+                console.log(`Pausing player for ${url}`);
                 playerRef.current.stop();
                 isPlayingRef.current = false;
-            } catch (e) {
-                console.error("Error pausing:", e);
+            } else {
+                console.log(`Cannot pause ${url}, not playing:`, playerRef.current.state);
             }
+        } catch (e) {
+            console.error("Error pausing:", e);
         }
     };
 
     const stop = () => {
-        if (playerRef.current && loaded && isPlayingRef.current) {
-            try {
-                console.log(`Stopping ${url}`);
+        if (!playerRef.current) return;
+        
+        try {
+            // Only stop if we're actually playing
+            if (playerRef.current.state === "started") {
+                console.log(`Stopping player for ${url}`);
                 playerRef.current.stop();
                 isPlayingRef.current = false;
-            } catch (e) {
-                console.error("Error stopping:", e);
+            } else {
+                console.log(`Cannot stop ${url}, not playing:`, playerRef.current.state);
             }
+        } catch (e) {
+            console.error("Error stopping:", e);
         }
     };
 
