@@ -1,7 +1,6 @@
 'use client'
 import React from "react"
 import { BoundingBox } from "@/app/types/audioType";
-import { Badge } from "@radix-ui/themes";
 import { SpeakerLoudIcon } from "@radix-ui/react-icons";
 
 type Props = {

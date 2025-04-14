@@ -11,7 +11,7 @@ import {
     Box,
     Separator
 } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, InfoCircledIcon, SpeakerLoudIcon, SpeakerQuietIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 
 type Props = {
     trackListName: string;
@@ -36,7 +36,6 @@ export default function AudioInterface({
 }: Props) {
     // Simulated playback progress (would need to be connected to actual audio playback)
     const [progress, setProgress] = React.useState(0);
-    const [volume, setVolume] = React.useState(80);
     
     // Update progress bar if playing
     React.useEffect(() => {
@@ -128,19 +127,7 @@ export default function AudioInterface({
                 </Flex>
                 
                 <Separator orientation="vertical" className="h-20" />
-                
-                {/* Volume section
-                <Flex align="center" gap="3" className="w-1/4 px-4">
-                    <SpeakerQuietIcon />
-                    <Slider 
-                        value={[volume]} 
-                        onValueChange={(value) => setVolume(value[0])}
-                        max={100}
-                        step={1}
-                        className="flex-1"
-                    />
-                    <SpeakerLoudIcon />
-                </Flex> */}
+               
             </Flex>
         </Card>
     );

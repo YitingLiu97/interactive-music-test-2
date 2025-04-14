@@ -215,7 +215,7 @@ export default function AudioCircle({
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
         };
-    }, [dragging]); // Add dragging as a dependency to re-attach listeners when it changes
+    }, [dragging, onMouseMove]); // Add dragging as a dependency to re-attach listeners when it changes
 
     return (
         <>
