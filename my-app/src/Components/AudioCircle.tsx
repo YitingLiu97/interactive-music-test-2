@@ -10,11 +10,12 @@ type Props = {
     startPoint: StartPoint;
     boundingBox: BoundingBox;
     audioUrl: string;
+    instrumentName?: string;
     color: string;
     audioRef?: React.RefObject<AudioControlRef | null>;
 
 }
-export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, audioRef }: Props) {
+export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, audioRef,instrumentName }: Props) {
     // const audioUrl = "/resources/DeanTown.mp3";
     const hasPlayedRef = useRef<boolean>(false);
     const { play, stop, pause, setPan, setVolume, loaded, toggleLoop, currentVolume, currentPan } = useAudioCircle(audioUrl);
@@ -148,7 +149,7 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                 boundingBox={boundingBox}
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
-            />
+                instrumentName={instrumentName}            />
 
 
                {/* Debug overlay to show current volume and pan */}

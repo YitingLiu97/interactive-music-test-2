@@ -3,31 +3,51 @@ import React from "react"
 import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react"
 import AudioInterface from "./AudioInterface";
-import { AudioControlRef,BoundingBox as BoundingBoxType  } from "@/app/types/audioType";
+import { AudioControlRef, BoundingBox as BoundingBoxType } from "@/app/types/audioType";
+
 interface AudioInfo {
     audioUrl: string;
     circleColor: string;
+    instrumentName?:string;
 }
 
 export default function BoundingBox() {
     const boxRef = useRef<HTMLDivElement>(null);
     const [size, setSize] = useState({ x: 100, y: 100 });
     const [mounted, setMounted] = useState<boolean>(false);
-  
-     const audioInfos: AudioInfo[] = [
+
+    const audioInfos: AudioInfo[] = [
         {
             audioUrl: "/resources/piano.mp3",
-            circleColor: "red"
+            circleColor: "red",
+            instrumentName:"piano"
 
         },
         {
             audioUrl: "/resources/bass.mp3",
-            circleColor: "purple"
+            circleColor: "purple",
+            instrumentName:"bass"
 
         },
         {
             audioUrl: "/resources/drums.mp3",
-            circleColor: "gray"
+            circleColor: "gray",
+            instrumentName:"drums"
+
+        }
+        ,
+        {
+            audioUrl: "/resources/timp.mp3",
+            circleColor: "brown",
+            instrumentName:"timp"
+
+        }
+        ,
+        {
+            audioUrl: "/resources/pedal-steel.mp3",
+            circleColor: "blue",
+            instrumentName:"pedal-steel"
+
 
         }
     ];
@@ -35,14 +55,14 @@ export default function BoundingBox() {
     const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>([]);
     useEffect(() => {
         // Create a ref for each audio track
-        if( audioRefs.current){
+        if (audioRefs.current) {
             audioInfos.forEach(() => {
                 audioRefs.current.push(React.createRef<AudioControlRef>());
-            });            
+            });
             console.log("Created refs for", audioInfos.length, "audio tracks");
-       
+
         }
-         }, []);
+    }, []);
 
     useEffect(() => setMounted(true), []);
     // audio logic 
@@ -58,7 +78,7 @@ export default function BoundingBox() {
         });
     }
 
-    function pauseAll(){
+    function pauseAll() {
         console.log("Pause all triggered");
         audioRefs.current.forEach((ref, index) => {
             if (ref.current && ref.current.stop) {
@@ -68,7 +88,7 @@ export default function BoundingBox() {
         });
     }
 
-    function toggleAll(){
+    function toggleAll() {
         console.log("Toggle loop triggered");
         audioRefs.current.forEach((ref, index) => {
             if (ref.current && ref.current.toggle) {
@@ -98,7 +118,7 @@ export default function BoundingBox() {
 
     if (!mounted) return null;
 
-   return (
+    return (
         <div
             ref={boxRef}
             style={{
@@ -109,31 +129,32 @@ export default function BoundingBox() {
                 backgroundColor: "#f0f0f0"
             }}>
             {/* For now, just render one AudioCircle with its ref */}
-            <AudioCircle 
-   startPoint={{x: 0.5, y:0.5}}
-   boundingBox={size} 
-                   audioUrl="/resources/drums.mp3" 
+            {/* <AudioCircle
+                startPoint={{ x: 0.5, y: 0.5 }}
+                boundingBox={size}
+                audioUrl="/resources/bass.mp3"
                 color="red"
                 audioRef={audioRefs.current[0]}
-            />
-            
-            {/* {audioInfos.map((info, index) => (
-                <AudioCircle 
+            /> */}
+
+            {audioInfos.map((info, index) => (
+                <AudioCircle
                     key={index}
-                    startPoint={{x: 0.3, y: 0.3*index+0.2}}
-                    boundingBox={size} 
-                    audioUrl={info.audioUrl} 
+                    startPoint={{ x: 0.3, y: 0.3 * index + 0.2 }}
+                    boundingBox={size}
+                    audioUrl={info.audioUrl}
                     color={info.circleColor}
                     audioRef={audioRefs.current[index]}
+                    instrumentName={info.instrumentName}
                 />
-            ))} */}
-            
-            <AudioInterface 
-                trackListName="air traffic noise" 
-                authorName="alex ruthmann" 
-                onPlayAll={playAll} 
-                onPauseAll={pauseAll} 
-                onToggleAll={toggleAll} 
+            ))}
+
+            <AudioInterface
+                trackListName="air traffic noise"
+                authorName="alex ruthmann"
+                onPlayAll={playAll}
+                onPauseAll={pauseAll}
+                onToggleAll={toggleAll}
             />
         </div>
     )

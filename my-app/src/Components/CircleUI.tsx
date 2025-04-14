@@ -10,6 +10,7 @@ type Props = {
     boundingBox: BoundingBox;
     color?: string;
     opacity: number;
+    instrumentName?:string;
 }
 
 export default function CircleUI({ 
@@ -20,7 +21,8 @@ export default function CircleUI({
     isDragging,
     boundingBox,
     color = "red", 
-    opacity
+    opacity,
+    instrumentName
 }: Props) {
     return (
         <div
@@ -38,6 +40,13 @@ export default function CircleUI({
                 zIndex: isDragging ? 10 : 1, // Higher z-index when dragging
                 boxShadow: isDragging ? "0 0 10px rgba(255, 255, 255, 0.5)" : "none", // Visual feedback when dragging
             }}
-        />
+        >
+            <p  style={{
+                color: `black`,
+                alignItems: "center",
+                zIndex: 20, // Higher z-index when dragging
+
+            }}>{instrumentName}</p>
+        </div>
     );
 }
