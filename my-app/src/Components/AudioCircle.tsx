@@ -13,21 +13,33 @@ type Props = {
     instrumentName?: string;
     color: string;
     audioRef?: React.RefObject<AudioControlRef | null>;
+    onPlay?: () => void;
+    onStop?: () => void;
 }
 
-export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, audioRef, instrumentName }: Props) {
-    const { 
-        play, 
-        stop, 
-        pause, 
-        setPan, 
-        setVolume, 
-        loaded, 
-        toggleLoop, 
-        currentVolume, 
-        currentPan 
+export default function AudioCircle({
+    startPoint,
+    boundingBox,
+    audioUrl,
+    color,
+    audioRef,
+    instrumentName,
+    onPlay,
+    onStop
+}: Props) {
+    const {
+        play,
+        stop,
+        pause,
+        setPan,
+        setVolume,
+        loaded,
+        toggleLoop,
+        currentVolume,
+        currentPan,
+        isPlaying
     } = useAudioCircle(audioUrl);
-    
+
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>({
         xPercent: startPoint.x * 100,
@@ -39,6 +51,17 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
 
     const playerRef = useRef(false);
     const initializedRef = useRef(false);
+
+    // Update position reference when playing state changes and notify parent
+    useEffect(() => {
+        playerRef.current = isPlaying;
+        
+        if (isPlaying && onPlay) {
+            onPlay();
+        } else if (!isPlaying && onStop) {
+            onStop();
+        }
+    }, [isPlaying, onPlay, onStop]);
 
     // Fix for hydration issue - move dynamic updates to useEffect
     useEffect(() => {
@@ -63,12 +86,12 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
             };
             window.addEventListener('click', handleFirstInteraction);
         }
-        
+
         // Set playback rate to normal (1.0)
         if (Tone.Transport.bpm.value !== 120) {
             Tone.Transport.bpm.value = 120;
         }
-        
+
         return () => {
             // Clean up event listeners and audio when component unmounts
             window.removeEventListener('click', () => Tone.start());
@@ -114,21 +137,17 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
             const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
             const volumeValue = mapRange(position.yPercent, 0, 100, -30, 0);
 
-            console.log(`Setting initial volume/pan for ${audioUrl}`);
-            console.log(`Position: x=${position.xPercent}%, y=${position.yPercent}%`);
-            console.log(`Calculated: vol=${volumeValue}dB, pan=${panValue}`);
-
             setPan(panValue);
             setVolume(volumeValue);
         }
-    }, [loaded, audioUrl, position.xPercent, position.yPercent, setPan, setVolume]);
+    }, [loaded, position.xPercent, position.yPercent, setPan, setVolume]);
 
     function onMouseDown(e: React.MouseEvent) {
         e.stopPropagation();
         if (!loaded) return;
-        
+
         setDragging(true);
-        
+
         // Only start playing if not already playing
         if (!playerRef.current) {
             Tone.start();
@@ -143,43 +162,44 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
 
     function onMouseMove(e: MouseEvent) {
         if (!dragging || !boundingBox) return;
-        
+
         // Calculate new position based on mouse coordinates
-        const container = boxRef.current?.getBoundingClientRect() || 
-                     { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
-        
+        const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
+            { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
+
         // Calculate position as percentage of container
         const newXPercent = ((e.clientX - container.left) / container.width) * 100;
         const newYPercent = ((e.clientY - container.top) / container.height) * 100;
-        
-        // Apply boundaries
+
+        // Apply boundaries to prevent going outside the bounding box
+        // or into the audio interface area
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
 
-        const boundedXPercent = Math.max(0, Math.min(newXPercent, maxXPercent));
-        const boundedYPercent = Math.max(0, Math.min(newYPercent, maxYPercent));
+        const boundedXPercent = Math.max(marginPercent, Math.min(newXPercent, maxXPercent));
+        const boundedYPercent = Math.max(marginPercent, Math.min(newYPercent, maxYPercent));
 
-        // Update the circle size based on vertical position
-        const newCircleSize = mapRange(boundedYPercent, 0, 100, 10, 100);
+        // Update the circle size based on vertical position (smaller as it goes up)
+        const newCircleSize = mapRange(boundedYPercent, 0, 100, 20,80);
         setCircleSize(newCircleSize);
 
-        // Set pan and volume for THIS specific audio only
+        // Set pan and volume based on position
         const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
-        const volumeValue = mapRange(boundedYPercent, 0, 100, -30, 0);
+        const volumeValue = mapRange(boundedYPercent, 0, 100, -10, -40); // Reversed for intuitive control
 
         setPosition({
             xPercent: boundedXPercent,
             yPercent: boundedYPercent
         });
-        
-        // Set the values (debounce these calls slightly to prevent audio glitches)
+
+        // Set the values
         setPan(panValue);
         setVolume(volumeValue);
     }
 
     // Reference to the bounding box element
     const boxRef = useRef<HTMLDivElement | null>(null);
-    
+
     // Find and store reference to the bounding box after mount
     useEffect(() => {
         boxRef.current = document.querySelector('[ref="boxRef"]');
@@ -190,7 +210,7 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
             window.addEventListener("mousemove", onMouseMove);
             window.addEventListener("mouseup", onMouseUp);
         }
-        
+
         return () => {
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
@@ -208,10 +228,10 @@ export default function AudioCircle({ startPoint, boundingBox, audioUrl, color, 
                 boundingBox={boundingBox}
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
-                instrumentName={instrumentName} 
+                instrumentName={instrumentName}
+                isPlaying={isPlaying}
             />
 
-            {/* Debug overlay to show current volume and pan */}
             <div
                 style={{
                     position: 'absolute',

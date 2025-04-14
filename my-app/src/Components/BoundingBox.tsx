@@ -16,6 +16,9 @@ export default function BoundingBox() {
     const [size, setSize] = useState({ x: 100, y: 100 });
     const [mounted, setMounted] = useState<boolean>(false);
     const [audioRefsCreated, setAudioRefsCreated] = useState(false);
+    const [currentTrack, setCurrentTrack] = useState<string | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isLooping, setIsLooping] = useState(false);
 
     const audioInfos: AudioInfo[] = [
         {
@@ -61,8 +64,13 @@ export default function BoundingBox() {
         function updateSize() {
             if (boxRef.current) {
                 const rect = boxRef.current.getBoundingClientRect();
-                setSize({ x: rect.width, y: rect.height });
-                console.log("Size updated:", rect.width, rect.height);
+                // Make the bounding box smaller to not overlap with the interface
+                // Subtract the height of the audio interface (around 130px) plus some margin
+                setSize({ 
+                    x: rect.width, 
+                    y: rect.height - 150 // Reserve space for the audio interface
+                });
+                console.log("Size updated:", rect.width, rect.height - 150);
             }
         }
         
@@ -87,6 +95,8 @@ export default function BoundingBox() {
                 console.log(`Ref ${index} is not ready`);
             }
         });
+        setIsPlaying(true);
+        setCurrentTrack("All instruments");
     }
 
     function pauseAll() {
@@ -97,6 +107,7 @@ export default function BoundingBox() {
                 ref.current.stop();
             }
         });
+        setIsPlaying(false);
     }
 
     function toggleAll() {
@@ -107,41 +118,55 @@ export default function BoundingBox() {
                 ref.current.toggle();
             }
         });
+        setIsLooping(!isLooping);
     }
 
     // Don't render anything on the server, only render on client
-    // This avoids hydration errors completely
     if (!mounted) return null;
 
     return (
-        <div
-            ref={boxRef}
-            style={{
-                width: "100vw",
-                height: "100vh",
-                position: "relative",
-                overflow: "hidden",
-                backgroundColor: "#f0f0f0"
-            }}
-        >
-            {audioRefsCreated && audioInfos.map((info, index) => (
-                <AudioCircle
-                    key={index}
-                    startPoint={{ x: 0.3, y: 0.3 }}
-                    boundingBox={size}
-                    audioUrl={info.audioUrl}
-                    color={info.circleColor}
-                    audioRef={audioRefs.current[index]}
-                    instrumentName={info.instrumentName}
-                />
-            ))}
+        <div className="flex flex-col h-screen w-screen">
+            {/* Main bounding box for audio circles */}
+            <div
+                ref={boxRef}
+                style={{
+                    width: "100%",
+                    height: "calc(100vh - 150px)", // Reserve space for audio interface
+                    position: "relative",
+                    overflow: "hidden",
+                    backgroundColor: "#f0f0f0"
+                }}
+            >
+                {audioRefsCreated && audioInfos.map((info, index) => (
+                    <AudioCircle
+                        key={index}
+                        startPoint={{ x: 0.3+index* 0.1, y:0.3}}
+                        boundingBox={size}
+                        audioUrl={info.audioUrl}
+                        color={info.circleColor}
+                        audioRef={audioRefs.current[index]}
+                        instrumentName={info.instrumentName}
+                        onPlay={() => {
+                            setIsPlaying(true);
+                            setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
+                        }}
+                        onStop={() => {
+                            setIsPlaying(false);
+                        }}
+                    />
+                ))}
+            </div>
 
+            {/* Audio interface outside the bounding box */}
             <AudioInterface
                 trackListName="air traffic noise"
                 authorName="alex ruthmann"
                 onPlayAll={playAll}
                 onPauseAll={pauseAll}
                 onToggleAll={toggleAll}
+                isPlaying={isPlaying}
+                isLooping={isLooping}
+                currentTrack={currentTrack}
             />
         </div>
     );

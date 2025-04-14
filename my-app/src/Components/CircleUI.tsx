@@ -1,6 +1,8 @@
 'use client'
 import React from "react"
 import { BoundingBox } from "@/app/types/audioType";
+import { Badge } from "@radix-ui/themes";
+import { SpeakerLoudIcon } from "@radix-ui/react-icons";
 
 type Props = {
     xPercent: number;
@@ -12,6 +14,7 @@ type Props = {
     color?: string;
     opacity: number;
     instrumentName?: string;
+    isPlaying?: boolean;
 }
 
 export default function CircleUI({ 
@@ -23,7 +26,8 @@ export default function CircleUI({
     boundingBox,
     color = "red", 
     opacity,
-    instrumentName
+    instrumentName,
+    isPlaying = false
 }: Props) {
     // Calculate the actual position in pixels
     const xPos = (xPercent * boundingBox.x) / 100;
@@ -42,29 +46,75 @@ export default function CircleUI({
                 top: 0,
                 transform: `translate(${xPos}px, ${yPos}px)`,
                 cursor: isDragging ? "grabbing" : "grab",
-                transition: isDragging ? "none" : "transform 0.1s ease",
+                transition: isDragging ? "none" : "all 0.1s ease",
                 opacity: opacity,
                 zIndex: isDragging ? 10 : 1,
-                boxShadow: isDragging ? "0 0 10px rgba(0, 0, 0, 0.3)" : "none",
+                boxShadow: isDragging 
+                    ? "0 0 15px rgba(255, 255, 255, 0.6)" 
+                    : isPlaying 
+                        ? `0 0 10px ${color}, 0 0 20px ${color}`
+                        : "none",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                userSelect: "none"
+                userSelect: "none",
+                overflow: "visible"
             }}
         >
-            {instrumentName && (
-                <p style={{
-                    margin: 0,
-                    padding: 0,
-                    color: "black",
-                    fontSize: "12px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    lineHeight: 1
+            {/* Animated waves when playing */}
+            {isPlaying && (
+                <div className="absolute inset-0 rounded-full" style={{
+                    animation: "pulse 2s infinite",
+                    border: `2px solid ${color}`,
+                    opacity: 0.6,
+                    transform: "scale(1.1)",
                 }}>
-                    {instrumentName}
-                </p>
+                </div>
             )}
+            
+            {/* Instrument name */}
+            {instrumentName && (
+                <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "4px"
+                }}>
+                    <div style={{
+                        fontSize: Math.max(10, circleSize * 0.25),
+                        fontWeight: "bold",
+                        color: "#000",
+                        textShadow: "0 0 2px rgba(255,255,255,0.7)",
+                        lineHeight: 1
+                    }}>
+                        {instrumentName}
+                    </div>
+                    
+                    {isPlaying && (
+                        <SpeakerLoudIcon style={{
+                            width: Math.max(10, circleSize * 0.2),
+                            height: Math.max(10, circleSize * 0.2),
+                            color: "#000",
+                            animation: "bounce 0.5s infinite alternate"
+                        }} />
+                    )}
+                </div>
+            )}
+            
+            {/* Add some CSS animations for the playing state */}
+            <style jsx global>{`
+                @keyframes pulse {
+                    0% { opacity: 0.7; transform: scale(1); }
+                    70% { opacity: 0; transform: scale(1.3); }
+                    100% { opacity: 0; transform: scale(1.5); }
+                }
+                
+                @keyframes bounce {
+                    0% { transform: translateY(-1px); }
+                    100% { transform: translateY(1px); }
+                }
+            `}</style>
         </div>
     );
 }
