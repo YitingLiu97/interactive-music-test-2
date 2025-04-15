@@ -15,6 +15,11 @@ export function useAudioCircle(audioUrl: string) {
   const playerRef = useRef<Tone.Player | null>(null);
   const pannerRef = useRef<Tone.Panner | null>(null);
   const volumeRef = useRef<Tone.Volume | null>(null);
+  
+  // Add refs to track current values without triggering re-renders
+  const currentVolumeRef = useRef<number>(currentVolume);
+  const currentPanRef = useRef<number>(currentPan);
+  const isMutedRef = useRef<boolean>(isMuted);
 
   // Initialize audio components
   useEffect(() => {
@@ -124,7 +129,7 @@ export function useAudioCircle(audioUrl: string) {
     }
   };
 
-  // Set pan function
+  // Set pan function - FIXED to avoid infinite update loops
   const setPan = (value: number) => {
     if (!pannerRef.current) return;
     
@@ -132,49 +137,65 @@ export function useAudioCircle(audioUrl: string) {
     const clampedValue = Math.max(-1, Math.min(value, 1));
     
     try {
+      // Only update the DOM node
       pannerRef.current.pan.value = clampedValue;
-      setCurrentPan(clampedValue);
+      
+      // Only update React state if the value has actually changed
+      if (currentPanRef.current !== clampedValue) {
+        currentPanRef.current = clampedValue;
+        setCurrentPan(clampedValue);
+      }
     } catch (error) {
       console.error("Error setting pan:", error);
     }
   };
 
- // Set volume function with CORRECTED muting logic
- const setVolume = (value: number) => {
-  if (!volumeRef.current) return;
-  
-  // Store the incoming volume value for display purposes
-  const clampedValue = Math.max(-60, Math.min(value, 0));
-  setCurrentVolume(clampedValue);
-  
-  try {
-    // CORRECT LOGIC FOR MUTING:
-    // In dB, MORE negative means QUIETER
-    // So value <= threshold means QUIETER than threshold (should mute)
-    // And value > threshold means LOUDER than threshold (should play)
+  // Set volume function with CORRECTED muting logic - FIXED to avoid infinite update loops
+  const setVolume = (value: number) => {
+    if (!volumeRef.current) return;
     
-    if (value <= volumeThreshold) {
-      // Volume is QUIETER than threshold, should mute
-      if (!isMuted) {
-        console.log(`Volume (${value.toFixed(1)} dB) is quieter than threshold (${volumeThreshold} dB), muting`);
-        volumeRef.current.mute = true;
-        setIsMuted(true);
-      }
-    } else {
-      // Volume is LOUDER than threshold, should unmute
-      if (isMuted) {
-        console.log(`Volume (${value.toFixed(1)} dB) is louder than threshold (${volumeThreshold} dB), unmuting`);
-        volumeRef.current.mute = false;
-        setIsMuted(false);
+    // Ensure value is within range
+    const clampedValue = Math.max(-60, Math.min(value, 0));
+    
+    try {
+      // CORRECT LOGIC FOR MUTING:
+      // In dB, MORE negative means QUIETER
+      // So value <= threshold means QUIETER than threshold (should mute)
+      // And value > threshold means LOUDER than threshold (should play)
+      
+      const shouldBeMuted = clampedValue <= volumeThreshold;
+      
+      // Update node values first
+      if (shouldBeMuted) {
+        // Volume is QUIETER than threshold, should mute
+        if (!isMutedRef.current) {
+          console.log(`Volume (${value.toFixed(1)} dB) is quieter than threshold (${volumeThreshold} dB), muting`);
+          volumeRef.current.mute = true;
+          isMutedRef.current = true;
+          setIsMuted(true);
+        }
+      } else {
+        // Volume is LOUDER than threshold, should unmute
+        if (isMutedRef.current) {
+          console.log(`Volume (${value.toFixed(1)} dB) is louder than threshold (${volumeThreshold} dB), unmuting`);
+          volumeRef.current.mute = false;
+          isMutedRef.current = false;
+          setIsMuted(false);
+        }
+        
+        // Only set volume when not muted
+        volumeRef.current.volume.value = clampedValue;
       }
       
-      // Only set volume when not muted
-      volumeRef.current.volume.value = clampedValue;
+      // Only update React state if the value has actually changed
+      if (currentVolumeRef.current !== clampedValue) {
+        currentVolumeRef.current = clampedValue;
+        setCurrentVolume(clampedValue);
+      }
+    } catch (error) {
+      console.error("Error setting volume:", error);
     }
-  } catch (error) {
-    console.error("Error setting volume:", error);
-  }
-};
+  };
 
   // Toggle loop function
   const toggleLoop = () => {
@@ -188,6 +209,19 @@ export function useAudioCircle(audioUrl: string) {
       console.error("Error toggling loop:", error);
     }
   };
+
+  // Sync refs with state when state changes
+  useEffect(() => {
+    currentVolumeRef.current = currentVolume;
+  }, [currentVolume]);
+  
+  useEffect(() => {
+    currentPanRef.current = currentPan;
+  }, [currentPan]);
+  
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   return {
     play,
