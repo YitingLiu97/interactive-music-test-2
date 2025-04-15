@@ -14,6 +14,7 @@ type Props = {
     opacity: number;
     instrumentName?: string;
     isPlaying?: boolean;
+    isMuted?:boolean;
 }
 
 export default function CircleUI({ 
@@ -26,7 +27,8 @@ export default function CircleUI({
     color = "red", 
     opacity,
     instrumentName,
-    isPlaying = false
+    isPlaying = false,
+    isMuted = true
 }: Props) {
     // Calculate the actual position in pixels
     const xPos = (xPercent * boundingBox.x) / 100;
@@ -39,7 +41,7 @@ export default function CircleUI({
                 width: circleSize,
                 height: circleSize,
                 borderRadius: "50%",
-                backgroundColor: color,
+                backgroundColor: isMuted?"gray": color,
                 position: "absolute",
                 left: 0,
                 top: 0,
@@ -62,7 +64,7 @@ export default function CircleUI({
             }}
         >
             {/* Animated waves when playing */}
-            {isPlaying && (
+            {isPlaying && !isMuted && (
                 <div className="absolute inset-0 rounded-full" style={{
                     animation: "pulse 2s infinite",
                     border: `2px solid ${color}`,

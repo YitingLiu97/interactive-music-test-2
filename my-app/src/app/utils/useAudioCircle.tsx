@@ -142,21 +142,16 @@ export function useAudioCircle(audioUrl: string) {
   // Set volume function
   const setVolume = (value: number) => {
     if (!volumeRef.current) return;
-    // Volume in dB, typically between -60 (silent) and 0 (full)
     const clampedValue = Math.max(-60, Math.min(value, 0));
     setCurrentVolume(clampedValue);
-    
     try {
-      // Check if volume exceeds threshold (e.g., -10 dB)
-      if (value < volumeThreshold) {
-        // If we're above threshold and not already muted, mute
+      if (value <= volumeThreshold) {
         if (!isMuted) {
-          console.log(`Volume (${value} dB) exceeded threshold (-10 dB), muting`);
+          console.log(`Volume (${value} dB) exceeded threshold (${volumeThreshold} dB), muting`);
           volumeRef.current.mute = true;
           setIsMuted(true);
         }
       } else {
-        // Below threshold, unmute if needed
         if (isMuted) {
           console.log(`Volume (${value} dB) below threshold (-10 dB), unmuting`);
           volumeRef.current.mute = false;

@@ -49,6 +49,7 @@ export default function AudioCircle({
 
     const [circleSize, setCircleSize] = useState<number>(50);
     const marginPercent = 10;
+    const silentVolume = -60;
 
     const playerRef = useRef(false);
     const initializedRef = useRef(false);
@@ -101,44 +102,51 @@ export default function AudioCircle({
 
 
 
-    // Setup refs for external control
-    useEffect(() => {
-        if (audioRef && 'current' in audioRef) {
-            audioRef.current = {
-                play: () => {
-                    // Make sure we don't call play multiple times
-                    if (!playerRef.current) {
-                        Tone.start();
-                        play();
-                        playerRef.current = true;
+// In AudioCircle.tsx, update the audio ref effect to correctly handle muting
 
-                        // Set volume and pan again when playing starts
-                        const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
-                        const volumeValue =  mapRange(position.yPercent, 0, 100, -30, 0);
-                        setPan(panValue);
-                        setVolume(volumeValue);
-                    }
-                },
-                stop: () => {
-                    stop();
-                    playerRef.current = false;
-                },
-                pause: () => {
-                    pause();
-                    playerRef.current = false;
-                },
-                toggle: () => {
-                    toggleLoop();
+useEffect(() => {
+    if (audioRef && 'current' in audioRef) {
+        audioRef.current = {
+            play: () => {
+                // Make sure we don't call play multiple times
+                if (!playerRef.current) {
+                    Tone.start();
+                    play();
+                    playerRef.current = true;
+
+                    // Set volume and pan again when playing starts
+                    // Use the fixed mapping approach
+                    const minXPercent = marginPercent;
+                    const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
+                    const minYPercent = marginPercent;
+                    const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
+                    
+                    const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
+                    const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
+                    
+                    setPan(panValue);
+                    setVolume(volumeValue);
                 }
-            };
-        }
-    }, [audioRef, play, pause, toggleLoop, position.xPercent, position.yPercent, setPan, setVolume, stop]);
-
+            },
+            stop: () => {
+                stop();
+                playerRef.current = false;
+            },
+            pause: () => {
+                pause();
+                playerRef.current = false;
+            },
+            toggle: () => {
+                toggleLoop();
+            }
+        };
+    }
+}, [audioRef, play, pause, toggleLoop, position.xPercent, position.yPercent, setPan, setVolume, stop, boundingBox, circleSize, marginPercent]);
     // Initialize audio parameters once loaded
     useEffect(() => {
         if (loaded) {
             const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
-            const volumeValue = mapRange(position.yPercent, 0, 100, -30, 0);
+            const volumeValue = mapRange(position.yPercent, 0, 100, silentVolume, 0);
 
             setPan(panValue);
             setVolume(volumeValue);
@@ -286,6 +294,7 @@ export default function AudioCircle({
                 opacity={position.yPercent / 100 + 0.2}
                 instrumentName={instrumentName}
                 isPlaying={isPlaying}
+                isMuted={isMuted}
             />
 
             <div
