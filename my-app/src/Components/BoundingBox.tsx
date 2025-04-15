@@ -64,50 +64,60 @@ export default function BoundingBox() {
         function updateSize() {
             if (boxRef.current) {
                 const rect = boxRef.current.getBoundingClientRect();
-                   setSize({ 
-                    x: rect.width, 
-                    y: rect.height 
+                setSize({
+                    x: rect.width,
+                    y: rect.height
                 });
                 console.log("Size updated:", rect.width, rect.height - 150);
             }
         }
-        
+
         if (mounted) {
             updateSize();
             window.addEventListener("resize", updateSize);
-            
+
             return () => {
                 window.removeEventListener("resize", updateSize);
             };
         }
     }, [mounted]);
-// In BoundingBox.tsx
-function playAll() {
-    console.log("Play all triggered, refs:", audioRefs.current.length);
-    
-    // First, start all tracks playing - they'll all play simultaneously
-    audioRefs.current.forEach((ref, index) => {
-        if (ref.current && ref.current.play) {
-            console.log(`Playing track ${index}`);
-            ref.current.play();
-        } else {
-            console.log(`Ref ${index} is not ready`);
-        }
-    });
-    
-    // After a small delay to ensure all tracks have started,
-    // apply muting based on current position
-    setTimeout(() => {
-        audioRefs.current.forEach((ref) => {
-            if (ref.current && ref.current.applyPositionMuting) {
-                ref.current.applyPositionMuting();
+    // In BoundingBox.tsx
+    function playAll() {
+        console.log("Play all triggered, refs:", audioRefs.current.length);
+
+        // First, start all tracks playing - they'll all play simultaneously
+        audioRefs.current.forEach((ref, index) => {
+            if (ref.current && ref.current.play) {
+                console.log(`Playing track ${index}`);
+                ref.current.play();
+            } else {
+                console.log(`Ref ${index} is not ready`);
             }
         });
-    }, 50);
+
+      
+        setIsPlaying(true);
+        setCurrentTrack("All instruments");
+    }
+
+
+      // create setTimeOut
+      useEffect(() => {
+        // Store the timeout ID so we can clear it if needed
+        const timeoutId = setTimeout(() => {
+            audioRefs.current.forEach((ref) => {
+                if (ref.current && ref.current.applyPositionMuting) {
+                    ref.current.applyPositionMuting();
+                }
+            });
+        }, 50);
+
+        return () => {
+            clearTimeout(timeoutId);
+        };
+    }, []);
+
     
-    setIsPlaying(true);
-    setCurrentTrack("All instruments");
-}
     function pauseAll() {
         console.log("Pause all triggered");
         audioRefs.current.forEach((ref, index) => {
@@ -149,7 +159,7 @@ function playAll() {
                 {audioRefsCreated && audioInfos.map((info, index) => (
                     <AudioCircle
                         key={index}
-                        startPoint={{ x: 0.3+index* 0.1, y:0.3}}
+                        startPoint={{ x: 0.3 + index * 0.1, y: 0.3 }}
                         boundingBox={size}
                         audioUrl={info.audioUrl}
                         color={info.circleColor}
