@@ -98,6 +98,8 @@ export default function AudioCircle({
         };
     }, []);
 
+
+
     // Setup refs for external control
     useEffect(() => {
         if (audioRef && 'current' in audioRef) {
@@ -111,8 +113,9 @@ export default function AudioCircle({
 
                         // Set volume and pan again when playing starts
                         const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
-                        const volumeValue = mapRange(position.yPercent, 0, 100, -30, 0);
+                        const volumeValue =  mapRange(position.yPercent, 0, 100, -30, 0);
                         setPan(panValue);
+                        
                         setVolume(volumeValue);
                     }
                 },
@@ -185,16 +188,16 @@ export default function AudioCircle({
 
         // Set pan and volume based on position
         const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
-        const volumeValue = mapRange(boundedYPercent, 0, 100, -10, -40); // Reversed for intuitive control
+        const mappedVolume = mapRange(boundedYPercent, 0, 100, -30, 0); // Reversed for intuitive control
+        console.log("mappedVolume value is " + mappedVolume);
 
         setPosition({
             xPercent: boundedXPercent,
             yPercent: boundedYPercent
         });
-
-        // Set the values
+      
         setPan(panValue);
-        setVolume(volumeValue);
+        setVolume(mappedVolume);
     }
 
     // Reference to the bounding box element
@@ -237,7 +240,7 @@ export default function AudioCircle({
                     position: 'absolute',
                     top: `${(position.yPercent * boundingBox.y) / 100 - 20}px`,
                     left: `${(position.xPercent * boundingBox.x) / 100 + circleSize}px`,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    backgroundColor: 'rgb(0,0,0)',
                     color: 'white',
                     padding: '2px 5px',
                     borderRadius: '3px',

@@ -8,7 +8,9 @@ export function useAudioCircle(audioUrl: string) {
   const [isLooping, setIsLooping] = useState(false);
   const [currentVolume, setCurrentVolume] = useState(0);
   const [currentPan, setCurrentPan] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
 
+  const volumeThreshold = -15;
   // Use refs to keep track of player instances to prevent multiple instances
   const playerRef = useRef<Tone.Player | null>(null);
   const pannerRef = useRef<Tone.Panner | null>(null);
@@ -140,13 +142,30 @@ export function useAudioCircle(audioUrl: string) {
   // Set volume function
   const setVolume = (value: number) => {
     if (!volumeRef.current) return;
-    
     // Volume in dB, typically between -60 (silent) and 0 (full)
     const clampedValue = Math.max(-60, Math.min(value, 0));
+    setCurrentVolume(clampedValue);
     
     try {
-      volumeRef.current.volume.value = clampedValue;
-      setCurrentVolume(clampedValue);
+      // Check if volume exceeds threshold (e.g., -10 dB)
+      if (value < volumeThreshold) {
+        // If we're above threshold and not already muted, mute
+        if (!isMuted) {
+          console.log(`Volume (${value} dB) exceeded threshold (-10 dB), muting`);
+          Tone.Destination.mute = true;
+          setIsMuted(true);
+        }
+      } else {
+        // Below threshold, unmute if needed
+        if (isMuted) {
+          console.log(`Volume (${value} dB) below threshold (-10 dB), unmuting`);
+          Tone.Destination.mute = false;
+          setIsMuted(false);
+        }
+        
+        // Apply actual volume to the volume node
+        volumeRef.current.volume.value = clampedValue;
+      }
     } catch (error) {
       console.error("Error setting volume:", error);
     }
@@ -176,6 +195,7 @@ export function useAudioCircle(audioUrl: string) {
     isPlaying,
     isLooping,
     currentVolume,
-    currentPan
+    currentPan,
+    isMuted
   };
 }
