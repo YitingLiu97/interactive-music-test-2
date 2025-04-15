@@ -52,7 +52,7 @@ export default function CircleUI({
                 zIndex: isDragging ? 10 : 1,
                 boxShadow: isDragging 
                     ? "0 0 15px rgba(255, 255, 255, 0.6)" 
-                    : isPlaying 
+                    : (isPlaying && !isMuted) 
                         ? `0 0 10px ${color}, 0 0 20px ${color}`
                         : "none",
                 display: "flex",
@@ -66,8 +66,8 @@ export default function CircleUI({
             {/* Animated waves when playing */}
             {isPlaying && !isMuted && (
                 <div className="absolute inset-0 rounded-full" style={{
-                    animation: "pulse 2s infinite",
-                    border: `2px solid ${color}`,
+                    animation: isMuted? "none": "pulse 2s infinite",
+                    border: isMuted? "none": `2px solid ${color}`,
                     opacity: 0.6,
                     transform: "scale(1.1)",
                 }}>
@@ -92,7 +92,7 @@ export default function CircleUI({
                         {instrumentName}
                     </div>
                     
-                    {isPlaying && (
+                    {isPlaying && !isMuted && (
                         <SpeakerLoudIcon style={{
                             width: Math.max(10, circleSize * 0.2),
                             height: Math.max(10, circleSize * 0.2),
