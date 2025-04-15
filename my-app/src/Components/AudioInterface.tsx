@@ -6,7 +6,6 @@ import {
     Text, 
     Heading, 
     Card, 
-    Badge, 
     Slider, 
     Box,
     Separator
@@ -78,12 +77,12 @@ export default function AudioInterface({
                         <Text size="2" className="text-gray-400">
                             <InfoCircledIcon /> By {authorName}
                         </Text>
-                        {/* temp hide the track info */}
-                        {/* {currentTrack && (
-                            <Badge color="orange" variant="soft" radius="full">
-                                Now playing: {currentTrack}
-                            </Badge>
-                        )} */}
+                        {currentTrack && (
+                            <></>
+                            // <Badge color="orange" variant="soft" radius="full">
+                            //     Now playing: {currentTrack}
+                            // </Badge>
+                        )}
                     </Flex>
                 </Box>
                 
