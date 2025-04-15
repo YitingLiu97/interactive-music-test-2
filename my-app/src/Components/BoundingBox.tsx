@@ -81,22 +81,34 @@ export default function BoundingBox() {
             };
         }
     }, [mounted]);
-
-    // Audio control functions
-    function playAll() {
-        console.log("Play all triggered, refs:", audioRefs.current.length);
+// In BoundingBox.tsx
+function playAll() {
+    console.log("Play all triggered, refs:", audioRefs.current.length);
+    
+    // First, start all tracks playing - they'll all play simultaneously
+    audioRefs.current.forEach((ref, index) => {
+        if (ref.current && ref.current.play) {
+            console.log(`Playing track ${index}`);
+            // Start playback for all tracks
+            ref.current.play();
+        } else {
+            console.log(`Ref ${index} is not ready`);
+        }
+    });
+    
+    // After a small delay to ensure all tracks have started,
+    // apply muting based on current position
+    setTimeout(() => {
         audioRefs.current.forEach((ref, index) => {
-            if (ref.current && ref.current.play) {
-                console.log(`Playing track ${index}`);
-                ref.current.play();
-            } else {
-                console.log(`Ref ${index} is not ready`);
+            if (ref.current && ref.current.applyPositionMuting) {
+                ref.current.applyPositionMuting();
             }
         });
-        setIsPlaying(true);
-        setCurrentTrack("All instruments");
-    }
-
+    }, 50);
+    
+    setIsPlaying(true);
+    setCurrentTrack("All instruments");
+}
     function pauseAll() {
         console.log("Pause all triggered");
         audioRefs.current.forEach((ref, index) => {

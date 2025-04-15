@@ -102,8 +102,8 @@ export default function AudioCircle({
 
 
 
-// In AudioCircle.tsx, update the audio ref effect to correctly handle muting
 
+// And in AudioCircle.tsx, update the useEffect for audioRef:
 useEffect(() => {
     if (audioRef && 'current' in audioRef) {
         audioRef.current = {
@@ -113,19 +113,6 @@ useEffect(() => {
                     Tone.start();
                     play();
                     playerRef.current = true;
-
-                    // Set volume and pan again when playing starts
-                    // Use the fixed mapping approach
-                    const minXPercent = marginPercent;
-                    const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
-                    const minYPercent = marginPercent;
-                    const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
-                    
-                    const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
-                    const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
-                    
-                    setPan(panValue);
-                    setVolume(volumeValue);
                 }
             },
             stop: () => {
@@ -138,12 +125,26 @@ useEffect(() => {
             },
             toggle: () => {
                 toggleLoop();
+            },
+            // Apply muting based on current position
+            applyPositionMuting: () => {
+                const minXPercent = marginPercent;
+                const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
+                const minYPercent = marginPercent;
+                const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
+                
+                const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
+                const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
+                
+                // Set pan value
+                setPan(panValue);
+                
+                // Apply volume and enforce muting based on threshold
+                setVolume(volumeValue);
             }
         };
     }
-}, [audioRef, play, pause, toggleLoop, position.xPercent, position.yPercent, setPan, setVolume, stop, boundingBox, circleSize, marginPercent]);
-    // Initialize audio parameters once loaded
-    useEffect(() => {
+}, [audioRef, play, stop, pause, toggleLoop, position, boundingBox, circleSize, marginPercent, setPan, setVolume]); useEffect(() => {
         if (loaded) {
             const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
             const volumeValue = mapRange(position.yPercent, 0, 100, silentVolume, 0);

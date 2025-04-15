@@ -139,32 +139,42 @@ export function useAudioCircle(audioUrl: string) {
     }
   };
 
-  // Set volume function
-  const setVolume = (value: number) => {
-    if (!volumeRef.current) return;
-    const clampedValue = Math.max(-60, Math.min(value, 0));
-    setCurrentVolume(clampedValue);
-    try {
-      if (value <= volumeThreshold) {
-        if (!isMuted) {
-          console.log(`Volume (${value} dB) exceeded threshold (${volumeThreshold} dB), muting`);
-          volumeRef.current.mute = true;
-          setIsMuted(true);
-        }
-      } else {
-        if (isMuted) {
-          console.log(`Volume (${value} dB) below threshold (-10 dB), unmuting`);
-          volumeRef.current.mute = false;
-          setIsMuted(false);
-        }
-        
-        // Apply actual volume to the volume node
-        volumeRef.current.volume.value = clampedValue;
+ // Set volume function with CORRECTED muting logic
+ const setVolume = (value: number) => {
+  if (!volumeRef.current) return;
+  
+  // Store the incoming volume value for display purposes
+  const clampedValue = Math.max(-60, Math.min(value, 0));
+  setCurrentVolume(clampedValue);
+  
+  try {
+    // CORRECT LOGIC FOR MUTING:
+    // In dB, MORE negative means QUIETER
+    // So value <= threshold means QUIETER than threshold (should mute)
+    // And value > threshold means LOUDER than threshold (should play)
+    
+    if (value <= volumeThreshold) {
+      // Volume is QUIETER than threshold, should mute
+      if (!isMuted) {
+        console.log(`Volume (${value.toFixed(1)} dB) is quieter than threshold (${volumeThreshold} dB), muting`);
+        volumeRef.current.mute = true;
+        setIsMuted(true);
       }
-    } catch (error) {
-      console.error("Error setting volume:", error);
+    } else {
+      // Volume is LOUDER than threshold, should unmute
+      if (isMuted) {
+        console.log(`Volume (${value.toFixed(1)} dB) is louder than threshold (${volumeThreshold} dB), unmuting`);
+        volumeRef.current.mute = false;
+        setIsMuted(false);
+      }
+      
+      // Only set volume when not muted
+      volumeRef.current.volume.value = clampedValue;
     }
-  };
+  } catch (error) {
+    console.error("Error setting volume:", error);
+  }
+};
 
   // Toggle loop function
   const toggleLoop = () => {
