@@ -25,7 +25,7 @@ export default function AudioCircle({
     audioRef,
     instrumentName,
     onPlay,
-    onStop
+    onStop,
 }: Props) {
     const {
         play,
@@ -37,7 +37,8 @@ export default function AudioCircle({
         toggleLoop,
         currentVolume,
         currentPan,
-        isPlaying
+        isPlaying,
+        isMuted
     } = useAudioCircle(audioUrl);
 
     const [dragging, setDragging] = useState<boolean>(false);
@@ -115,7 +116,6 @@ export default function AudioCircle({
                         const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
                         const volumeValue =  mapRange(position.yPercent, 0, 100, -30, 0);
                         setPan(panValue);
-                        
                         setVolume(volumeValue);
                     }
                 },

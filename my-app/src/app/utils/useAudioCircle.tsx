@@ -152,14 +152,14 @@ export function useAudioCircle(audioUrl: string) {
         // If we're above threshold and not already muted, mute
         if (!isMuted) {
           console.log(`Volume (${value} dB) exceeded threshold (-10 dB), muting`);
-          Tone.Destination.mute = true;
+          volumeRef.current.mute = true;
           setIsMuted(true);
         }
       } else {
         // Below threshold, unmute if needed
         if (isMuted) {
           console.log(`Volume (${value} dB) below threshold (-10 dB), unmuting`);
-          Tone.Destination.mute = false;
+          volumeRef.current.mute = false;
           setIsMuted(false);
         }
         
