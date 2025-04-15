@@ -78,11 +78,12 @@ export default function AudioInterface({
                         <Text size="2" className="text-gray-400">
                             <InfoCircledIcon /> By {authorName}
                         </Text>
-                        {currentTrack && (
+                        {/* temp hide the track info */}
+                        {/* {currentTrack && (
                             <Badge color="orange" variant="soft" radius="full">
                                 Now playing: {currentTrack}
                             </Badge>
-                        )}
+                        )} */}
                     </Flex>
                 </Box>
                 
