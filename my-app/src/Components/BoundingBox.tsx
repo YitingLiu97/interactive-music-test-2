@@ -89,7 +89,6 @@ function playAll() {
     audioRefs.current.forEach((ref, index) => {
         if (ref.current && ref.current.play) {
             console.log(`Playing track ${index}`);
-            // Start playback for all tracks
             ref.current.play();
         } else {
             console.log(`Ref ${index} is not ready`);
@@ -99,7 +98,7 @@ function playAll() {
     // After a small delay to ensure all tracks have started,
     // apply muting based on current position
     setTimeout(() => {
-        audioRefs.current.forEach((ref, index) => {
+        audioRefs.current.forEach((ref) => {
             if (ref.current && ref.current.applyPositionMuting) {
                 ref.current.applyPositionMuting();
             }

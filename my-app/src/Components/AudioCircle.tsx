@@ -152,7 +152,7 @@ useEffect(() => {
             setPan(panValue);
             setVolume(volumeValue);
         }
-    }, [loaded, position.xPercent, position.yPercent, setPan, setVolume]);
+    }, [loaded, position.xPercent, position.yPercent, setPan, setVolume, silentVolume]);
 
     function onMouseDown(e: React.MouseEvent) {
         e.stopPropagation();
@@ -172,7 +172,7 @@ useEffect(() => {
         setDragging(false);
     }
 
-    function onMouseMove(e: MouseEvent) {
+    const onMouseMove = useCallback((e: MouseEvent) => {
         if (!dragging || !boundingBox) return;
     
         // Calculate new position based on mouse coordinates
@@ -215,7 +215,7 @@ useEffect(() => {
       
         setPan(panValue);
         setVolume(mappedVolume);
-    }
+    }, [dragging, boundingBox, marginPercent, circleSize, setPan, setVolume]);
 
 
     const mapAudioParams = useCallback(() => {
@@ -245,7 +245,7 @@ useEffect(() => {
         
         setPan(panValue);
         setVolume(volumeValue);
-    }, [loaded, mapAudioParams, setPan, setVolume]);
+    }, [loaded, mapAudioParams, setPan, setVolume, boundingBox]);
     
     // Effect to handle boundary box changes (including resize)
     useEffect(() => {
