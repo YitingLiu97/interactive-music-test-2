@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback} from "react";
 import { useAudioCircle } from "@/app/utils/useAudioCircle";
 import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
@@ -165,32 +165,40 @@ export default function AudioCircle({
 
     function onMouseMove(e: MouseEvent) {
         if (!dragging || !boundingBox) return;
-
+    
         // Calculate new position based on mouse coordinates
         const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
             { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
-
+    
         // Calculate position as percentage of container
         const newXPercent = ((e.clientX - container.left) / container.width) * 100;
         const newYPercent = ((e.clientY - container.top) / container.height) * 100;
-
+    
         // Apply boundaries to prevent going outside the bounding box
         // or into the audio interface area
+        const minXPercent = marginPercent;
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
+        
+        const minYPercent = marginPercent;
         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
-
-        const boundedXPercent = Math.max(marginPercent, Math.min(newXPercent, maxXPercent));
-        const boundedYPercent = Math.max(marginPercent, Math.min(newYPercent, maxYPercent));
-
+    
+        const boundedXPercent = Math.max(minXPercent, Math.min(newXPercent, maxXPercent));
+        const boundedYPercent = Math.max(minYPercent, Math.min(newYPercent, maxYPercent));
+    
         // Update the circle size based on vertical position (smaller as it goes up)
-        const newCircleSize = mapRange(boundedYPercent, 0, 100, 20,80);
+        const newCircleSize = mapRange(boundedYPercent, 0, 100, 20, 80);
         setCircleSize(newCircleSize);
-
-        // Set pan and volume based on position
-        const panValue = mapRange(boundedXPercent, 0, 100, -1, 1);
-        const mappedVolume = mapRange(boundedYPercent, 0, 100, -30, 0); // Reversed for intuitive control
+    
+        // FIXED MAPPING: Map from the actual available range to full -1 to 1 range
+        // This ensures the full pan range is utilized within the constrained area
+        const panValue = mapRange(boundedXPercent, minXPercent, maxXPercent, -1, 1);
+        
+        // Volume mapping (similarly adjusted to use full range)
+        const mappedVolume = mapRange(boundedYPercent, minYPercent, maxYPercent, -30, 0);
+        
         console.log("mappedVolume value is " + mappedVolume);
-
+        console.log("panValue is " + panValue + " (position: " + boundedXPercent.toFixed(1) + "%)");
+    
         setPosition({
             xPercent: boundedXPercent,
             yPercent: boundedYPercent
@@ -199,6 +207,51 @@ export default function AudioCircle({
         setPan(panValue);
         setVolume(mappedVolume);
     }
+
+
+    const mapAudioParams = useCallback(() => {
+        if (!boundingBox) return { panValue: 0, volumeValue: 0 };
+        
+        // Calculate the constrained movement area
+        const minXPercent = marginPercent;
+        const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
+        
+        const minYPercent = marginPercent;
+        const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
+        
+        // Map current position to full parameter ranges
+        const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
+        const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
+        
+        return { panValue, volumeValue };
+    }, [position, boundingBox, circleSize, marginPercent]);
+    
+    // Function to update audio parameters
+    const updateAudioParams = useCallback(() => {
+        if (!loaded || !boundingBox) return;
+        
+        const { panValue, volumeValue } = mapAudioParams();
+        
+        console.log(`Updating after resize - Pan: ${panValue.toFixed(2)}, Volume: ${volumeValue.toFixed(1)} dB`);
+        
+        setPan(panValue);
+        setVolume(volumeValue);
+    }, [loaded, mapAudioParams, setPan, setVolume]);
+    
+    // Effect to handle boundary box changes (including resize)
+    useEffect(() => {
+        if (loaded && boundingBox) {
+            console.log("Bounding box changed:", boundingBox);
+            updateAudioParams();
+        }
+    }, [loaded, boundingBox, updateAudioParams]);
+    
+    // Optional: Also add this to your existing effect that initializes parameters after loading
+    useEffect(() => {
+        if (loaded) {
+            updateAudioParams();
+        }
+    }, [loaded, updateAudioParams]);
 
     // Reference to the bounding box element
     const boxRef = useRef<HTMLDivElement | null>(null);
