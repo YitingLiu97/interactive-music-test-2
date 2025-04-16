@@ -27,9 +27,9 @@ export default function BoundingBox() {
             instrumentName: "piano"
         },
         {
-            audioUrl: "/resources/bass.mp3",
+            audioUrl: "/resources/baritone-guitar.mp3",
             circleColor: "purple",
-            instrumentName: "bass"
+            instrumentName: "baritone-guitar"
         },
         {
             audioUrl: "/resources/drums.mp3",
@@ -37,14 +37,9 @@ export default function BoundingBox() {
             instrumentName: "drums"
         },
         {
-            audioUrl: "/resources/timp.mp3",
-            circleColor: "brown",
-            instrumentName: "timp"
-        },
-        {
-            audioUrl: "/resources/pedal-steel.mp3",
+            audioUrl: "/resources/vocal.mp3",
             circleColor: "blue",
-            instrumentName: "pedal-steel"
+            instrumentName: "vocal"
         }
     ];
 
