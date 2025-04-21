@@ -9,13 +9,35 @@ export function useAudioCircle(audioUrl: string) {
   const [currentVolume, setCurrentVolume] = useState(0);
   const [currentPan, setCurrentPan] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+ // Audio analysis state
+ const [audioData, setAudioData] = useState<{
+  fftData: Float32Array | null;
+  waveformData: Float32Array | null;
+  amplitude: number;
+  isQuiet: boolean;
+}>({
+  fftData: null,
+  waveformData: null,
+  amplitude: 0,
+  isQuiet: true
+});
 
   const volumeThreshold = -15;
-  // Use refs to keep track of player instances to prevent multiple instances
+  const quietThreshold = -30; // dB threshold to determine if audio is "quiet"
+    // Use refs to keep track of player instances to prevent multiple instances
+
+
   const playerRef = useRef<Tone.Player | null>(null);
   const pannerRef = useRef<Tone.Panner | null>(null);
   const volumeRef = useRef<Tone.Volume | null>(null);
   
+    // Add audio analysis refs
+    const analyzerRef = useRef<Tone.FFT | null>(null);
+    const waveformRef = useRef<Tone.Waveform | null>(null);
+    const meterRef = useRef<Tone.Meter | null>(null);
+    const analysisFrameRef = useRef<number | null>(null);
+    
+
   // Add refs to track current values without triggering re-renders
   const currentVolumeRef = useRef<number>(currentVolume);
   const currentPanRef = useRef<number>(currentPan);
@@ -33,6 +55,20 @@ export function useAudioCircle(audioUrl: string) {
     if (volumeRef.current) {
       volumeRef.current.dispose();
     }
+    if (analyzerRef.current) {
+      analyzerRef.current.dispose();
+    }
+    if (waveformRef.current) {
+      waveformRef.current.dispose();
+    }
+    if (meterRef.current) {
+      meterRef.current.dispose();
+    }
+    
+    // Cancel any ongoing animation frame
+    if (analysisFrameRef.current) {
+      cancelAnimationFrame(analysisFrameRef.current);
+    }
 
     // Create new audio components
     try {
@@ -43,6 +79,22 @@ export function useAudioCircle(audioUrl: string) {
       // Create a panner node
       const pannerNode = new Tone.Panner(0).connect(volumeNode);
       pannerRef.current = pannerNode;
+      
+      // Create analysis nodes
+      // FFT for frequency analysis - 512 size is a good balance between detail and performance
+      const fftAnalyzer = new Tone.FFT(512);
+      analyzerRef.current = fftAnalyzer;
+      
+      // Waveform for time-domain analysis
+      const waveformAnalyzer = new Tone.Waveform(1024);
+      waveformRef.current = waveformAnalyzer;
+      
+      // Meter for amplitude/volume detection
+      const meter = new Tone.Meter();
+      meterRef.current = meter;
+      
+      // Connect analysis nodes
+      pannerNode.fan(fftAnalyzer, waveformAnalyzer, meter);
 
       // Create player with fixed settings
       const player = new Tone.Player({
@@ -73,8 +125,87 @@ export function useAudioCircle(audioUrl: string) {
       if (volumeRef.current) {
         volumeRef.current.dispose();
       }
+      if (analyzerRef.current) {
+        analyzerRef.current.dispose();
+      }
+      if (waveformRef.current) {
+        waveformRef.current.dispose();
+      }
+      if (meterRef.current) {
+        meterRef.current.dispose();
+      }
+      if (analysisFrameRef.current) {
+        cancelAnimationFrame(analysisFrameRef.current);
+      }
     };
   }, [audioUrl]); // Only recreate when audioUrl changes
+
+  
+  // Function to analyze audio data
+  const analyzeAudio = () => {
+    if (!isPlaying || 
+        !analyzerRef.current || 
+        !waveformRef.current || 
+        !meterRef.current) {
+      return;
+    }
+    
+    try {
+      // Get FFT data (frequency domain)
+      const fftData = analyzerRef.current.getValue();
+      
+      // Get waveform data (time domain)
+      const waveformData = waveformRef.current.getValue();
+      
+      // Get current amplitude in dB
+      const amplitude = meterRef.current.getValue();
+      
+      // Determine if audio is quiet based on amplitude
+      const isQuiet = Array.isArray(amplitude) 
+        ? Math.max(...amplitude) < quietThreshold 
+        : amplitude < quietThreshold;
+      
+      // Update audio data state
+      setAudioData({
+        fftData,
+        waveformData,
+        amplitude: Array.isArray(amplitude) ? Math.max(...amplitude) : amplitude,
+        isQuiet
+      });
+      
+      // Schedule next analysis frame
+      analysisFrameRef.current = requestAnimationFrame(analyzeAudio);
+    } catch (error) {
+      console.error("Error analyzing audio:", error);
+    }
+  };
+
+  // Start/stop audio analysis based on playback state
+  useEffect(() => {
+    if (isPlaying) {
+      // Start analysis loop
+      analyzeAudio();
+    } else {
+      // Stop analysis loop
+      if (analysisFrameRef.current) {
+        cancelAnimationFrame(analysisFrameRef.current);
+      }
+      
+      // Reset audio data when stopped
+      setAudioData({
+        fftData: null,
+        waveformData: null,
+        amplitude: 0,
+        isQuiet: true
+      });
+    }
+    
+    return () => {
+      if (analysisFrameRef.current) {
+        cancelAnimationFrame(analysisFrameRef.current);
+      }
+    };
+  }, [isPlaying]);
 
   // Play function
   const play = () => {
@@ -150,6 +281,7 @@ export function useAudioCircle(audioUrl: string) {
     }
   };
 
+  
   // Set volume function with CORRECTED muting logic - FIXED to avoid infinite update loops
   const setVolume = (value: number) => {
     if (!volumeRef.current) return;
@@ -235,6 +367,7 @@ export function useAudioCircle(audioUrl: string) {
     isLooping,
     currentVolume,
     currentPan,
-    isMuted
+    isMuted,
+    audioData
   };
 }

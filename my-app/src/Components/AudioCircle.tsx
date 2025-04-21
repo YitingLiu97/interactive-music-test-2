@@ -38,7 +38,8 @@ export default function AudioCircle({
         currentVolume,
         currentPan,
         isPlaying,
-        isMuted
+        isMuted,
+        audioData
     } = useAudioCircle(audioUrl);
 
     const [dragging, setDragging] = useState<boolean>(false);
@@ -105,7 +106,7 @@ export default function AudioCircle({
 
 // And in AudioCircle.tsx, update the useEffect for audioRef:
 useEffect(() => {
-    if (audioRef && 'current' in audioRef) {
+    if (audioRef &&  audioRef.current &&  'current' in audioRef) {
         audioRef.current = {
             play: () => {
                 // Make sure we don't call play multiple times
@@ -296,6 +297,7 @@ useEffect(() => {
                 instrumentName={instrumentName}
                 isPlaying={isPlaying}
                 isMuted={isMuted}
+                audioData={audioData} // Pass the audio analysis data to CircleUI
             />
 
             <div

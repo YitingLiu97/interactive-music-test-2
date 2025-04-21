@@ -5,6 +5,8 @@ export interface AudioControlRef {
     pause: () => void;
     toggle: () => void;
     applyPositionMuting: () => void; // Add this
+    getAudioData: ()=>void;
+    
 }
 export interface BoundingBox {
     x: number;
