@@ -8,9 +8,18 @@ import {
     Card, 
     Slider, 
     Box,
-    Separator
+    Separator,
+    Tooltip
 } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+
+// Define a type for audio sections
+interface AudioSection {
+    id: string;
+    name: string;
+    startTime: number; // Start time in seconds
+    endTime: number;   // End time in seconds
+}
 
 type Props = {
     trackListName: string;
@@ -20,7 +29,11 @@ type Props = {
     onToggleAll: () => void;
     isPlaying: boolean;
     isLooping: boolean;
-    currentTrack: string | null;
+    currentTrack: string|null ;
+    totalDuration?: number; // Total duration in seconds
+    // New props
+    sections?: AudioSection[];
+    onSeekTo?: (timeInSeconds: number) => void;
 };
 
 export default function AudioInterface({ 
@@ -31,7 +44,16 @@ export default function AudioInterface({
     onToggleAll,
     isPlaying,
     isLooping,
-    currentTrack
+    totalDuration = 180, // Default 3 minutes
+    sections = [
+        { id: '1', name: 'Intro', startTime: 0, endTime: 15 },
+        { id: '2', name: 'Verse 1', startTime: 15, endTime: 45 },
+        { id: '3', name: 'Chorus', startTime: 45, endTime: 75 },
+        { id: '4', name: 'Verse 2', startTime: 75, endTime: 105 },
+        { id: '5', name: 'Bridge', startTime: 105, endTime: 135 },
+        { id: '6', name: 'Outro', startTime: 135, endTime: 180 }
+    ],
+    onSeekTo = () => {},
 }: Props) {
     // Simulated playback progress (would need to be connected to actual audio playback)
     const [progress, setProgress] = React.useState(0);
@@ -65,6 +87,33 @@ export default function AudioInterface({
         }
     }, [isPlaying]);
 
+    // Calculate progress percentage from time in seconds
+    const calculateProgressFromTime = (timeInSeconds: number): number => {
+        return (timeInSeconds / totalDuration) * 100;
+    };
+
+    // Calculate time in seconds from progress percentage
+    const calculateTimeFromProgress = (progressPercentage: number): number => {
+        return (progressPercentage / 100) * totalDuration;
+    };
+
+    // Handle section click
+    const handleSectionClick = (section: AudioSection) => {
+        const newProgress = calculateProgressFromTime(section.startTime);
+        setProgress(newProgress);
+        onSeekTo(section.startTime);
+    };
+
+    // Get current section based on progress
+    const getCurrentSection = (): AudioSection | undefined => {
+        const currentTimeInSeconds = calculateTimeFromProgress(progress);
+        return sections.find(
+            section => currentTimeInSeconds >= section.startTime && currentTimeInSeconds <= section.endTime
+        );
+    };
+
+    const currentSection = getCurrentSection();
+
     return (
         <Card className="w-full h-[150px] bg-black text-white rounded-none">
             <Flex direction="row" gap="4" align="center" className="h-full">
@@ -77,11 +126,10 @@ export default function AudioInterface({
                         <Text size="2" className="text-gray-400">
                             <InfoCircledIcon /> By {authorName}
                         </Text>
-                        {currentTrack && (
-                            <></>
-                            // <Badge color="orange" variant="soft" radius="full">
-                            //     Now playing: {currentTrack}
-                            // </Badge>
+                        {currentSection && (
+                            <Text size="2" className="text-orange-400">
+                                Now playing: {currentSection.name}
+                            </Text>
                         )}
                     </Flex>
                 </Box>
@@ -109,20 +157,71 @@ export default function AudioInterface({
                         </Button>
                     </Flex>
                     
-                    <Flex align="center" gap="3" className="px-2">
-                        <Text size="1" className="text-gray-300 w-10">
-                            {formatTime(progress)}
-                        </Text>
-                        <Slider 
-                            value={[progress]} 
-                            max={100}
-                            step={0.1}
-                            className="flex-1"
-                            color="orange"
-                        />
-                        <Text size="1" className="text-gray-300 w-10">
-                            {formatTime(100)}
-                        </Text>
+                    <Flex direction="column" className="px-2 relative">
+                        {/* Time indicators */}
+                        <Flex align="center" gap="3">
+                            <Text size="1" className="text-gray-300 w-10">
+                                {formatTime(calculateTimeFromProgress(progress))}
+                            </Text>
+                            <Box className="flex-1 relative">
+                                <Slider 
+                                    value={[progress]} 
+                                    max={100}
+                                    step={0.1}
+                                    color="orange"
+                                    onValueChange={(value) => {
+                                        const newProgress = value[0];
+                                        setProgress(newProgress);
+                                        onSeekTo(calculateTimeFromProgress(newProgress));
+                                    }}
+                                />
+                                
+                                {/* Section markers */}
+                                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                                    {sections.map((section, index) => (
+                                        <div 
+                                            key={section.id}
+                                            className="absolute top-0 h-full"
+                                            style={{
+                                                left: `${calculateProgressFromTime(section.startTime)}%`,
+                                                width: `${calculateProgressFromTime(section.endTime - section.startTime)}%`,
+                                            }}
+                                        >
+                                            {/* Marker line */}
+                                            {index > 0 && (
+                                                <div 
+                                                    className="absolute top-0 left-0 w-0.5 h-full bg-gray-500"
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </Box>
+                            <Text size="1" className="text-gray-300 w-10">
+                                {formatTime(totalDuration)}
+                            </Text>
+                        </Flex>
+                        
+                        {/* Section labels */}
+                        <Flex className="mt-1 relative h-6">
+                            {sections.map((section) => (
+                                <Tooltip key={section.id} content={`Jump to ${section.name}`}>
+                                    <Button 
+                                        size="1"
+                                        variant="ghost"
+                                        className="p-0 h-6 text-xs absolute top-0 transform -translate-x-1/2"
+                                        style={{
+                                            left: `${calculateProgressFromTime(section.startTime + (section.endTime - section.startTime) / 2)}%`,
+                                            maxWidth: `${calculateProgressFromTime(section.endTime - section.startTime)}%`,
+                                            color: currentSection?.id === section.id ? 'rgb(255, 160, 90)' : 'rgb(156, 163, 175)',
+                                        }}
+                                        onClick={() => handleSectionClick(section)}
+                                    >
+                                        {section.name}
+                                    </Button>
+                                </Tooltip>
+                            ))}
+                        </Flex>
                     </Flex>
                 </Flex>
                 
@@ -134,10 +233,8 @@ export default function AudioInterface({
 }
 
 // Helper function to format time as mm:ss
-function formatTime(progress: number): string {
-    // Assuming total length is 3 minutes (180 seconds)
-    const totalSeconds = (progress / 100) * 180;
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = Math.floor(totalSeconds % 60);
+function formatTime(timeInSeconds: number): string {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
