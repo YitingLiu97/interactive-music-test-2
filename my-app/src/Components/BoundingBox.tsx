@@ -203,8 +203,8 @@ export default function BoundingBox() {
 
             {/* Audio interface outside the bounding box */}
             <AudioInterface
-                trackListName="air traffic noise"
-                authorName="alex ruthmann"
+                trackListName="Air Traffic - The Magician's Wife"
+                authorName="Clara Berry and Wooldog"
                 onPlayAll={playAll}
                 onPauseAll={pauseAll}
                 onToggleAll={toggleAll}
