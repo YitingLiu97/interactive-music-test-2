@@ -22,25 +22,55 @@ export default function BoundingBox() {
 
     const audioInfos: AudioInfo[] = [
         {
-            audioUrl: "/resources/piano.mp3",
+            audioUrl: "/resources/ATCBaritoneGuitar_03.mp3",
             circleColor: "red",
-            instrumentName: "piano"
+            instrumentName: "BaritoneGuitar"
         },
         {
-            audioUrl: "/resources/baritone-guitar.mp3",
-            circleColor: "purple",
-            instrumentName: "baritone-guitar"
+            audioUrl: "/resources/ATCBass_03.mp3",
+            circleColor: "oraneg",
+            instrumentName: "Bass"
         },
         {
-            audioUrl: "/resources/drums.mp3",
-            circleColor: "gray",
-            instrumentName: "drums"
+            audioUrl: "/resources/ATCBGVocals_03.mp3",
+            circleColor: "yellow",
+            instrumentName: "BGVocals"
         },
         {
-            audioUrl: "/resources/vocal.mp3",
+            audioUrl: "/resources/ATCDrums_03.mp3",
+            circleColor: "green",
+            instrumentName: "Drums"
+        },
+        {
+            audioUrl: "/resources/ATCLeadVocals_03.mp3",
+            circleColor: "teal",
+            instrumentName: "LeadVocals"
+        },
+        {
+            audioUrl: "/resources/ATCPedalSteel_03.mp3",
             circleColor: "blue",
-            instrumentName: "vocal"
-        }
+            instrumentName: "PedalSteel"
+        },
+        {
+            audioUrl: "/resources/ATCPiano_03.mp3",
+            circleColor: "purple",
+            instrumentName: "Piano"
+        },
+        {
+            audioUrl: "/resources/ATCTimpani_03.mp3",
+            circleColor: "gray",
+            instrumentName: "Timpani"
+        },
+        // {
+        //     audioUrl: "/resources/ATCTwoMix_03.L.mp3",
+        //     circleColor: "blue",
+        //     instrumentName: "Mix_L"
+        // },
+        // {
+        //     audioUrl: "/resources/ATCTwoMix_03.R.mp3",
+        //     circleColor: "blue",
+        //     instrumentName: "Mix_R"
+        // }
     ];
 
     // Initialize the refs array with the correct length first
