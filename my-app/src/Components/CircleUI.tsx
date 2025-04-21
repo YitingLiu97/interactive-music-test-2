@@ -227,7 +227,7 @@ export default function CircleUI({
                 width: circleSize,
                 height: circleSize,
                 borderRadius: "50%",
-                backgroundColor: dynamicColor,
+                backgroundColor: audioData?.isQuiet? "gray":dynamicColor,
                 position: "absolute",
                 left: 0,
                 top: 0,
@@ -360,8 +360,8 @@ export default function CircleUI({
                     ) : (
                         // Default pulsing border when no waveform data or audio is quiet
                         <div className="absolute inset-0 rounded-full" style={{
-                            animation: isMuted ? "none" : `pulse 2s infinite`,
-                            border: isMuted ? "none" : `2px solid ${color}`,
+                            animation: isMuted || audioData?.isQuiet ? "none" : `pulse 2s infinite`,
+                            border: isMuted || audioData?.isQuiet  ? "none" : `2px solid ${color}`,
                             opacity: 0.6,
                             transform: `scale(${pulseAmplitude})`,
                         }}>
@@ -475,8 +475,9 @@ export default function CircleUI({
                 </div>
             )}
             
+         
             {/* Audio level meter (only visible when playing) */}
-            {isPlaying && !isMuted && audioData && !audioData.isQuiet && (
+            {/* {isPlaying && !isMuted && audioData && !audioData.isQuiet && (
                 <div style={{
                     position: "absolute",
                     bottom: -10,
@@ -495,7 +496,7 @@ export default function CircleUI({
                         transition: "width 0.1s ease"
                     }} />
                 </div>
-            )}
+            )} */}
             
             {/* Add some CSS animations for the playing state */}
             <style jsx global>{`

@@ -29,8 +29,9 @@ type Props = {
     onToggleAll: () => void;
     isPlaying: boolean;
     isLooping: boolean;
-    currentTrack: string|null ;
+    currentTrack: string|null;
     totalDuration?: number; // Total duration in seconds
+    currentTime?: number; // Current playback time in seconds
     // New props
     sections?: AudioSection[];
     onSeekTo?: (timeInSeconds: number) => void;
@@ -44,7 +45,9 @@ export default function AudioInterface({
     onToggleAll,
     isPlaying,
     isLooping,
+    currentTrack,
     totalDuration = 180, // Default 3 minutes
+    currentTime = 0, // Current time from parent
     sections = [
         { id: '1', name: 'Intro', startTime: 0, endTime: 15 },
         { id: '2', name: 'Verse 1', startTime: 15, endTime: 45 },
@@ -55,38 +58,9 @@ export default function AudioInterface({
     ],
     onSeekTo = () => {},
 }: Props) {
-    // Simulated playback progress (would need to be connected to actual audio playback)
-    const [progress, setProgress] = React.useState(0);
+    // Progress based on currentTime prop (percentage)
+    const progress = (currentTime / totalDuration) * 100;
     
-    // Update progress bar if playing
-    React.useEffect(() => {
-        let intervalId: NodeJS.Timeout;
-        
-        if (isPlaying) {
-            intervalId = setInterval(() => {
-                setProgress(prev => {
-                    if (prev >= 100) {
-                        if (isLooping) return 0;
-                        clearInterval(intervalId);
-                        return 100;
-                    }
-                    return prev + 0.1;
-                });
-            }, 100);
-        }
-        
-        return () => {
-            if (intervalId) clearInterval(intervalId);
-        };
-    }, [isPlaying, isLooping]);
-    
-    // Reset progress when playback stops
-    React.useEffect(() => {
-        if (!isPlaying) {
-            setProgress(0);
-        }
-    }, [isPlaying]);
-
     // Calculate progress percentage from time in seconds
     const calculateProgressFromTime = (timeInSeconds: number): number => {
         return (timeInSeconds / totalDuration) * 100;
@@ -99,16 +73,21 @@ export default function AudioInterface({
 
     // Handle section click
     const handleSectionClick = (section: AudioSection) => {
-        const newProgress = calculateProgressFromTime(section.startTime);
-        setProgress(newProgress);
         onSeekTo(section.startTime);
     };
 
-    // Get current section based on progress
+    // Handle slider change
+    const handleSliderChange = (value: number[]) => {
+        if (value.length > 0) {
+            const newTime = calculateTimeFromProgress(value[0]);
+            onSeekTo(newTime);
+        }
+    };
+
+    // Get current section based on currentTime
     const getCurrentSection = (): AudioSection | undefined => {
-        const currentTimeInSeconds = calculateTimeFromProgress(progress);
         return sections.find(
-            section => currentTimeInSeconds >= section.startTime && currentTimeInSeconds <= section.endTime
+            section => currentTime >= section.startTime && currentTime <= section.endTime
         );
     };
 
@@ -126,9 +105,14 @@ export default function AudioInterface({
                         <Text size="2" className="text-gray-400">
                             <InfoCircledIcon /> By {authorName}
                         </Text>
-                        {currentSection && (
+                        {currentTrack && (
                             <Text size="2" className="text-orange-400">
-                                Now playing: {currentSection.name}
+                                Now playing: {currentTrack}
+                            </Text>
+                        )}
+                        {currentSection && (
+                            <Text size="2" className="text-blue-400">
+                                Section: {currentSection.name}
                             </Text>
                         )}
                     </Flex>
@@ -161,7 +145,7 @@ export default function AudioInterface({
                         {/* Time indicators */}
                         <Flex align="center" gap="3">
                             <Text size="1" className="text-gray-300 w-10">
-                                {formatTime(calculateTimeFromProgress(progress))}
+                                {formatTime(currentTime)}
                             </Text>
                             <Box className="flex-1 relative">
                                 <Slider 
@@ -169,11 +153,7 @@ export default function AudioInterface({
                                     max={100}
                                     step={0.1}
                                     color="orange"
-                                    onValueChange={(value) => {
-                                        const newProgress = value[0];
-                                        setProgress(newProgress);
-                                        onSeekTo(calculateTimeFromProgress(newProgress));
-                                    }}
+                                    onValueChange={handleSliderChange}
                                 />
                                 
                                 {/* Section markers */}

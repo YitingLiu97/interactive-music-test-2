@@ -52,17 +52,21 @@ export default function AudioCircle({
     const marginPercent = 10;
     const silentVolume = -60;
 
+    // Use a ref to track playing state without causing re-renders
     const playerRef = useRef(false);
     const initializedRef = useRef(false);
 
     // Update position reference when playing state changes and notify parent
     useEffect(() => {
-        playerRef.current = isPlaying;
-        
-        if (isPlaying && onPlay) {
-            onPlay();
-        } else if (!isPlaying && onStop) {
-            onStop();
+        // Only trigger callbacks when the state actually changes
+        if (playerRef.current !== isPlaying) {
+            playerRef.current = isPlaying;
+            
+            if (isPlaying && onPlay) {
+                onPlay();
+            } else if (!isPlaying && onStop) {
+                onStop();
+            }
         }
     }, [isPlaying, onPlay, onStop]);
 
@@ -101,51 +105,49 @@ export default function AudioCircle({
         };
     }, []);
 
-
-
-
-// And in AudioCircle.tsx, update the useEffect for audioRef:
-useEffect(() => {
-    if (audioRef &&  audioRef.current &&  'current' in audioRef) {
-        audioRef.current = {
-            play: () => {
-                // Make sure we don't call play multiple times
-                if (!playerRef.current) {
-                    Tone.start();
-                    play();
-                    playerRef.current = true;
+    // Expose methods to the parent component via ref
+    // IMPORTANT: Only update the ref once to prevent infinite loops
+    useEffect(() => {
+        if (audioRef && audioRef.current === null) {
+            audioRef.current = {
+                play: () => {
+                    // Make sure we don't call play multiple times
+                    if (!playerRef.current) {
+                        Tone.start();
+                        play();
+                    }
+                },
+                stop: () => {
+                    stop();
+                },
+                pause: () => {
+                    pause();
+                },
+                toggle: () => {
+                    toggleLoop();
+                },
+                // Apply muting based on current position
+                applyPositionMuting: () => {
+                    const minXPercent = marginPercent;
+                    const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
+                    const minYPercent = marginPercent;
+                    const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
+                    
+                    const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
+                    const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
+                    
+                    // Set pan value
+                    setPan(panValue);
+                    
+                    // Apply volume and enforce muting based on threshold
+                    setVolume(volumeValue);
                 }
-            },
-            stop: () => {
-                stop();
-                playerRef.current = false;
-            },
-            pause: () => {
-                pause();
-                playerRef.current = false;
-            },
-            toggle: () => {
-                toggleLoop();
-            },
-            // Apply muting based on current position
-            applyPositionMuting: () => {
-                const minXPercent = marginPercent;
-                const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
-                const minYPercent = marginPercent;
-                const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
-                
-                const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
-                const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
-                
-                // Set pan value
-                setPan(panValue);
-                
-                // Apply volume and enforce muting based on threshold
-                setVolume(volumeValue);
-            }
-        };
-    }
-}, [audioRef, play, stop, pause, toggleLoop, position, boundingBox, circleSize, marginPercent, setPan, setVolume]); useEffect(() => {
+            };
+        }
+    }, [audioRef, play, stop, pause, toggleLoop, setPan, setVolume, position, boundingBox, circleSize, marginPercent]);
+
+    // Update audio parameters when position or loaded state changes
+    useEffect(() => {
         if (loaded) {
             const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
             const volumeValue = mapRange(position.yPercent, 0, 100, silentVolume, 0);
@@ -165,7 +167,6 @@ useEffect(() => {
         if (!playerRef.current) {
             Tone.start();
             play();
-            playerRef.current = true;
         }
     }
 
@@ -205,9 +206,6 @@ useEffect(() => {
         
         // Volume mapping (similarly adjusted to use full range)
         const mappedVolume = mapRange(boundedYPercent, minYPercent, maxYPercent, -30, 0);
-        
-        console.log("mappedVolume value is " + mappedVolume);
-        console.log("panValue is " + panValue + " (position: " + boundedXPercent.toFixed(1) + "%)");
     
         setPosition({
             xPercent: boundedXPercent,
@@ -217,7 +215,6 @@ useEffect(() => {
         setPan(panValue);
         setVolume(mappedVolume);
     }, [dragging, boundingBox, marginPercent, circleSize, setPan, setVolume]);
-
 
     const mapAudioParams = useCallback(() => {
         if (!boundingBox) return { panValue: 0, volumeValue: 0 };
@@ -242,8 +239,6 @@ useEffect(() => {
         
         const { panValue, volumeValue } = mapAudioParams();
         
-        console.log(`Updating after resize - Pan: ${panValue.toFixed(2)}, Volume: ${volumeValue.toFixed(1)} dB`);
-        
         setPan(panValue);
         setVolume(volumeValue);
     }, [loaded, mapAudioParams, setPan, setVolume, boundingBox]);
@@ -251,7 +246,6 @@ useEffect(() => {
     // Effect to handle boundary box changes (including resize)
     useEffect(() => {
         if (loaded && boundingBox) {
-            console.log("Bounding box changed:", boundingBox);
             updateAudioParams();
         }
     }, [loaded, boundingBox, updateAudioParams]);
