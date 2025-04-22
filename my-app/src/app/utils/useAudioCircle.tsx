@@ -38,6 +38,7 @@ export function useAudioCircle(audioUrl: string) {
   // Track if mounted and playing state
   const isMountedRef = useRef(true);
   const isPlayingRef = useRef(false);
+  const isAnalyzingRef = useRef(false); // Flag to prevent multiple analyze loops
 
   // Initialize audio
   useEffect(() => {
@@ -151,6 +152,7 @@ export function useAudioCircle(audioUrl: string) {
     // Clean up on unmount
     return () => {
       isMountedRef.current = false;
+      isAnalyzingRef.current = false;
       cleanup();
     };
   }, [audioUrl]);
@@ -158,15 +160,20 @@ export function useAudioCircle(audioUrl: string) {
   // Sync isPlayingRef with isPlaying state
   useEffect(() => {
     isPlayingRef.current = isPlaying;
-    console.log("isplayingref is "+isPlayingRef.current);
-    console.log("isplaying is "+isPlaying);
   }, [isPlaying]);
 
   // Analyze audio data for visualizations
   const analyzeAudio = () => {
-    if (!isPlayingRef.current || !analyzerRef.current || !waveformRef.current || !meterRef.current) return;
+    // Cancel if already analyzing to prevent multiple loops
+    if (!isPlayingRef.current || isAnalyzingRef.current || 
+        !analyzerRef.current || !waveformRef.current || !meterRef.current) {
+      return;
+    }
   
     try {
+      // Set flag to prevent multiple analysis loops
+      isAnalyzingRef.current = true;
+      
       const fftData = analyzerRef.current.getValue();
       const waveformData = waveformRef.current.getValue();
       const rawAmp = meterRef.current.getValue();
@@ -174,6 +181,7 @@ export function useAudioCircle(audioUrl: string) {
       const isQuietValue = amplitudeValue < quietThreshold;
     
       if (isMountedRef.current) {
+        // Use functional update to avoid closure issues
         setAudioData({
           fftData,
           waveformData,
@@ -181,10 +189,19 @@ export function useAudioCircle(audioUrl: string) {
           isQuiet: isQuietValue
         });
       }
-    
-      analysisFrameRef.current = requestAnimationFrame(analyzeAudio);
+      
+      // Only request next frame if still playing and mounted
+      if (isMountedRef.current && isPlayingRef.current) {
+        analysisFrameRef.current = requestAnimationFrame(() => {
+          isAnalyzingRef.current = false; // Reset flag before next call
+          analyzeAudio();
+        });
+      } else {
+        isAnalyzingRef.current = false; // Reset flag if stopping
+      }
     } catch (e) {
       console.error("Error analyzing audio:", e);
+      isAnalyzingRef.current = false; // Reset flag on error
     }
   };
 
@@ -206,7 +223,6 @@ export function useAudioCircle(audioUrl: string) {
       // Start at specific time if provided
       if (startTimeSeconds !== undefined && isFinite(startTimeSeconds) && startTimeSeconds >= 0) {
         // Try to stay within valid bounds
-        console.log("Starting playback at time:", startTimeSeconds);
         playerRef.current.start(undefined, startTimeSeconds);
       } else {
         // Otherwise start from beginning
@@ -218,13 +234,19 @@ export function useAudioCircle(audioUrl: string) {
       
       if (isMountedRef.current) {
         setIsPlaying(true);
+        
+        // Cancel any existing analysis loop
+        if (analysisFrameRef.current) {
+          cancelAnimationFrame(analysisFrameRef.current);
+          analysisFrameRef.current = null;
+        }
+        
+        // Reset analysis flag
+        isAnalyzingRef.current = false;
+        
+        // Start new analysis loop
+        analyzeAudio();
       }
-      
-      // Start audio analysis
-      if (analysisFrameRef.current) {
-        cancelAnimationFrame(analysisFrameRef.current);
-      }
-      analyzeAudio();
       
       return true;
     } catch (error) {
@@ -240,8 +262,11 @@ export function useAudioCircle(audioUrl: string) {
           
           if (isMountedRef.current) {
             setIsPlaying(true);
+            
+            // Reset and restart analysis
+            isAnalyzingRef.current = false;
+            analyzeAudio();
           }
-          analyzeAudio();
         } catch (err) {
           console.error("Failed to restart audio:", err);
         }
@@ -266,7 +291,6 @@ export function useAudioCircle(audioUrl: string) {
       if (isMountedRef.current) {
         setIsPlaying(false);
       }
-      console.log("after stopping, isplayeingref is "+isPlayingRef.current);
       
       // Cancel animation frame
       if (analysisFrameRef.current) {
@@ -294,55 +318,52 @@ export function useAudioCircle(audioUrl: string) {
     return stop();
   };
 
-  // Fixed seek function - uses direct check of isPlayingRef
-  const seekTo = (timeInSeconds: number) => {
-    if (!playerRef.current || !isMountedRef.current) return false;
-    
-    console.log("Seeking to:", timeInSeconds, "Currently playing:", isPlayingRef.current);
-    
-    // Get current playing state directly from the ref
-    isPlayingRef.current = true;// isPlayingRef.current;
-    
-    const wasPlaying = isPlayingRef.current; 
-
-    try {
-      // Always stop first
-      if (playerRef.current.state === "started") {
-        playerRef.current.stop();
-      }
-      
-      // Set up restart if it was playing
-      if (wasPlaying) {
-        // Short delay to allow stopping to complete
-        setTimeout(() => {
-          if (!playerRef.current || !isMountedRef.current) return;
-          
-          try {
-            const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? timeInSeconds : 0;
-            console.log("Restarting at position:", validTime);
-            playerRef.current.start(undefined, validTime);
-            
-            // Update state
-            isPlayingRef.current = true;
-            
-            if (isMountedRef.current) {
-              setIsPlaying(true);
-            }
-            
-            analyzeAudio();
-          } catch (e) {
-            console.error("Error restarting at time position:", e);
-          }
-        }, 10);
-      }
-      
-      return true;
-    } catch (error) {
-      console.error("Error seeking:", error);
-      return false;
+  // Improved seek function that preserves playing state
+// Fixed seekTo function for useAudioCircle hook
+const seekTo = (timeInSeconds: number) => {
+  if (!playerRef.current || !isMountedRef.current) return false;
+  
+  console.log("Audio circle seeking to:", timeInSeconds);
+  
+  try {
+    // Always stop first
+    if (playerRef.current.state === "started") {
+      playerRef.current.stop();
     }
-  };
-
+    
+    // Ensure time is valid
+    const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? 
+      Math.min(timeInSeconds, getDuration()) : 0;
+    
+    // Short delay to allow stopping to complete
+    setTimeout(() => {
+      if (!playerRef.current || !isMountedRef.current) return;
+      
+      try {
+        // Start at the new position
+        console.log("Starting audio at position:", validTime);
+        playerRef.current.start(0, validTime);
+        
+        // Update state
+        isPlayingRef.current = true;
+        
+        if (isMountedRef.current) {
+          setIsPlaying(true);
+        }
+        
+        // Start visualization
+        analyzeAudio();
+      } catch (e) {
+        console.error("Error restarting at time position:", e);
+      }
+    }, 20);
+    
+    return true;
+  } catch (error) {
+    console.error("Error seeking:", error);
+    return false;
+  }
+};
   // Set pan function
   const setPan = (value: number) => {
     if (!pannerRef.current || !isMountedRef.current) return;

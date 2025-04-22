@@ -4,7 +4,6 @@ import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react";
 import AudioInterface from "./AudioInterface";
 import { AudioControlRef } from "@/app/types/audioType";
-import * as Tone from "tone";
 
 interface AudioInfo {
   audioUrl: string;
@@ -79,34 +78,10 @@ export default function BoundingBox() {
       .map(() => React.createRef<AudioControlRef>())
   );
 
-  // Initialize Tone.js once on component mount
-  useEffect(() => {
-    // Ensure Tone.js is started with user interaction
-    const startTone = () => {
-      if (Tone.context.state !== "running") {
-        Tone.start();
-      }
-    };
-    
-    // Add a global click handler to start Tone
-    window.addEventListener("click", startTone, { once: true });
-    
-    return () => {
-      // Stop all audio when unmounting
-      pauseAll();
-      
-      // Clear the timer
-      if (playbackTimerRef.current) {
-        clearInterval(playbackTimerRef.current);
-        playbackTimerRef.current = null;
-      }
-      
-      window.removeEventListener("click", startTone);
-    };
-  }, []);
 
   // This useEffect will run only once after component mounts
   useEffect(() => {
+    if(mounted && audioRefsCreated) return;
     setMounted(true);
     setAudioRefsCreated(true);
   }, []);
@@ -202,12 +177,6 @@ export default function BoundingBox() {
   function playAll(startTimeSeconds?: number) {
     console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");
     
-    // Ensure Tone.js is started
-    if (Tone.context.state !== "running") {
-      Tone.start();
-    }
-    
-    // Set UI state
     setIsPlaying(true);
     setCurrentTrack("All instruments");
     
@@ -259,19 +228,19 @@ export default function BoundingBox() {
     
     console.log("Paused all tracks, now seeking each track...");
     
-    // Call seekTo on all tracks
+    // First update all audio track positions
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.seekTo) {
         const success = ref.current.seekTo(timeInSeconds);
         console.log(`Seeking track: ${success ? 'success' : 'failed'}`);
       }
     });
-    
-    // After seeking, always play from the new position
-    // This is the key change - we always play after seeking
+    playAll();
+
+    // Use a small delay to ensure all tracks are properly positioned
     setTimeout(() => {
-      console.log("Starting playback at new position");
-      playAll(timeInSeconds);
+      // Start playback at the new position
+      console.log("Starting playback at new position:", timeInSeconds);
       
       // Clear the seeking flag after everything is done
       setTimeout(() => {
