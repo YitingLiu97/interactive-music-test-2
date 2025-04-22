@@ -5,6 +5,7 @@ import { useRef, useEffect, useState } from "react";
 import AudioInterface from "./AudioInterface";
 import { AudioControlRef } from "@/app/types/audioType";
 import StageBackground from "./StageBackground";
+import PerspectiveStageBackground from "./PerspectiveStageBackground";
 interface AudioInfo {
   audioUrl: string;
   circleColor: string;
@@ -325,7 +326,7 @@ export default function BoundingBox() {
           backgroundColor: "#f0f0f0",
         }}
       >
-        <StageBackground boundingBox={size} />
+        <PerspectiveStageBackground boundingBox={size} />
 
         {audioRefsCreated &&
           audioInfos.map((info, index) => (

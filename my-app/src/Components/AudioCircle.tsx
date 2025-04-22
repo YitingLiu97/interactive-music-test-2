@@ -8,8 +8,6 @@ import { BoundingBox, AudioControlRef, StartPoint } from "@/app/types/audioType"
 type Props = {
     startPoint: StartPoint;
     boundingBox: BoundingBox;
-    containerOffsetX: number,
-    containerOffsetY: number,
     audioUrl: string;
     instrumentName?: string;
     color: string;
