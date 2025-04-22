@@ -71,17 +71,25 @@ export default function AudioInterface({
         return (progressPercentage / 100) * totalDuration;
     };
 
-    // Handle section click
-    const handleSectionClick = (section: AudioSection) => {
+    // Handle section click - FIXED with stopPropagation
+    const handleSectionClick = (e: React.MouseEvent, section: AudioSection) => {
+        // Stop event from bubbling up to parent elements
+        e.stopPropagation();
         onSeekTo(section.startTime);
     };
 
-    // Handle slider change
+    // Handle slider change - FIXED with event parameter
     const handleSliderChange = (value: number[]) => {
         if (value.length > 0) {
             const newTime = calculateTimeFromProgress(value[0]);
             onSeekTo(newTime);
         }
+    };
+
+    // Handle slider container click - FIXED to prevent propagation
+    const handleSliderContainerClick = (e: React.MouseEvent) => {
+        // Stop event from reaching the parent elements
+        e.stopPropagation();
     };
 
     // Get current section based on currentTime
@@ -92,6 +100,22 @@ export default function AudioInterface({
     };
 
     const currentSection = getCurrentSection();
+
+    // Handle play/pause button click - FIXED with stopPropagation
+    const handlePlayPauseClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isPlaying) {
+            onPauseAll();
+        } else {
+            onPlayAll();
+        }
+    };
+
+    // Handle loop button click - FIXED with stopPropagation
+    const handleLoopClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onToggleAll();
+    };
 
     return (
         <Card className="w-full h-[150px] bg-black text-white rounded-none">
@@ -126,7 +150,7 @@ export default function AudioInterface({
                         <Button 
                             variant={isPlaying ? "outline" : "solid"} 
                             color="orange"
-                            onClick={isPlaying ? onPauseAll : onPlayAll}
+                            onClick={handlePlayPauseClick}
                             size="3"
                         >
                             {isPlaying ? <PauseIcon width="20" height="20" /> : <PlayIcon width="20" height="20" />}
@@ -134,14 +158,14 @@ export default function AudioInterface({
                         <Button 
                             variant={isLooping ? "solid" : "outline"} 
                             color={isLooping ? "green" : "gray"}
-                            onClick={onToggleAll}
+                            onClick={handleLoopClick}
                             size="3"
                         >
                             <ResetIcon width="20" height="20" />
                         </Button>
                     </Flex>
                     
-                    <Flex direction="column" className="px-2 relative">
+                    <Flex direction="column" className="px-2 relative" onClick={handleSliderContainerClick}>
                         {/* Time indicators */}
                         <Flex align="center" gap="3">
                             <Text size="1" className="text-gray-300 w-10">
@@ -157,7 +181,10 @@ export default function AudioInterface({
                                 />
                                 
                                 {/* Section markers */}
-                                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                                <div 
+                                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     {sections.map((section, index) => (
                                         <div 
                                             key={section.id}
@@ -195,7 +222,7 @@ export default function AudioInterface({
                                             maxWidth: `${calculateProgressFromTime(section.endTime - section.startTime)}%`,
                                             color: currentSection?.id === section.id ? 'rgb(255, 160, 90)' : 'rgb(156, 163, 175)',
                                         }}
-                                        onClick={() => handleSectionClick(section)}
+                                        onClick={(e) => handleSectionClick(e, section)}
                                     >
                                         {section.name}
                                     </Button>

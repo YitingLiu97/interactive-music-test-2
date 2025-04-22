@@ -1,18 +1,22 @@
 // Place this file in a shared location, like @/app/types/audioTypes.ts
 export interface AudioControlRef {
-  play: () => void;
-  stop: () => void;
-  pause: () => void;
-  toggle: () => void;
-  getAudioData?: () => void;
-  applyPositionMuting: () => void; // Add this
-}
-export interface BoundingBox {
-  x: number;
-  y: number;
-}
-
-export interface StartPoint {
-  x: number;
-  y: number;
-}
+    isPlaying?: boolean;
+    play: (startTime?: number) => boolean | void;
+    stop: () => boolean | void;
+    pause: () => boolean | void;
+    toggle: () => void;
+    seekTo?: (timeInSeconds: number) => boolean | void;
+    setLooping?: (loopState: boolean) => void;
+    getDuration?: () => number;
+    applyPositionMuting: () => void;
+  }
+  
+  export interface BoundingBox {
+    x: number;
+    y: number;
+  }
+  
+  export interface StartPoint {
+    x: number;
+    y: number;
+  }

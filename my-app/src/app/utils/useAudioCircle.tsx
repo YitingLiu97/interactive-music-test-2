@@ -9,7 +9,8 @@ export function useAudioCircle(audioUrl: string) {
   const [currentVolume, setCurrentVolume] = useState(0);
   const [currentPan, setCurrentPan] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  // Audio analysis state
+  
+  // Audio analysis state for visualizations
   const [audioData, setAudioData] = useState<{
     fftData: Float32Array | null;
     waveformData: Float32Array | null;
@@ -23,309 +24,365 @@ export function useAudioCircle(audioUrl: string) {
   });
 
   const volumeThreshold = -15;
-  const quietThreshold = -30; // dB threshold to determine if audio is "quiet"
-  // Use refs to keep track of player instances to prevent multiple instances
-  const initialAudioData = {
-    fftData: null,
-    waveformData: null,
-    amplitude: 0,
-    isQuiet: true,
-  };
+  const quietThreshold = -30;
   
+  // Audio objects
   const playerRef = useRef<Tone.Player | null>(null);
   const pannerRef = useRef<Tone.Panner | null>(null);
   const volumeRef = useRef<Tone.Volume | null>(null);
-
-  // Add audio analysis refs
   const analyzerRef = useRef<Tone.FFT | null>(null);
   const waveformRef = useRef<Tone.Waveform | null>(null);
   const meterRef = useRef<Tone.Meter | null>(null);
   const analysisFrameRef = useRef<number | null>(null);
+  
+  // Track if mounted and playing state
+  const isMountedRef = useRef(true);
+  const isPlayingRef = useRef(false);
 
-  // Add refs to track current values without triggering re-renders
-  const currentVolumeRef = useRef<number>(currentVolume);
-  const currentPanRef = useRef<number>(currentPan);
-  const isMutedRef = useRef<boolean>(isMuted);
-  const isPlayingRef = useRef<boolean>(isPlaying);
-
-  // Initialize audio components
+  // Initialize audio
   useEffect(() => {
-    // Clean up any existing players first
-    if (playerRef.current) {
-      playerRef.current.dispose();
-    }
-    if (pannerRef.current) {
-      pannerRef.current.dispose();
-    }
-    if (volumeRef.current) {
-      volumeRef.current.dispose();
-    }
-    if (analyzerRef.current) {
-      analyzerRef.current.dispose();
-    }
-    if (waveformRef.current) {
-      waveformRef.current.dispose();
-    }
-    if (meterRef.current) {
-      meterRef.current.dispose();
-    }
-
-    // Cancel any ongoing animation frame
-    if (analysisFrameRef.current) {
-      cancelAnimationFrame(analysisFrameRef.current);
-    }
-
+    isMountedRef.current = true;
+    
+    // Clean up function
+    const cleanup = () => {
+      if (analysisFrameRef.current) {
+        cancelAnimationFrame(analysisFrameRef.current);
+        analysisFrameRef.current = null;
+      }
+      
+      if (playerRef.current) {
+        try {
+          playerRef.current.stop();
+          playerRef.current.dispose();
+          playerRef.current = null;
+        } catch (e) {
+          console.error("Error disposing player:", e);
+        }
+      }
+  
+      if (pannerRef.current) {
+        try {
+          pannerRef.current.dispose();
+          pannerRef.current = null;
+        } catch (e) {
+          console.log("error: "+ e);
+        }
+      }
+      
+      if (volumeRef.current) {
+        try {
+          volumeRef.current.dispose();
+          volumeRef.current = null;
+        } catch (e) {
+          console.log("error: "+ e);
+        }
+      }
+      
+      if (analyzerRef.current) {
+        try {
+          analyzerRef.current.dispose();
+          analyzerRef.current = null;
+        } catch (e) {
+          console.log("error: "+ e);
+        }
+      }
+      
+      if (waveformRef.current) {
+        try {
+          waveformRef.current.dispose();
+          waveformRef.current = null;
+        } catch (e) {
+          console.log("error: "+ e);
+        }
+      }
+      
+      if (meterRef.current) {
+        try {
+          meterRef.current.dispose();
+          meterRef.current = null;
+        } catch (e) {
+          console.log("error: "+ e);
+        }
+      }
+    };
+    
+    // Clean up previous instances
+    cleanup();
+    
     // Create new audio components
     try {
-      // Create a volume node
+      // Create volume node
       const volumeNode = new Tone.Volume(0).toDestination();
       volumeRef.current = volumeNode;
 
-      // Create a panner node
+      // Create panner node
       const pannerNode = new Tone.Panner(0).connect(volumeNode);
       pannerRef.current = pannerNode;
 
       // Create analysis nodes
-      // FFT for frequency analysis - 512 size is a good balance between detail and performance
       const fftAnalyzer = new Tone.FFT(512);
       analyzerRef.current = fftAnalyzer;
-
-      // Waveform for time-domain analysis
       const waveformAnalyzer = new Tone.Waveform(1024);
       waveformRef.current = waveformAnalyzer;
-
-      // Meter for amplitude/volume detection
       const meter = new Tone.Meter();
       meterRef.current = meter;
 
       // Connect analysis nodes
       pannerNode.fan(fftAnalyzer, waveformAnalyzer, meter);
 
-      // Create player with fixed settings
+      // Create player
       const player = new Tone.Player({
         url: audioUrl,
         loop: false,
         autostart: false,
-        playbackRate: 1.0, // Ensure normal playback rate
         onload: () => {
-          setLoaded(true);
+          if (isMountedRef.current) {
+            setLoaded(true);
+          }
         },
       }).connect(pannerNode);
 
       playerRef.current = player;
+      
     } catch (error) {
       console.error("Error initializing audio:", error);
     }
 
-    // Cleanup function
+    // Clean up on unmount
     return () => {
-      if (playerRef.current) {
-        playerRef.current.stop();
-        playerRef.current.dispose();
-      }
-      if (pannerRef.current) {
-        pannerRef.current.dispose();
-      }
-      if (volumeRef.current) {
-        volumeRef.current.dispose();
-      }
-      if (analyzerRef.current) {
-        analyzerRef.current.dispose();
-      }
-      if (waveformRef.current) {
-        waveformRef.current.dispose();
-      }
-      if (meterRef.current) {
-        meterRef.current.dispose();
-      }
-      if (analysisFrameRef.current) {
-        cancelAnimationFrame(analysisFrameRef.current);
-      }
+      isMountedRef.current = false;
+      cleanup();
     };
-  }, [audioUrl]); // Only recreate when audioUrl changes
+  }, [audioUrl]);
 
-  // Function to analyze audio data
+  // Sync isPlayingRef with isPlaying state
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    console.log("isplayingref is "+isPlayingRef.current);
+    console.log("isplaying is "+isPlaying);
+  }, [isPlaying]);
+
+  // Analyze audio data for visualizations
   const analyzeAudio = () => {
     if (!isPlayingRef.current || !analyzerRef.current || !waveformRef.current || !meterRef.current) return;
   
-    const fftData = analyzerRef.current.getValue();
-    const waveformData = waveformRef.current.getValue();
-  
-    // compute a single amplitude number
-    const rawAmp = meterRef.current.getValue();
-    const amplitudeValue = Array.isArray(rawAmp) ? Math.max(...rawAmp) : rawAmp;
-    const isQuietValue = amplitudeValue < quietThreshold;
-  
-    // only update if something really changed
-    setAudioData(prev => {
-      if (
-        prev.amplitude === amplitudeValue &&
-        prev.isQuiet === isQuietValue &&
-        prev.fftData === fftData &&
-        prev.waveformData === waveformData
-      ) {
-        return prev;
+    try {
+      const fftData = analyzerRef.current.getValue();
+      const waveformData = waveformRef.current.getValue();
+      const rawAmp = meterRef.current.getValue();
+      const amplitudeValue = Array.isArray(rawAmp) ? Math.max(...rawAmp) : rawAmp;
+      const isQuietValue = amplitudeValue < quietThreshold;
+    
+      if (isMountedRef.current) {
+        setAudioData({
+          fftData,
+          waveformData,
+          amplitude: amplitudeValue,
+          isQuiet: isQuietValue
+        });
       }
-      return {
-        fftData,
-        waveformData,
-        amplitude: amplitudeValue,
-        isQuiet: isQuietValue
-      };
-    });
-  
-    analysisFrameRef.current = requestAnimationFrame(analyzeAudio);
+    
+      analysisFrameRef.current = requestAnimationFrame(analyzeAudio);
+    } catch (e) {
+      console.error("Error analyzing audio:", e);
+    }
   };
 
-  // Play function
-  const play = () => {
-    if (!playerRef.current || !loaded) return;
+  // Play function with optional start time
+  const play = (startTimeSeconds?: number) => {
+    if (!playerRef.current || !loaded || !isMountedRef.current) return false;
 
     // Make sure Tone.js is started
     if (Tone.context.state !== "running") {
       Tone.start();
     }
 
-    // Only start if not already playing
-    if (!isPlayingRef.current) {
-      try {
+    try {
+      // If already playing, stop first
+      if (playerRef.current.state === "started") {
+        playerRef.current.stop();
+      }
+      
+      // Start at specific time if provided
+      if (startTimeSeconds !== undefined && isFinite(startTimeSeconds) && startTimeSeconds >= 0) {
+        // Try to stay within valid bounds
+        console.log("Starting playback at time:", startTimeSeconds);
+        playerRef.current.start(undefined, startTimeSeconds);
+      } else {
+        // Otherwise start from beginning
         playerRef.current.start();
-        isPlayingRef.current = true;
+      }
+      
+      // Update state
+      isPlayingRef.current = true;
+      
+      if (isMountedRef.current) {
         setIsPlaying(true);
-        // Start audio analysis when playing begins
-        analyzeAudio();
-      } catch (error) {
-        console.error("Error playing audio:", error);
-
-        // If there was an error (like already started), try restarting
+      }
+      
+      // Start audio analysis
+      if (analysisFrameRef.current) {
+        cancelAnimationFrame(analysisFrameRef.current);
+      }
+      analyzeAudio();
+      
+      return true;
+    } catch (error) {
+      console.error("Error playing audio:", error);
+      
+      // Try again with a delay
+      setTimeout(() => {
+        if (!playerRef.current || !isMountedRef.current) return;
+        
         try {
-          playerRef.current.stop();
           playerRef.current.start();
           isPlayingRef.current = true;
-          setIsPlaying(true);
-          // Start audio analysis when playing begins
+          
+          if (isMountedRef.current) {
+            setIsPlaying(true);
+          }
           analyzeAudio();
-        } catch (innerError) {
-          console.error("Could not restart audio:", innerError);
+        } catch (err) {
+          console.error("Failed to restart audio:", err);
         }
-      }
+      }, 20);
+      
+      return false;
     }
   };
 
   // Stop function
   const stop = () => {
-    if (!playerRef.current || !loaded) return;
+    if (!playerRef.current || !isMountedRef.current) return false;
 
     try {
-      playerRef.current.stop();
-      isPlayingRef.current = false;
-      setIsPlaying(false);
-      setAudioData(initialAudioData);
+      if (playerRef.current.state === "started") {
+        playerRef.current.stop();
+      }
       
-      // Cancel animation frame when stopping
+      // Update state
+      isPlayingRef.current = false;
+      
+      if (isMountedRef.current) {
+        setIsPlaying(false);
+      }
+      console.log("after stopping, isplayeingref is "+isPlayingRef.current);
+      
+      // Cancel animation frame
       if (analysisFrameRef.current) {
         cancelAnimationFrame(analysisFrameRef.current);
         analysisFrameRef.current = null;
       }
+      
+      return true;
     } catch (error) {
       console.error("Error stopping audio:", error);
-    }
-  };
-
-  // Pause function (Tone.js doesn't have native pause, so we implement it)
-  const pause = () => {
-    if (!playerRef.current || !loaded) return;
-
-    try {
-      playerRef.current.stop();
-      isPlayingRef.current = false;
-      setIsPlaying(false);
-      setAudioData(initialAudioData);
       
-      // Cancel animation frame when pausing
-      if (analysisFrameRef.current) {
-        cancelAnimationFrame(analysisFrameRef.current);
-        analysisFrameRef.current = null;
+      // Update state anyway
+      isPlayingRef.current = false;
+      
+      if (isMountedRef.current) {
+        setIsPlaying(false);
       }
-    } catch (error) {
-      console.error("Error pausing audio:", error);
+      
+      return false;
     }
   };
 
-  // Set pan function - FIXED to avoid infinite update loops
-  const setPan = (value: number) => {
-    if (!pannerRef.current) return;
+  // Pause function (same as stop for Tone.js)
+  const pause = () => {
+    return stop();
+  };
 
-    // Ensure value is between -1 and 1
-    const clampedValue = Math.max(-1, Math.min(value, 1));
+  // Fixed seek function - uses direct check of isPlayingRef
+  const seekTo = (timeInSeconds: number) => {
+    if (!playerRef.current || !isMountedRef.current) return false;
+    
+    console.log("Seeking to:", timeInSeconds, "Currently playing:", isPlayingRef.current);
+    
+    // Get current playing state directly from the ref
+    isPlayingRef.current = true;// isPlayingRef.current;
+    
+    const wasPlaying = isPlayingRef.current; 
 
     try {
-      // Only update the DOM node
-      pannerRef.current.pan.value = clampedValue;
+      // Always stop first
+      if (playerRef.current.state === "started") {
+        playerRef.current.stop();
+      }
+      
+      // Set up restart if it was playing
+      if (wasPlaying) {
+        // Short delay to allow stopping to complete
+        setTimeout(() => {
+          if (!playerRef.current || !isMountedRef.current) return;
+          
+          try {
+            const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? timeInSeconds : 0;
+            console.log("Restarting at position:", validTime);
+            playerRef.current.start(undefined, validTime);
+            
+            // Update state
+            isPlayingRef.current = true;
+            
+            if (isMountedRef.current) {
+              setIsPlaying(true);
+            }
+            
+            analyzeAudio();
+          } catch (e) {
+            console.error("Error restarting at time position:", e);
+          }
+        }, 10);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error seeking:", error);
+      return false;
+    }
+  };
 
-      // Only update React state if the value has actually changed
-      // Use a small threshold to avoid floating point comparison issues
-      if (Math.abs(currentPanRef.current - clampedValue) > 0.01) {
-        currentPanRef.current = clampedValue;
-        // Batch updates to reduce render cycles
-        requestAnimationFrame(() => {
-          setCurrentPan(clampedValue);
-        });
+  // Set pan function
+  const setPan = (value: number) => {
+    if (!pannerRef.current || !isMountedRef.current) return;
+    
+    const clampedValue = Math.max(-1, Math.min(value, 1));
+    
+    try {
+      pannerRef.current.pan.value = clampedValue;
+      if (isMountedRef.current) {
+        setCurrentPan(clampedValue);
       }
     } catch (error) {
       console.error("Error setting pan:", error);
     }
   };
 
-  // Set volume function with CORRECTED muting logic - FIXED to avoid infinite update loops
+  // Set volume function
   const setVolume = (value: number) => {
-    if (!volumeRef.current) return;
-
-    // Ensure value is within range
+    if (!volumeRef.current || !isMountedRef.current) return;
+    
     const clampedValue = Math.max(-60, Math.min(value, 0));
-
+    
     try {
-      // CORRECT LOGIC FOR MUTING:
-      // In dB, MORE negative means QUIETER
-      // So value <= threshold means QUIETER than threshold (should mute)
-      // And value > threshold means LOUDER than threshold (should play)
-
       const shouldBeMuted = clampedValue <= volumeThreshold;
-
-      // Update node values first
+      
       if (shouldBeMuted) {
-        // Volume is QUIETER than threshold, should mute
-        if (!isMutedRef.current) {
-          volumeRef.current.mute = true;
-          isMutedRef.current = true;
-          // Use requestAnimationFrame for UI updates to avoid thrashing
-          requestAnimationFrame(() => {
-            setIsMuted(true);
-          });
+        volumeRef.current.mute = true;
+        if (isMountedRef.current) {
+          setIsMuted(true);
         }
       } else {
-        // Volume is LOUDER than threshold, should unmute
-        if (isMutedRef.current) {
-          volumeRef.current.mute = false;
-          isMutedRef.current = false;
-          // Use requestAnimationFrame for UI updates to avoid thrashing
-          requestAnimationFrame(() => {
-            setIsMuted(false);
-          });
+        volumeRef.current.mute = false;
+        if (isMountedRef.current) {
+          setIsMuted(false);
         }
-
-        // Only set volume when not muted
         volumeRef.current.volume.value = clampedValue;
       }
-
-      // Only update React state if the value has actually changed significantly
-      // Use a threshold to avoid too many updates for small changes
-      if (Math.abs(currentVolumeRef.current - clampedValue) > 0.5) {
-        currentVolumeRef.current = clampedValue;
-        // Batch updates to reduce render cycles  
-        requestAnimationFrame(() => {
-          setCurrentVolume(clampedValue);
-        });
+      
+      if (isMountedRef.current) {
+        setCurrentVolume(clampedValue);
       }
     } catch (error) {
       console.error("Error setting volume:", error);
@@ -334,44 +391,51 @@ export function useAudioCircle(audioUrl: string) {
 
   // Toggle loop function
   const toggleLoop = () => {
-    if (!playerRef.current) return;
-
+    if (!playerRef.current || !isMountedRef.current) return;
+    
     try {
       const newLoopState = !isLooping;
       playerRef.current.loop = newLoopState;
-      setIsLooping(newLoopState);
+      if (isMountedRef.current) {
+        setIsLooping(newLoopState);
+      }
     } catch (error) {
       console.error("Error toggling loop:", error);
     }
   };
-
-  // Start/stop audio analysis based on playback state
-  useEffect(() => {
-    // Use isPlayingRef instead of isPlaying to avoid unnecessary effect triggers
-    isPlayingRef.current = isPlaying;
+  
+  // Set loop state
+  const setLooping = (state: boolean) => {
+    if (!playerRef.current || !isMountedRef.current) return;
     
-    if (isPlaying && !analysisFrameRef.current) {
-      analyzeAudio();
-    } else if (!isPlaying && analysisFrameRef.current) {
-      cancelAnimationFrame(analysisFrameRef.current);
-      analysisFrameRef.current = null;
-    }
-    
-    return () => {
-      if (analysisFrameRef.current) {
-        cancelAnimationFrame(analysisFrameRef.current);
-        analysisFrameRef.current = null;
+    try {
+      playerRef.current.loop = state;
+      if (isMountedRef.current) {
+        setIsLooping(state);
       }
-    };
-  }, [isPlaying]);
+    } catch (error) {
+      console.error("Error setting loop state:", error);
+    }
+  };
+
+  // Get duration of audio if available
+  const getDuration = () => {
+    if (playerRef.current && playerRef.current.buffer) {
+      return playerRef.current.buffer.duration;
+    }
+    return 180; // Default duration
+  };
 
   return {
     play,
     stop,
     pause,
+    seekTo,
     setPan,
     setVolume,
     toggleLoop,
+    setLooping,
+    getDuration,
     loaded,
     isPlaying,
     isLooping,

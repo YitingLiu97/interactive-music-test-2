@@ -4,6 +4,7 @@ import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react";
 import AudioInterface from "./AudioInterface";
 import { AudioControlRef } from "@/app/types/audioType";
+import * as Tone from "tone";
 
 interface AudioInfo {
   audioUrl: string;
@@ -20,10 +21,13 @@ export default function BoundingBox() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
 
-  // Add current playback time tracking
+  // Add current playback time tracking for UI
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(180); // Default 3 minutes
   const playbackTimerRef = useRef<number | null>(null);
+  
+  // Track if we're currently seeking to avoid timer updates
+  const isSeekingRef = useRef(false);
 
   const audioInfos: AudioInfo[] = [
     {
@@ -65,17 +69,7 @@ export default function BoundingBox() {
       audioUrl: "/resources/ATCTimpani_03.mp3",
       circleColor: "pink",
       instrumentName: "Timpani",
-    },
-    // {
-    //     audioUrl: "/resources/ATCTwoMix_03.L.mp3",
-    //     circleColor: "blue",
-    //     instrumentName: "Mix_L"
-    // },
-    // {
-    //     audioUrl: "/resources/ATCTwoMix_03.R.mp3",
-    //     circleColor: "blue",
-    //     instrumentName: "Mix_R"
-    // }
+    }
   ];
 
   // Initialize the refs array with the correct length first
@@ -84,43 +78,32 @@ export default function BoundingBox() {
       .fill(null)
       .map(() => React.createRef<AudioControlRef>())
   );
-  // Start a timer to update current time when playing
-  useEffect(() => {
-    if (isPlaying) {
-      if (playbackTimerRef.current) {
-        clearInterval(playbackTimerRef.current);
-      }
 
-      // Update time every 100ms (10 times per second)
-      playbackTimerRef.current = window.setInterval(() => {
-        setCurrentTime((prevTime) => {
-          // Loop back to start if we reach the end and looping is enabled
-          if (prevTime >= totalDuration) {
-            if (isLooping) {
-              return 0;
-            } else {
-              pauseAll();
-              return totalDuration;
-            }
-          }
-          return prevTime + 0.1;
-        });
-      }, 100);
-    } else {
-      // Clear the timer if not playing
+  // Initialize Tone.js once on component mount
+  useEffect(() => {
+    // Ensure Tone.js is started with user interaction
+    const startTone = () => {
+      if (Tone.context.state !== "running") {
+        Tone.start();
+      }
+    };
+    
+    // Add a global click handler to start Tone
+    window.addEventListener("click", startTone, { once: true });
+    
+    return () => {
+      // Stop all audio when unmounting
+      pauseAll();
+      
+      // Clear the timer
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
-    }
-
-    // Clean up on unmount
-    return () => {
-      if (playbackTimerRef.current) {
-        clearInterval(playbackTimerRef.current);
-      }
+      
+      window.removeEventListener("click", startTone);
     };
-  }, [isPlaying, isLooping, totalDuration]);
+  }, []);
 
   // This useEffect will run only once after component mounts
   useEffect(() => {
@@ -137,7 +120,6 @@ export default function BoundingBox() {
           x: rect.width,
           y: rect.height,
         });
-        console.log("Size updated:", rect.width, rect.height - 150);
       }
     }
 
@@ -151,27 +133,54 @@ export default function BoundingBox() {
     }
   }, [mounted]);
 
-  // Start a timer to update current time when playing
+  // Get audio duration from first loaded track
   useEffect(() => {
-    if (isPlaying) {
+    if (audioRefsCreated) {
+      // Set a small delay to ensure audio has loaded
+      const timeoutId = setTimeout(() => {
+        for (const ref of audioRefs.current) {
+          if (ref.current && ref.current.getDuration) {
+            const duration = ref.current.getDuration();
+            if (duration && duration > 0) {
+              setTotalDuration(duration);
+              console.log("Found audio duration:", duration);
+              break;
+            }
+          }
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [audioRefsCreated]);
+
+  // Start a timer to update current time when playing (UI only)
+  useEffect(() => {
+    if (isPlaying && !isSeekingRef.current) {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
       }
 
-      // Update time every 100ms (10 times per second)
+      // Update time every 100ms
       playbackTimerRef.current = window.setInterval(() => {
-        setCurrentTime((prevTime) => {
-          // Loop back to start if we reach the end and looping is enabled
-          if (prevTime >= totalDuration) {
-            if (isLooping) {
-              return 0;
-            } else {
-              pauseAll();
-              return totalDuration;
+        // Don't update if actively seeking
+        if (!isSeekingRef.current) {
+          setCurrentTime((prevTime) => {
+            // Loop back to start if we reach the end and looping is enabled
+            if (prevTime >= totalDuration) {
+              if (isLooping) {
+                // If looping, restart playback from beginning
+                pauseAll();
+                setTimeout(() => playAll(0), 50);
+                return 0;
+              } else {
+                pauseAll();
+                return totalDuration;
+              }
             }
-          }
-          return prevTime + 0.1;
-        });
+            return prevTime + 0.1;
+          });
+        }
       }, 100);
     } else {
       // Clear the timer if not playing
@@ -181,84 +190,124 @@ export default function BoundingBox() {
       }
     }
 
-    // Clean up on unmount
     return () => {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
       }
     };
   }, [isPlaying, isLooping, totalDuration]);
 
-  // In BoundingBox.tsx
-  function playAll() {
-    console.log("Play all triggered, refs:", audioRefs.current.length);
-    // First, start all tracks playing - they'll all play simultaneously
-    audioRefs.current.forEach((ref, index) => {
-      if (ref.current && ref.current.play) {
-        console.log(`Playing track ${index}`);
-        ref.current.play();
-      } else {
-        console.log(`Ref ${index} is not ready`);
-      }
-    });
+  // Play all audio circles
+  function playAll(startTimeSeconds?: number) {
+    console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");
+    
+    // Ensure Tone.js is started
+    if (Tone.context.state !== "running") {
+      Tone.start();
+    }
+    
+    // Set UI state
     setIsPlaying(true);
     setCurrentTrack("All instruments");
-  }
-
-  // Handle seeking to a specific time
-  function seekTo(timeInSeconds: number) {
-    // Set the current time
-    setCurrentTime(timeInSeconds);
-
-    // If currently playing, stop all tracks first
-    if (isPlaying) {
-      pauseAll();
+    
+    // If time is specified, update UI time
+    if (startTimeSeconds !== undefined) {
+      setCurrentTime(startTimeSeconds);
     }
-
-    // Then start playing from the new position
-    // Note: In a real implementation, you would need to set the start position
-    // in the audio player before playing. Since Tone.js doesn't support direct seeking,
-    // you would typically need to create a new player or use other techniques.
-    playAll();
+    
+    // Call play on all audio circles
+    let successCount = 0;
+    audioRefs.current.forEach((ref) => {
+      if (ref.current && ref.current.play) {
+        // Pass the start time if specified
+        const success = ref.current.play(startTimeSeconds);
+        if (success) successCount++;
+      }
+    });
+    
+    console.log(`Successfully started ${successCount} of ${audioRefs.current.length} tracks`);
   }
 
-  // create setTimeOut
-  useEffect(() => {
-    // Store the timeout ID so we can clear it if needed
-    const timeoutId = setTimeout(() => {
-      audioRefs.current.forEach((ref) => {
-        if (ref.current && ref.current.applyPositionMuting) {
-          ref.current.applyPositionMuting();
-        }
-      });
-    }, 50);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, []);
-
+  // Pause all audio circles
   function pauseAll() {
-    console.log("Pause all triggered");
-    audioRefs.current.forEach((ref, index) => {
-      if (ref.current && ref.current.stop) {
-        console.log(`Stopping track ${index}`);
-        ref.current.stop();
+    console.log("Pausing all tracks");
+    
+    // Set UI state
+    setIsPlaying(false);
+    
+    // Call pause on all audio circles
+    audioRefs.current.forEach((ref) => {
+      if (ref.current && ref.current.pause) {
+        ref.current.pause();
       }
     });
-    setIsPlaying(false);
   }
 
-  function toggleAll() {
-    console.log("Toggle loop triggered");
-    audioRefs.current.forEach((ref, index) => {
-      if (ref.current && ref.current.toggle) {
-        console.log(`Toggling loop for track ${index}`);
-        ref.current.toggle();
+  // Improved seek function that forces playback after seeking
+  function seekTo(timeInSeconds: number) {
+    console.log(`Seeking to ${timeInSeconds}s`);
+    
+    // Mark that we're seeking to avoid timer updates
+    isSeekingRef.current = true;
+    
+    // Update UI time immediately
+    setCurrentTime(timeInSeconds);
+    
+    // Always pause first to avoid conflicts
+    pauseAll();
+    
+    console.log("Paused all tracks, now seeking each track...");
+    
+    // Call seekTo on all tracks
+    audioRefs.current.forEach((ref) => {
+      if (ref.current && ref.current.seekTo) {
+        const success = ref.current.seekTo(timeInSeconds);
+        console.log(`Seeking track: ${success ? 'success' : 'failed'}`);
       }
     });
-    setIsLooping(!isLooping);
+    
+    // After seeking, always play from the new position
+    // This is the key change - we always play after seeking
+    setTimeout(() => {
+      console.log("Starting playback at new position");
+      playAll(timeInSeconds);
+      
+      // Clear the seeking flag after everything is done
+      setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 50);
+    }, 50);
   }
+
+  // Toggle loop state for all tracks
+  function toggleAll() {
+    const newLoopState = !isLooping;
+    setIsLooping(newLoopState);
+    
+    audioRefs.current.forEach((ref) => {
+      if (ref.current && ref.current.setLooping) {
+        ref.current.setLooping(newLoopState);
+      }
+    });
+  }
+
+  // Apply position-based muting for all audio circles
+  useEffect(() => {
+    if (audioRefsCreated) {
+      const timeoutId = setTimeout(() => {
+        audioRefs.current.forEach((ref) => {
+          if (ref.current && ref.current.applyPositionMuting) {
+            ref.current.applyPositionMuting();
+          }
+        });
+      }, 500);
+
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [audioRefsCreated]);
 
   // Don't render anything on the server, only render on client
   if (!mounted) return null;
@@ -286,12 +335,9 @@ export default function BoundingBox() {
               color={info.circleColor}
               audioRef={audioRefs.current[index]}
               instrumentName={info.instrumentName}
-              onPlay={() => {
-                setIsPlaying(true);
+              masterIsPlaying={isPlaying}
+              onTrackSelect={() => {
                 setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
-              }}
-              onStop={() => {
-                setIsPlaying(false);
               }}
             />
           ))}
