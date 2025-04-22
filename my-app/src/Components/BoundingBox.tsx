@@ -1,11 +1,10 @@
 "use client";
 import React from "react";
 import AudioCircle from "./AudioCircle";
-import { useRef, useEffect, useState } from "react";
+import { useCallback,useRef, useEffect, useState, } from "react";
 import AudioInterface from "./AudioInterface";
 import { AudioControlRef } from "@/app/types/audioType";
-import StageBackground from "./StageBackground";
-import PerspectiveStageBackground from "./PerspectiveStageBackground";
+import PerspectiveStageBackground, { FloorCoordinates} from "./PerspectiveStageBackground";
 interface AudioInfo {
   audioUrl: string;
   circleColor: string;
@@ -20,6 +19,7 @@ export default function BoundingBox() {
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
+  const [floorCoords, setFloorCoords] = useState<FloorCoordinates | null>(null);
 
   // Add current playback time tracking for UI
   const [currentTime, setCurrentTime] = useState(0);
@@ -72,6 +72,9 @@ export default function BoundingBox() {
     },
   ];
 
+   const handleFloorCoordsChange = useCallback((coords: FloorCoordinates) => {
+    setFloorCoords(coords);
+  }, []);
   // Initialize the refs array with the correct length first
   const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>(
     Array(audioInfos.length)
@@ -84,7 +87,7 @@ export default function BoundingBox() {
     if (mounted && audioRefsCreated) return;
     setMounted(true);
     setAudioRefsCreated(true);
-  }, []);
+  }, [mounted,audioRefsCreated]);
 
   // Update size when mounted or on resize
   useEffect(() => {
@@ -201,7 +204,7 @@ export default function BoundingBox() {
     };
   }, [isPlaying, isLooping, totalDuration, audioRefsCreated, mounted]);
   // Play all audio circles
-  function playAll(startTimeSeconds?: number) {
+  const playAll= useCallback((startTimeSeconds?: number) =>{
     console.log(
       "Playing all tracks",
       startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : ""
@@ -228,10 +231,10 @@ export default function BoundingBox() {
     console.log(
       `Successfully started ${successCount} of ${audioRefs.current.length} tracks`
     );
-  }
+  },[]);
 
   // Pause all audio circles
-  function pauseAll() {
+  const pauseAll =useCallback(()=> {
     console.log("Pausing all tracks");
 
     // Set UI state
@@ -243,10 +246,10 @@ export default function BoundingBox() {
         ref.current.pause();
       }
     });
-  }
+  },[]);
 
   // Improved seek function that forces playback after seeking
-  function seekTo(timeInSeconds: number) {
+  const seekTo=useCallback((timeInSeconds: number) => {
     console.log(`Seeking to ${timeInSeconds}s`);
 
     // Mark that we're seeking to avoid timer updates
@@ -279,7 +282,8 @@ export default function BoundingBox() {
         isSeekingRef.current = false;
       }, 50);
     }, 50);
-  }
+  },[pauseAll, playAll]);
+
 
   // Toggle loop state for all tracks
   function toggleAll() {
@@ -326,13 +330,16 @@ export default function BoundingBox() {
           backgroundColor: "#f0f0f0",
         }}
       >
-        <PerspectiveStageBackground boundingBox={size} />
-
-        {audioRefsCreated &&
+       <PerspectiveStageBackground 
+          boundingBox={size} 
+          onFloorCoordinatesChange={handleFloorCoordsChange}
+        />
+        {audioRefsCreated && floorCoords && 
           audioInfos.map((info, index) => (
             <AudioCircle
               key={index}
               startPoint={{ x: 0.3 + index * 0.1, y: 0.3 }}
+              floorCoords={floorCoords}
               boundingBox={size}
               audioUrl={info.audioUrl}
               color={info.circleColor}
