@@ -56,6 +56,14 @@ export default function AudioCircle({
     
     const initializedRef = useRef(false);
     const lastPlayingState = useRef(masterIsPlaying);
+    
+    // Use refs to track the last audio parameter values to avoid redundant updates
+    const lastPanValue = useRef(0);
+    const lastVolumeValue = useRef(0);
+    
+    // Throttling for parameter updates during dragging to prevent audio buzzing
+    const throttleTimerRef = useRef<number | null>(null);
+    const pendingParamUpdateRef = useRef<{pan: number, volume: number} | null>(null);
 
     // Respond to parent play/pause state changes
     useEffect(() => {
@@ -81,13 +89,53 @@ export default function AudioCircle({
         }
     }, [startPoint.x, startPoint.y]);
 
+    // Cleanup function for timers
+    useEffect(() => {
+        return () => {
+            if (throttleTimerRef.current) {
+                window.clearTimeout(throttleTimerRef.current);
+                throttleTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    // Throttled audio parameter update function to prevent buzzing
+    const updateAudioParams = useCallback((panValue: number, volumeValue: number) => {
+        // Store the pending values in the ref
+        pendingParamUpdateRef.current = { pan: panValue, volume: volumeValue };
+        
+        // If there's no active timer, set one up to apply the parameters
+        if (!throttleTimerRef.current) {
+            throttleTimerRef.current = window.setTimeout(() => {
+                // Apply the most recent values from the ref
+                if (pendingParamUpdateRef.current && loaded) {
+                    const { pan, volume } = pendingParamUpdateRef.current;
+                    
+                    // Only update if values have changed significantly to avoid unnecessary updates
+                    if (Math.abs(lastPanValue.current - pan) > 0.01) {
+                        setPan(pan);
+                        lastPanValue.current = pan;
+                    }
+                    
+                    if (Math.abs(lastVolumeValue.current - volume) > 0.5) {
+                        setVolume(volume);
+                        lastVolumeValue.current = volume;
+                    }
+                }
+                
+                // Clear the timer and pending values
+                throttleTimerRef.current = null;
+                pendingParamUpdateRef.current = null;
+            }, 20); // Throttle to max 50 updates per second
+        }
+    }, [loaded, setPan, setVolume]);
+
     // Expose methods to the parent component via ref
     useEffect(() => {
         if (audioRef && audioRef.current === null) {
             audioRef.current = {
                 play: (startTime?: number) => {
                     if (loaded) {
-                        console.log("AUDIO CIRCLE audio ref play at "+startTime);
                         return play(startTime);
                     }
                     return false;
@@ -103,7 +151,6 @@ export default function AudioCircle({
                 },
                 seekTo: (timeInSeconds: number) => {
                     if (seekTo) {
-                        console.log("seek to "+timeInSeconds);
                         return seekTo(timeInSeconds);
                     }
                     return false;
@@ -129,24 +176,36 @@ export default function AudioCircle({
                         const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
                         const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
                         
+                        // Use direct parameter setting for initialization
                         setPan(panValue);
                         setVolume(volumeValue);
+                        
+                        // Update stored values
+                        lastPanValue.current = panValue;
+                        lastVolumeValue.current = volumeValue;
                     }
                 }
             };
         }
     }, [audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent]);
 
-    // Update audio parameters when position or loaded state changes
+    // Initial parameter setting and updates from position changes
     useEffect(() => {
-        if (loaded) {
+        if (loaded && !dragging) {
+            // Only update parameters on position changes when not actively dragging
+            // (Dragging updates are handled separately in onMouseMove for better performance)
             const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
             const volumeValue = mapRange(position.yPercent, 0, 100, silentVolume, 0);
 
+            // Update without throttling for initial setup and non-drag updates
             setPan(panValue);
             setVolume(volumeValue);
+            
+            // Store the values
+            lastPanValue.current = panValue;
+            lastVolumeValue.current = volumeValue;
         }
-    }, [loaded, position.xPercent, position.yPercent, setPan, setVolume, silentVolume]);
+    }, [loaded, position.xPercent, position.yPercent, setPan, setVolume, silentVolume, dragging]);
 
     function onMouseDown(e: React.MouseEvent) {
         e.stopPropagation();
@@ -161,6 +220,22 @@ export default function AudioCircle({
     }
 
     function onMouseUp() {
+        // When mouse up, apply the final parameters immediately
+        if (pendingParamUpdateRef.current && loaded) {
+            const { pan, volume } = pendingParamUpdateRef.current;
+            setPan(pan);
+            setVolume(volume);
+            
+            // Clear the pending update
+            pendingParamUpdateRef.current = null;
+        }
+        
+        // Clear any pending throttled updates
+        if (throttleTimerRef.current) {
+            window.clearTimeout(throttleTimerRef.current);
+            throttleTimerRef.current = null;
+        }
+        
         setDragging(false);
     }
 
@@ -189,18 +264,19 @@ export default function AudioCircle({
         const newCircleSize = mapRange(boundedYPercent, 0, 100, 20, 80);
         setCircleSize(newCircleSize);
     
-        // Map position to audio parameters
-        const panValue = mapRange(boundedXPercent, minXPercent, maxXPercent, -1, 1);
-        const mappedVolume = mapRange(boundedYPercent, minYPercent, maxYPercent, -30, 0);
-    
+        // Update position state for UI
         setPosition({
             xPercent: boundedXPercent,
             yPercent: boundedYPercent
         });
+        
+        // Map position to audio parameters
+        const panValue = mapRange(boundedXPercent, minXPercent, maxXPercent, -1, 1);
+        const mappedVolume = mapRange(boundedYPercent, minYPercent, maxYPercent, -30, 0);
       
-        setPan(panValue);
-        setVolume(mappedVolume);
-    }, [dragging, boundingBox, marginPercent, circleSize, setPan, setVolume]);
+        // Use the throttled update function for audio parameters during dragging
+        updateAudioParams(panValue, mappedVolume);
+    }, [dragging, boundingBox, marginPercent, circleSize, updateAudioParams]);
 
     useEffect(() => {
         if (dragging) {

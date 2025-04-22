@@ -130,12 +130,18 @@ export default function BoundingBox() {
   }, [audioRefsCreated]);
 
   // Start a timer to update current time when playing (UI only)
-  useEffect(() => {
-    if (isPlaying && !isSeekingRef.current) {
-      if (playbackTimerRef.current) {
-        clearInterval(playbackTimerRef.current);
-      }
+  // Start a timer to update current time when playing (UI only)
+useEffect(() => {
+  // Clear any existing timer first to prevent multiple timers
+  if (playbackTimerRef.current) {
+    clearInterval(playbackTimerRef.current);
+    playbackTimerRef.current = null;
+  }
 
+  // Only start timer when playing and not seeking
+  if (isPlaying && !isSeekingRef.current) {
+    // Use setTimeout to ensure this code runs AFTER the render completes
+    const timerStartId = setTimeout(() => {
       // Update time every 100ms
       playbackTimerRef.current = window.setInterval(() => {
         // Don't update if actively seeking
@@ -144,12 +150,32 @@ export default function BoundingBox() {
             // Loop back to start if we reach the end and looping is enabled
             if (prevTime >= totalDuration) {
               if (isLooping) {
-                // If looping, restart playback from beginning
-                pauseAll();
-                setTimeout(() => playAll(0), 50);
-                return 0;
+                // If looping, DON'T call pauseAll here - use an event handler approach instead
+                const newTime = 0;
+                // Use setTimeout to avoid calling state setters during render
+                setTimeout(() => {
+                  // First update the time to 0
+                  setCurrentTime(0);
+                  // Then in another tick, restart playback
+                  setTimeout(() => {
+                    audioRefs.current.forEach((ref) => {
+                      if (ref.current && ref.current.seekTo) {
+                        ref.current.seekTo(0);
+                      }
+                    });
+                  }, 20);
+                }, 0);
+                return newTime;
               } else {
-                pauseAll();
+                // If not looping, use setTimeout to pause AFTER the render cycle completes
+                setTimeout(() => {
+                  setIsPlaying(false);
+                  audioRefs.current.forEach((ref) => {
+                    if (ref.current && ref.current.pause) {
+                      ref.current.pause();
+                    }
+                  });
+                }, 0);
                 return totalDuration;
               }
             }
@@ -157,22 +183,24 @@ export default function BoundingBox() {
           });
         }
       }, 100);
-    } else {
-      // Clear the timer if not playing
-      if (playbackTimerRef.current) {
-        clearInterval(playbackTimerRef.current);
-        playbackTimerRef.current = null;
-      }
-    }
+    }, 0);
 
     return () => {
+      clearTimeout(timerStartId);
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
     };
-  }, [isPlaying, isLooping, totalDuration]);
+  }
 
+  return () => {
+    if (playbackTimerRef.current) {
+      clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
+  };
+}, [isPlaying, isLooping, totalDuration]);
   // Play all audio circles
   function playAll(startTimeSeconds?: number) {
     console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");

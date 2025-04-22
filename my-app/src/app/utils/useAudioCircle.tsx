@@ -38,7 +38,7 @@ export function useAudioCircle(audioUrl: string) {
   // Track if mounted and playing state
   const isMountedRef = useRef(true);
   const isPlayingRef = useRef(false);
-  const isAnalyzingRef = useRef(false); // Flag to prevent multiple analyze loops
+  const isAnalyzingRef = useRef(false);
 
   // Initialize audio
   useEffect(() => {
@@ -136,6 +136,8 @@ export function useAudioCircle(audioUrl: string) {
         url: audioUrl,
         loop: false,
         autostart: false,
+        fadeIn: 0.005,  // Tiny fade in to prevent clicks
+        fadeOut: 0.005, // Tiny fade out to prevent clicks
         onload: () => {
           if (isMountedRef.current) {
             setLoaded(true);
@@ -181,7 +183,6 @@ export function useAudioCircle(audioUrl: string) {
       const isQuietValue = amplitudeValue < quietThreshold;
     
       if (isMountedRef.current) {
-        // Use functional update to avoid closure issues
         setAudioData({
           fftData,
           waveformData,
@@ -318,69 +319,86 @@ export function useAudioCircle(audioUrl: string) {
     return stop();
   };
 
-  // Improved seek function that preserves playing state
-// Fixed seekTo function for useAudioCircle hook
-const seekTo = (timeInSeconds: number) => {
-  if (!playerRef.current || !isMountedRef.current) return false;
-  
-  console.log("Audio circle seeking to:", timeInSeconds);
-  
-  try {
-    // Always stop first
-    if (playerRef.current.state === "started") {
-      playerRef.current.stop();
-    }
+  // Fixed seek function
+  const seekTo = (timeInSeconds: number) => {
+    if (!playerRef.current || !isMountedRef.current) return false;
     
-    // Ensure time is valid
-    const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? 
-      Math.min(timeInSeconds, getDuration()) : 0;
-    
-    // Short delay to allow stopping to complete
-    setTimeout(() => {
-      if (!playerRef.current || !isMountedRef.current) return;
-      
-      try {
-        // Start at the new position
-        console.log("Starting audio at position:", validTime);
-        playerRef.current.start(0, validTime);
-        
-        // Update state
-        isPlayingRef.current = true;
-        
-        if (isMountedRef.current) {
-          setIsPlaying(true);
-        }
-        
-        // Start visualization
-        analyzeAudio();
-      } catch (e) {
-        console.error("Error restarting at time position:", e);
+    try {
+      // Always stop first
+      if (playerRef.current.state === "started") {
+        playerRef.current.stop();
       }
-    }, 20);
-    
-    return true;
-  } catch (error) {
-    console.error("Error seeking:", error);
-    return false;
-  }
-};
-  // Set pan function
+      
+      // Use setTimeout to avoid React render conflicts
+      setTimeout(() => {
+        if (!playerRef.current || !isMountedRef.current) return;
+        
+        try {
+          const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? timeInSeconds : 0;
+          playerRef.current.start(undefined, validTime);
+          
+          // Update state
+          isPlayingRef.current = true;
+          
+          if (isMountedRef.current) {
+            setIsPlaying(true);
+            
+            // Reset analysis flag and restart analysis
+            isAnalyzingRef.current = false;
+            analyzeAudio();
+          }
+        } catch (e) {
+          console.error("Error restarting at time position:", e);
+        }
+      }, 20);
+      
+      return true;
+    } catch (error) {
+      console.error("Error seeking:", error);
+      return false;
+    }
+  };
+
+  // Set pan function with smoother transitions
   const setPan = (value: number) => {
     if (!pannerRef.current || !isMountedRef.current) return;
     
     const clampedValue = Math.max(-1, Math.min(value, 1));
     
     try {
-      pannerRef.current.pan.value = clampedValue;
+      // Apply smooth ramping to prevent audio artifacts
+      const now = Tone.now();
+      const currentValue = pannerRef.current.pan.value;
+      
+      // Only ramp if the change is significant enough
+      if (Math.abs(currentValue - clampedValue) > 0.01) {
+        pannerRef.current.pan.cancelScheduledValues(now);
+        pannerRef.current.pan.setValueAtTime(currentValue, now);
+        pannerRef.current.pan.linearRampToValueAtTime(clampedValue, now + 0.05);
+      } else {
+        // For very small changes, just set directly
+        pannerRef.current.pan.value = clampedValue;
+      }
+      
       if (isMountedRef.current) {
         setCurrentPan(clampedValue);
       }
     } catch (error) {
       console.error("Error setting pan:", error);
+      
+      // Fallback to direct setting if ramping fails
+      try {
+        pannerRef.current.pan.value = clampedValue;
+        if (isMountedRef.current) {
+          setCurrentPan(clampedValue);
+        }
+      } catch (e) {
+        console.error("Fallback pan setting failed:", e);
+      }
     }
   };
 
-  // Set volume function
+  // Set volume function with smoother transitions
   const setVolume = (value: number) => {
     if (!volumeRef.current || !isMountedRef.current) return;
     
@@ -396,10 +414,24 @@ const seekTo = (timeInSeconds: number) => {
         }
       } else {
         volumeRef.current.mute = false;
+        
+        // Apply smooth ramping to prevent audio artifacts
+        const now = Tone.now();
+        const currentValue = volumeRef.current.volume.value;
+        
+        // Only ramp if the change is significant enough
+        if (Math.abs(currentValue - clampedValue) > 0.5) {
+          volumeRef.current.volume.cancelScheduledValues(now);
+          volumeRef.current.volume.setValueAtTime(currentValue, now);
+          volumeRef.current.volume.linearRampToValueAtTime(clampedValue, now + 0.05);
+        } else {
+          // For very small changes, just set directly
+          volumeRef.current.volume.value = clampedValue;
+        }
+        
         if (isMountedRef.current) {
           setIsMuted(false);
         }
-        volumeRef.current.volume.value = clampedValue;
       }
       
       if (isMountedRef.current) {
@@ -407,6 +439,23 @@ const seekTo = (timeInSeconds: number) => {
       }
     } catch (error) {
       console.error("Error setting volume:", error);
+      
+      // Fallback to direct setting if ramping fails
+      try {
+        const shouldBeMuted = clampedValue <= volumeThreshold;
+        volumeRef.current.mute = shouldBeMuted;
+        
+        if (!shouldBeMuted) {
+          volumeRef.current.volume.value = clampedValue;
+        }
+        
+        if (isMountedRef.current) {
+          setIsMuted(shouldBeMuted);
+          setCurrentVolume(clampedValue);
+        }
+      } catch (e) {
+        console.error("Fallback volume setting failed:", e);
+      }
     }
   };
 
