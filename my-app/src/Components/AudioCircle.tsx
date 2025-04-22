@@ -52,7 +52,7 @@ export default function AudioCircle({
 
     const [circleSize, setCircleSize] = useState<number>(50);
     const marginPercent = 10;
-    const silentVolume = -60;
+    const silentVolume = -20;
     
     const initializedRef = useRef(false);
     const lastPlayingState = useRef(masterIsPlaying);
@@ -118,8 +118,8 @@ export default function AudioCircle({
                     }
                     
                     if (Math.abs(lastVolumeValue.current - volume) > 0.5) {
-                        setVolume(volume);
                         lastVolumeValue.current = volume;
+                        setVolume( lastVolumeValue.current);
                     }
                 }
                 
@@ -174,7 +174,7 @@ export default function AudioCircle({
                         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
                         
                         const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
-                        const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, -30, 0);
+                        const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent,silentVolume, 0);
                         
                         // Use direct parameter setting for initialization
                         setPan(panValue);
@@ -222,62 +222,88 @@ export default function AudioCircle({
     function onMouseUp() {
         // When mouse up, apply the final parameters immediately
         if (pendingParamUpdateRef.current && loaded) {
-            const { pan, volume } = pendingParamUpdateRef.current;
-            setPan(pan);
-            setVolume(volume);
-            
-            // Clear the pending update
-            pendingParamUpdateRef.current = null;
+          const { pan, volume } = pendingParamUpdateRef.current;
+          
+          // Apply the final parameters directly
+          setPan(pan);
+          setVolume(volume);
+          
+          // Store the values in refs
+          lastPanValue.current = pan;
+          lastVolumeValue.current = volume;
+          
+          // Clear the pending update
+          pendingParamUpdateRef.current = null;
+        } else if (loaded) {
+          // If no pending updates, ensure current position values are applied
+          const minXPercent = marginPercent;
+          const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
+          const minYPercent = marginPercent;
+          const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
+          
+          const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
+          const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, 0, silentVolume);
+          
+          // Force-apply final parameters
+          setPan(panValue);
+          setVolume(volumeValue);
+          
+          // Update stored values
+          lastPanValue.current = panValue;
+          lastVolumeValue.current = volumeValue;
         }
         
         // Clear any pending throttled updates
         if (throttleTimerRef.current) {
-            window.clearTimeout(throttleTimerRef.current);
-            throttleTimerRef.current = null;
+          window.clearTimeout(throttleTimerRef.current);
+          throttleTimerRef.current = null;
         }
         
         setDragging(false);
-    }
+      }
 
-    const onMouseMove = useCallback((e: MouseEvent) => {
+      const onMouseMove = useCallback((e: MouseEvent) => {
         if (!dragging || !boundingBox) return;
-    
+      
         // Calculate new position based on mouse coordinates
         const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
             { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
-    
+      
         // Calculate position as percentage of container
         const newXPercent = ((e.clientX - container.left) / container.width) * 100;
         const newYPercent = ((e.clientY - container.top) / container.height) * 100;
-    
+      
         // Apply boundaries to prevent going outside the bounding box
         const minXPercent = marginPercent;
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
         
         const minYPercent = marginPercent;
         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
-    
+      
         const boundedXPercent = Math.max(minXPercent, Math.min(newXPercent, maxXPercent));
         const boundedYPercent = Math.max(minYPercent, Math.min(newYPercent, maxYPercent));
-    
+      
         // Update the circle size based on vertical position
         const newCircleSize = mapRange(boundedYPercent, 0, 100, 20, 80);
         setCircleSize(newCircleSize);
-    
+      
         // Update position state for UI
         setPosition({
-            xPercent: boundedXPercent,
-            yPercent: boundedYPercent
+          xPercent: boundedXPercent,
+          yPercent: boundedYPercent
         });
         
         // Map position to audio parameters
+        // Pan from left to right (-1 to 1)
         const panValue = mapRange(boundedXPercent, minXPercent, maxXPercent, -1, 1);
-        const mappedVolume = mapRange(boundedYPercent, minYPercent, maxYPercent, -30, 0);
-      
+        
+        // Map volume from top to bottom (0dB to -60dB)
+        const mappedVolume = mapRange(boundedYPercent, minYPercent, maxYPercent, silentVolume, 0);
+        
         // Use the throttled update function for audio parameters during dragging
         updateAudioParams(panValue, mappedVolume);
-    }, [dragging, boundingBox, marginPercent, circleSize, updateAudioParams]);
-
+      }, [dragging, boundingBox, marginPercent, circleSize, updateAudioParams]);
+      
     useEffect(() => {
         if (dragging) {
             window.addEventListener("mousemove", onMouseMove);
