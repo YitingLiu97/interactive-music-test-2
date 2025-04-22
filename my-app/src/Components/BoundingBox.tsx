@@ -4,7 +4,7 @@ import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState } from "react";
 import AudioInterface from "./AudioInterface";
 import { AudioControlRef } from "@/app/types/audioType";
-
+import StageBackground from "./StageBackground";
 interface AudioInfo {
   audioUrl: string;
   circleColor: string;
@@ -24,10 +24,10 @@ export default function BoundingBox() {
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(180); // Default 3 minutes
   const playbackTimerRef = useRef<number | null>(null);
-  
+
   // Track if we're currently seeking to avoid timer updates
   const isSeekingRef = useRef(false);
-
+ 
   const audioInfos: AudioInfo[] = [
     {
       audioUrl: "/resources/ATCBaritoneGuitar_03.mp3",
@@ -68,7 +68,7 @@ export default function BoundingBox() {
       audioUrl: "/resources/ATCTimpani_03.mp3",
       circleColor: "pink",
       instrumentName: "Timpani",
-    }
+    },
   ];
 
   // Initialize the refs array with the correct length first
@@ -78,10 +78,9 @@ export default function BoundingBox() {
       .map(() => React.createRef<AudioControlRef>())
   );
 
-
   // This useEffect will run only once after component mounts
   useEffect(() => {
-    if(mounted && audioRefsCreated) return;
+    if (mounted && audioRefsCreated) return;
     setMounted(true);
     setAudioRefsCreated(true);
   }, []);
@@ -124,95 +123,97 @@ export default function BoundingBox() {
           }
         }
       }, 1000);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [audioRefsCreated]);
 
   // Start a timer to update current time when playing (UI only)
-  // Start a timer to update current time when playing (UI only)
-useEffect(() => {
-  // Clear any existing timer first to prevent multiple timers
-  if (playbackTimerRef.current) {
-    clearInterval(playbackTimerRef.current);
-    playbackTimerRef.current = null;
-  }
+  useEffect(() => {
+    // Clear any existing timer first to prevent multiple timers
+    if (playbackTimerRef.current) {
+      clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
 
-  // Only start timer when playing and not seeking
-  if (isPlaying && !isSeekingRef.current) {
-    // Use setTimeout to ensure this code runs AFTER the render completes
-    const timerStartId = setTimeout(() => {
-      // Update time every 100ms
-      playbackTimerRef.current = window.setInterval(() => {
-        // Don't update if actively seeking
-        if (!isSeekingRef.current) {
-          setCurrentTime((prevTime) => {
-            // Loop back to start if we reach the end and looping is enabled
-            if (prevTime >= totalDuration) {
-              if (isLooping) {
-                // If looping, DON'T call pauseAll here - use an event handler approach instead
-                const newTime = 0;
-                // Use setTimeout to avoid calling state setters during render
-                setTimeout(() => {
-                  // First update the time to 0
-                  setCurrentTime(0);
-                  // Then in another tick, restart playback
+    // Only start timer when playing and not seeking
+    if (isPlaying && !isSeekingRef.current) {
+      // Use setTimeout to ensure this code runs AFTER the render completes
+      const timerStartId = setTimeout(() => {
+        // Update time every 100ms
+        playbackTimerRef.current = window.setInterval(() => {
+          // Don't update if actively seeking
+          if (!isSeekingRef.current) {
+            setCurrentTime((prevTime) => {
+              // Loop back to start if we reach the end and looping is enabled
+              if (prevTime >= totalDuration) {
+                if (isLooping) {
+                  // If looping, DON'T call pauseAll here - use an event handler approach instead
+                  const newTime = 0;
+                  // Use setTimeout to avoid calling state setters during render
                   setTimeout(() => {
+                    // First update the time to 0
+                    setCurrentTime(0);
+                    // Then in another tick, restart playback
+                    setTimeout(() => {
+                      audioRefs.current.forEach((ref) => {
+                        if (ref.current && ref.current.seekTo) {
+                          ref.current.seekTo(0);
+                        }
+                      });
+                    }, 20);
+                  }, 0);
+                  return newTime;
+                } else {
+                  // If not looping, use setTimeout to pause AFTER the render cycle completes
+                  setTimeout(() => {
+                    setIsPlaying(false);
                     audioRefs.current.forEach((ref) => {
-                      if (ref.current && ref.current.seekTo) {
-                        ref.current.seekTo(0);
+                      if (ref.current && ref.current.pause) {
+                        ref.current.pause();
                       }
                     });
-                  }, 20);
-                }, 0);
-                return newTime;
-              } else {
-                // If not looping, use setTimeout to pause AFTER the render cycle completes
-                setTimeout(() => {
-                  setIsPlaying(false);
-                  audioRefs.current.forEach((ref) => {
-                    if (ref.current && ref.current.pause) {
-                      ref.current.pause();
-                    }
-                  });
-                }, 0);
-                return totalDuration;
+                  }, 0);
+                  return totalDuration;
+                }
               }
-            }
-            return prevTime + 0.1;
-          });
+              return prevTime + 0.1;
+            });
+          }
+        }, 100);
+      }, 0);
+
+      return () => {
+        clearTimeout(timerStartId);
+        if (playbackTimerRef.current) {
+          clearInterval(playbackTimerRef.current);
+          playbackTimerRef.current = null;
         }
-      }, 100);
-    }, 0);
+      };
+    }
 
     return () => {
-      clearTimeout(timerStartId);
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
     };
-  }
-
-  return () => {
-    if (playbackTimerRef.current) {
-      clearInterval(playbackTimerRef.current);
-      playbackTimerRef.current = null;
-    }
-  };
-}, [isPlaying, isLooping, totalDuration,audioRefsCreated,mounted]);
+  }, [isPlaying, isLooping, totalDuration, audioRefsCreated, mounted]);
   // Play all audio circles
   function playAll(startTimeSeconds?: number) {
-    console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");
-    
+    console.log(
+      "Playing all tracks",
+      startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : ""
+    );
+
     setIsPlaying(true);
     setCurrentTrack("All instruments");
-    
+
     // If time is specified, update UI time
     if (startTimeSeconds !== undefined) {
       setCurrentTime(startTimeSeconds);
     }
-    
+
     // Call play on all audio circles
     let successCount = 0;
     audioRefs.current.forEach((ref) => {
@@ -222,17 +223,19 @@ useEffect(() => {
         if (success) successCount++;
       }
     });
-    
-    console.log(`Successfully started ${successCount} of ${audioRefs.current.length} tracks`);
+
+    console.log(
+      `Successfully started ${successCount} of ${audioRefs.current.length} tracks`
+    );
   }
 
   // Pause all audio circles
   function pauseAll() {
     console.log("Pausing all tracks");
-    
+
     // Set UI state
     setIsPlaying(false);
-    
+
     // Call pause on all audio circles
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.pause) {
@@ -244,23 +247,23 @@ useEffect(() => {
   // Improved seek function that forces playback after seeking
   function seekTo(timeInSeconds: number) {
     console.log(`Seeking to ${timeInSeconds}s`);
-    
+
     // Mark that we're seeking to avoid timer updates
     isSeekingRef.current = true;
-    
+
     // Update UI time immediately
     setCurrentTime(timeInSeconds);
-    
+
     // Always pause first to avoid conflicts
     pauseAll();
-    
+
     console.log("Paused all tracks, now seeking each track...");
-    
+
     // First update all audio track positions
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.seekTo) {
         const success = ref.current.seekTo(timeInSeconds);
-        console.log(`Seeking track: ${success ? 'success' : 'failed'}`);
+        console.log(`Seeking track: ${success ? "success" : "failed"}`);
       }
     });
     playAll();
@@ -269,7 +272,7 @@ useEffect(() => {
     setTimeout(() => {
       // Start playback at the new position
       console.log("Starting playback at new position:", timeInSeconds);
-      
+
       // Clear the seeking flag after everything is done
       setTimeout(() => {
         isSeekingRef.current = false;
@@ -281,7 +284,7 @@ useEffect(() => {
   function toggleAll() {
     const newLoopState = !isLooping;
     setIsLooping(newLoopState);
-    
+
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.setLooping) {
         ref.current.setLooping(newLoopState);
@@ -322,6 +325,8 @@ useEffect(() => {
           backgroundColor: "#f0f0f0",
         }}
       >
+        <StageBackground boundingBox={size} />
+
         {audioRefsCreated &&
           audioInfos.map((info, index) => (
             <AudioCircle
@@ -339,7 +344,6 @@ useEffect(() => {
             />
           ))}
       </div>
-
       {/* Audio interface outside the bounding box */}
       <AudioInterface
         trackListName="Air Traffic - The Magician's Wife"

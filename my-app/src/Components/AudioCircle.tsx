@@ -8,6 +8,8 @@ import { BoundingBox, AudioControlRef, StartPoint } from "@/app/types/audioType"
 type Props = {
     startPoint: StartPoint;
     boundingBox: BoundingBox;
+    containerOffsetX: number,
+    containerOffsetY: number,
     audioUrl: string;
     instrumentName?: string;
     color: string;
@@ -269,10 +271,12 @@ export default function AudioCircle({
         const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
             { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
       
+        const relativeX = e.clientX - container.left ;
+        const relativeY = e.clientY - container.top ;
+
         // Calculate position as percentage of container
-        const newXPercent = ((e.clientX - container.left) / container.width) * 100;
-        const newYPercent = ((e.clientY - container.top) / container.height) * 100;
-      
+        const newXPercent = (relativeX / boundingBox.x) * 100;
+        const newYPercent = (relativeY / boundingBox.y) * 100;
         // Apply boundaries to prevent going outside the bounding box
         const minXPercent = marginPercent;
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
@@ -302,7 +306,7 @@ export default function AudioCircle({
         
         // Use the throttled update function for audio parameters during dragging
         updateAudioParams(panValue, mappedVolume);
-      }, [silentVolume,dragging, boundingBox, marginPercent, circleSize, updateAudioParams]);
+      }, [silentVolume,dragging,boundingBox, marginPercent, circleSize, updateAudioParams]);
       
     useEffect(() => {
         if (dragging) {
