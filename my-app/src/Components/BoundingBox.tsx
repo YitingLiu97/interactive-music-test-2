@@ -200,7 +200,7 @@ useEffect(() => {
       playbackTimerRef.current = null;
     }
   };
-}, [isPlaying, isLooping, totalDuration]);
+}, [isPlaying, isLooping, totalDuration,audioRefsCreated,mounted]);
   // Play all audio circles
   function playAll(startTimeSeconds?: number) {
     console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");

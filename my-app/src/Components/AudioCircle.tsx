@@ -187,7 +187,7 @@ export default function AudioCircle({
                 }
             };
         }
-    }, [audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent]);
+    }, [silentVolume, audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent]);
 
     // Initial parameter setting and updates from position changes
     useEffect(() => {
@@ -302,7 +302,7 @@ export default function AudioCircle({
         
         // Use the throttled update function for audio parameters during dragging
         updateAudioParams(panValue, mappedVolume);
-      }, [dragging, boundingBox, marginPercent, circleSize, updateAudioParams]);
+      }, [silentVolume,dragging, boundingBox, marginPercent, circleSize, updateAudioParams]);
       
     useEffect(() => {
         if (dragging) {
@@ -314,7 +314,7 @@ export default function AudioCircle({
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
         };
-    }, [dragging, onMouseMove]); 
+    }, [onMouseUp,dragging, onMouseMove]); 
 
     return (
         <>
