@@ -139,71 +139,65 @@ export default function BoundingBox() {
       clearInterval(playbackTimerRef.current);
       playbackTimerRef.current = null;
     }
-
+  
     // Only start timer when playing and not seeking
     if (isPlaying && !isSeekingRef.current) {
-      // Use setTimeout to ensure this code runs AFTER the render completes
-      const timerStartId = setTimeout(() => {
-        // Update time every 100ms
-        playbackTimerRef.current = window.setInterval(() => {
-          // Don't update if actively seeking
-          if (!isSeekingRef.current) {
-            setCurrentTime((prevTime) => {
-              // Loop back to start if we reach the end and looping is enabled
-              if (prevTime >= totalDuration) {
-                if (isLooping) {
-                  // If looping, DON'T call pauseAll here - use an event handler approach instead
-                  const newTime = 0;
-                  // Use setTimeout to avoid calling state setters during render
-                  setTimeout(() => {
-                    // First update the time to 0
-                    setCurrentTime(0);
-                    // Then in another tick, restart playback
-                    setTimeout(() => {
-                      audioRefs.current.forEach((ref) => {
-                        if (ref.current && ref.current.seekTo) {
-                          ref.current.seekTo(0);
-                        }
-                      });
-                    }, 20);
-                  }, 0);
-                  return newTime;
-                } else {
-                  // If not looping, use setTimeout to pause AFTER the render cycle completes
-                  setTimeout(() => {
-                    setIsPlaying(false);
-                    audioRefs.current.forEach((ref) => {
-                      if (ref.current && ref.current.pause) {
-                        ref.current.pause();
-                      }
-                    });
-                  }, 0);
-                  return totalDuration;
-                }
+      // Create a single interval for updating the time
+      playbackTimerRef.current = window.setInterval(() => {
+        // Don't update if actively seeking
+        if (!isSeekingRef.current) {
+          setCurrentTime(prevTime => {
+            const newTime = prevTime + 0.1;
+            
+            // Check if we've reached the end
+            if (newTime >= totalDuration) {
+              if (isLooping) {
+                // For looping, handle separately to avoid nested setState calls
+                // that could cause infinite loops
+                requestAnimationFrame(() => {
+                  audioRefs.current.forEach(ref => {
+                    if (ref.current?.seekTo) {
+                      ref.current.seekTo(0);
+                    }
+                  });
+                  setCurrentTime(0);
+                });
+                // Return the current time unchanged, the animation frame will reset it
+                return prevTime;
+              } else {
+                // If not looping, schedule stopping everything
+                requestAnimationFrame(() => {
+                  setIsPlaying(false);
+                  audioRefs.current.forEach(ref => {
+                    if (ref.current?.pause) {
+                      ref.current.pause();
+                    }
+                  });
+                });
+                return totalDuration; // Cap at max duration
               }
-              return prevTime + 0.1;
-            });
-          }
-        }, 100);
-      }, 0);
-
+            }
+            
+            return newTime;
+          });
+        }
+      }, 100);
+  
       return () => {
-        clearTimeout(timerStartId);
         if (playbackTimerRef.current) {
           clearInterval(playbackTimerRef.current);
           playbackTimerRef.current = null;
         }
       };
     }
-
+  
     return () => {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
     };
-  }, [isPlaying, isLooping, totalDuration, audioRefsCreated, mounted]);
-  // Play all audio circles
+  }, [isPlaying, isLooping, totalDuration]); // Play all audio circles
   const playAll= useCallback((startTimeSeconds?: number) =>{
     console.log(
       "Playing all tracks",

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import React from "react";
 import { BoundingBox } from "@/app/types/audioType";
 
@@ -29,12 +29,13 @@ export default function PerspectiveStageBackground({
   const { x, y } = boundingBox;
 
   // Define the perspective floor points
-  const floorCoords: FloorCoordinates = {
+  const floorCoords = useMemo(()=>  {
+    return{
     topLeft: { x: x * 0.2, y: y * 0.4 },
     topRight: { x: x * 0.8, y: y * 0.4 },
     bottomRight: { x: x * 0.9, y: y * 0.8 },
-    bottomLeft: { x: x * 0.1, y: y * 0.8 },
-  };
+    bottomLeft: { x: x * 0.1, y: y * 0.8 },}
+  },[x,y]);
 
   const floorPoints = `
     ${floorCoords.bottomLeft.x},${floorCoords.bottomLeft.y} 

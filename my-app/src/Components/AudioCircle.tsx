@@ -253,30 +253,19 @@ export default function AudioCircle({
   ]);
 
   // Initial parameter setting and updates from position changes
-  useEffect(() => {
-    if (loaded && !dragging) {
-      // Only update parameters on position changes when not actively dragging
-      // (Dragging updates are handled separately in onMouseMove for better performance)
-      const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
-      const volumeValue = mapRange(position.yPercent, 0, 100, silentVolume, 0);
+useEffect(() => {
+  if (loaded && !dragging) {
+    // Only update parameters on position changes when not actively dragging
+    const panValue = mapRange(position.xPercent, 0, 100, -1, 1);
+    const volumeValue = mapRange(position.yPercent, 0, 100, silentVolume, 0);
 
-      // Update without throttling for initial setup and non-drag updates
-      setPan(panValue);
-      setVolume(volumeValue);
-
-      // Store the values
-      lastPanValue.current = panValue;
-      lastVolumeValue.current = volumeValue;
-    }
-  }, [
-    loaded,
-    position.xPercent,
-    position.yPercent,
-    setPan,
-    setVolume,
-    silentVolume,
-    dragging,
-  ]);
+    setPan(panValue);
+    setVolume(volumeValue);
+    
+    lastPanValue.current = panValue;
+    lastVolumeValue.current = volumeValue;
+  }
+}, [loaded, position.xPercent, position.yPercent, setPan, setVolume, silentVolume, dragging]);
 
   function onMouseDown(e: React.MouseEvent) {
     e.stopPropagation();
@@ -290,7 +279,7 @@ export default function AudioCircle({
     }
   }
 
-  function onMouseUp() {
+  const onMouseUp = useCallback(() =>{
     // When mouse up, apply the final parameters immediately
     if (pendingParamUpdateRef.current && loaded) {
       const { pan, volume } = pendingParamUpdateRef.current;
@@ -345,7 +334,7 @@ export default function AudioCircle({
     }
 
     setDragging(false);
-  }
+  },[loaded,boundingBox.x,boundingBox.y,circleSize,position.xPercent,position.yPercent,setPan,setVolume,silentVolume]);
 
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
