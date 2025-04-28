@@ -256,7 +256,7 @@ export function useHandDetection(
         cancelAnimationFrame(requestAnimationFrameId.current);
       }
     };
-  }, [isHandDetectionActive, startHandDetection]);
+  }, [isHandDetectionActive]);
 
   
   return {
