@@ -99,10 +99,10 @@ export function useHandDetection(
         );
         const grab = d < 50;
 
-        ctx.fillStyle = grab ? 'red' : 'green';
-        ctx.beginPath();
-        ctx.arc(palmX, palmY, 8, 0, Math.PI * 2);
-        ctx.fill();
+        // ctx.fillStyle = grab ? 'red' : 'green';
+        // ctx.beginPath();
+        // ctx.arc(palmX, palmY, 8, 0, Math.PI * 2);
+        // ctx.fill();
 
         const prev = prevPosRef.current;
         // On grab state change
