@@ -1,10 +1,13 @@
 "use client";
 import React from "react";
 import AudioCircle from "./AudioCircle";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import AudioInterface from "./AudioInterface";
 import { AudioControlRef } from "@/app/types/audioType";
-import StageBackground from "./StageBackground";
+import { useHandDetection } from "@/app/utils/useHandDetection";
+import { Button } from "@radix-ui/themes";
+import { VideoIcon } from "@radix-ui/react-icons";
+
 interface AudioInfo {
   audioUrl: string;
   circleColor: string;
@@ -24,10 +27,13 @@ export default function BoundingBox() {
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(180); // Default 3 minutes
   const playbackTimerRef = useRef<number | null>(null);
-
+  
   // Track if we're currently seeking to avoid timer updates
   const isSeekingRef = useRef(false);
- 
+  
+  // Track which audio circle is being controlled by hand gestures
+  const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<number | null>(null);
+
   const audioInfos: AudioInfo[] = [
     {
       audioUrl: "/resources/ATCBaritoneGuitar_03.mp3",
@@ -68,7 +74,7 @@ export default function BoundingBox() {
       audioUrl: "/resources/ATCTimpani_03.mp3",
       circleColor: "pink",
       instrumentName: "Timpani",
-    },
+    }
   ];
 
   // Initialize the refs array with the correct length first
@@ -77,10 +83,136 @@ export default function BoundingBox() {
       .fill(null)
       .map(() => React.createRef<AudioControlRef>())
   );
+  
+  // Create refs for audio circle positions
+  const audioCirclePositions = useRef<{x: number, y: number}[]>(
+    Array(audioInfos.length)
+      .fill(null)
+      .map((_, index) => ({ 
+        x: (0.3 + index * 0.1) * 100,  // Convert to percentage 
+        y: 0.3 * 100 
+      }))
+  );
+
+  // Hand detection gesture handlers
+  const handleHandMove = useCallback((x: number, y: number) => {
+    // When hand is open and moving, we just track it without affecting audio circles
+    // This is just for visualization/feedback to the user
+    
+    // Find the closest audio circle to the hand position
+    if (boxRef.current && activeHandCircleIndex === null) {
+      const boxRect = boxRef.current.getBoundingClientRect();
+      
+      // Convert absolute coordinates to percentages
+      const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
+      const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
+      
+      // Check if hand is close enough to any circle to "highlight" it
+      let closestDistance = Infinity;
+      let closestIndex = -1;
+      
+      audioCirclePositions.current.forEach((pos, index) => {
+        const distance = Math.sqrt(
+          Math.pow(xPercent - pos.x, 2) + 
+          Math.pow(yPercent - pos.y, 2)
+        );
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+      
+      // If hand is close enough to a circle, highlight it
+      // This would be implemented in AudioCircle component
+      if (closestDistance < 15) {  // 15% of container as threshold
+        // We could set a state to highlight this circle
+        setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
+      }
+    }
+  }, [activeHandCircleIndex, audioInfos]);
+  
+  const handleHandGrab = useCallback((x: number, y: number) => {
+    // When hand makes grabbing gesture
+    if (!boxRef.current) return;
+    
+    const boxRect = boxRef.current.getBoundingClientRect();
+    
+    // Convert absolute coordinates to percentages
+    const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
+    const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
+    
+    if (activeHandCircleIndex === null) {
+      // Not currently dragging - find closest circle to grab
+      let closestDistance = Infinity;
+      let closestIndex = -1;
+      
+      audioCirclePositions.current.forEach((pos, index) => {
+        const distance = Math.sqrt(
+          Math.pow(xPercent - pos.x, 2) + 
+          Math.pow(yPercent - pos.y, 2)
+        );
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+      
+      // If close enough to a circle, start dragging it
+      if (closestDistance < 15) {  // 15% of container as threshold
+        setActiveHandCircleIndex(closestIndex);
+        setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
+      }
+    } else {
+      // Already dragging - update position of active circle
+      // We'll update the position in audioCirclePositions ref
+      // This will be synced to the actual AudioCircle components
+      const newPositions = [...audioCirclePositions.current];
+      
+      // Apply boundaries to prevent going outside the bounding box
+      const marginPercent = 10;
+      const circleSize = 50; // Default circle size
+      
+      const minXPercent = marginPercent;
+      const maxXPercent = 100 - (circleSize / boxRect.width) * 100 - marginPercent;
+      
+      const minYPercent = marginPercent;
+      const maxYPercent = 100 - (circleSize / boxRect.height) * 100 - marginPercent;
+      
+      const boundedXPercent = Math.max(minXPercent, Math.min(xPercent, maxXPercent));
+      const boundedYPercent = Math.max(minYPercent, Math.min(yPercent, maxYPercent));
+      
+      newPositions[activeHandCircleIndex] = {
+        x: boundedXPercent,
+        y: boundedYPercent
+      };
+      
+      audioCirclePositions.current = newPositions;
+      
+      // Force a re-render to update circle positions
+      setSize(prevSize => ({ ...prevSize }));
+    }
+  }, [activeHandCircleIndex, audioInfos]);
+  
+  const handleHandRelease = useCallback(() => {
+    // When hand opens from grab, release the active circle
+    setActiveHandCircleIndex(null);
+  }, []);
+
+  // Initialize hand detection
+  const {
+    isHandDetectionActive,
+    toggleHandDetection,
+    handPosition,
+    isGrabbing,
+    videoRef,
+    canvasRef
+  } = useHandDetection(boxRef, handleHandMove, handleHandGrab, handleHandRelease);
 
   // This useEffect will run only once after component mounts
   useEffect(() => {
-    if (mounted && audioRefsCreated) return;
+    if(mounted && audioRefsCreated) return;
     setMounted(true);
     setAudioRefsCreated(true);
   }, []);
@@ -123,7 +255,7 @@ export default function BoundingBox() {
           }
         }
       }, 1000);
-
+      
       return () => clearTimeout(timeoutId);
     }
   }, [audioRefsCreated]);
@@ -135,7 +267,7 @@ export default function BoundingBox() {
       clearInterval(playbackTimerRef.current);
       playbackTimerRef.current = null;
     }
-
+  
     // Only start timer when playing and not seeking
     if (isPlaying && !isSeekingRef.current) {
       // Use setTimeout to ensure this code runs AFTER the render completes
@@ -182,7 +314,7 @@ export default function BoundingBox() {
           }
         }, 100);
       }, 0);
-
+  
       return () => {
         clearTimeout(timerStartId);
         if (playbackTimerRef.current) {
@@ -191,29 +323,27 @@ export default function BoundingBox() {
         }
       };
     }
-
+  
     return () => {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
     };
-  }, [isPlaying, isLooping, totalDuration, audioRefsCreated, mounted]);
+  }, [isPlaying, isLooping, totalDuration]);
+
   // Play all audio circles
   function playAll(startTimeSeconds?: number) {
-    console.log(
-      "Playing all tracks",
-      startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : ""
-    );
-
+    console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");
+    
     setIsPlaying(true);
     setCurrentTrack("All instruments");
-
+    
     // If time is specified, update UI time
     if (startTimeSeconds !== undefined) {
       setCurrentTime(startTimeSeconds);
     }
-
+    
     // Call play on all audio circles
     let successCount = 0;
     audioRefs.current.forEach((ref) => {
@@ -223,19 +353,17 @@ export default function BoundingBox() {
         if (success) successCount++;
       }
     });
-
-    console.log(
-      `Successfully started ${successCount} of ${audioRefs.current.length} tracks`
-    );
+    
+    console.log(`Successfully started ${successCount} of ${audioRefs.current.length} tracks`);
   }
 
   // Pause all audio circles
   function pauseAll() {
     console.log("Pausing all tracks");
-
+    
     // Set UI state
     setIsPlaying(false);
-
+    
     // Call pause on all audio circles
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.pause) {
@@ -247,23 +375,23 @@ export default function BoundingBox() {
   // Improved seek function that forces playback after seeking
   function seekTo(timeInSeconds: number) {
     console.log(`Seeking to ${timeInSeconds}s`);
-
+    
     // Mark that we're seeking to avoid timer updates
     isSeekingRef.current = true;
-
+    
     // Update UI time immediately
     setCurrentTime(timeInSeconds);
-
+    
     // Always pause first to avoid conflicts
     pauseAll();
-
+    
     console.log("Paused all tracks, now seeking each track...");
-
+    
     // First update all audio track positions
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.seekTo) {
         const success = ref.current.seekTo(timeInSeconds);
-        console.log(`Seeking track: ${success ? "success" : "failed"}`);
+        console.log(`Seeking track: ${success ? 'success' : 'failed'}`);
       }
     });
     playAll();
@@ -272,7 +400,7 @@ export default function BoundingBox() {
     setTimeout(() => {
       // Start playback at the new position
       console.log("Starting playback at new position:", timeInSeconds);
-
+      
       // Clear the seeking flag after everything is done
       setTimeout(() => {
         isSeekingRef.current = false;
@@ -284,7 +412,7 @@ export default function BoundingBox() {
   function toggleAll() {
     const newLoopState = !isLooping;
     setIsLooping(newLoopState);
-
+    
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.setLooping) {
         ref.current.setLooping(newLoopState);
@@ -314,6 +442,17 @@ export default function BoundingBox() {
 
   return (
     <div className="flex flex-col h-screen w-screen">
+      {/* Hand detection toggle button */}
+      <div className="absolute top-4 right-4 z-10">
+        <Button
+          variant={isHandDetectionActive ? "solid" : "outline"}
+          color={isHandDetectionActive ? "green" : "gray"}
+          onClick={toggleHandDetection}
+        >
+          <VideoIcon /> {isHandDetectionActive ? "Disable" : "Enable"} Hand Control
+        </Button>
+      </div>
+      
       {/* Main bounding box for audio circles */}
       <div
         ref={boxRef}
@@ -325,25 +464,87 @@ export default function BoundingBox() {
           backgroundColor: "#f0f0f0",
         }}
       >
-        <StageBackground boundingBox={size} />
-
         {audioRefsCreated &&
-          audioInfos.map((info, index) => (
-            <AudioCircle
-              key={index}
-              startPoint={{ x: 0.3 + index * 0.1, y: 0.3 }}
-              boundingBox={size}
-              audioUrl={info.audioUrl}
-              color={info.circleColor}
-              audioRef={audioRefs.current[index]}
-              instrumentName={info.instrumentName}
-              masterIsPlaying={isPlaying}
-              onTrackSelect={() => {
-                setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
+          audioInfos.map((info, index) => {
+            // Get position from our ref to support hand movement
+            const position = audioCirclePositions.current[index];
+            
+            return (
+              <AudioCircle
+                key={index}
+                startPoint={{ 
+                  x: position.x / 100, // Convert back to decimal for startPoint
+                  y: position.y / 100 
+                }}
+                boundingBox={size}
+                audioUrl={info.audioUrl}
+                color={info.circleColor}
+                audioRef={audioRefs.current[index]}
+                instrumentName={info.instrumentName}
+                masterIsPlaying={isPlaying}
+                onTrackSelect={() => {
+                  setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
+                }}
+                isHandControlled={activeHandCircleIndex === index}
+                onPositionChange={(xPercent, yPercent) => {
+                  // Update position in our ref
+                  const newPositions = [...audioCirclePositions.current];
+                  newPositions[index] = { x: xPercent, y: yPercent };
+                  audioCirclePositions.current = newPositions;
+                }}
+              />
+            );
+          })}
+        
+        {/* Hand detection visualization overlay */}
+        {isHandDetectionActive && (
+          <>
+            <video 
+              ref={videoRef}
+              className="absolute top-0 left-0 object-cover opacity-30 mirror-image"
+              style={{ 
+                width: "25%", 
+                height: "25%",
+                transform: "scaleX(-1)", // Mirror the video
+                zIndex: 5,
+                borderRadius: "0 0 8px 0",
+                opacity: 0.2  // Make video semi-transparent
               }}
             />
-          ))}
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 object-cover mirror-image"
+              style={{ 
+                width: "25%", 
+                height: "25%",
+                transform: "scaleX(-1)",  // Mirror the canvas
+                zIndex: 6,
+                borderRadius: "0 0 8px 0"
+              }}
+              width={640}
+              height={480}
+            />
+            
+            {/* Hand position indicator (optional) */}
+            {handPosition && (
+              <div
+                className="absolute z-10 pointer-events-none"
+                style={{
+                  left: `${handPosition.x}px`,
+                  top: `${handPosition.y}px`,
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  backgroundColor: isGrabbing ? "rgba(255, 0, 0, 0.5)" : "rgba(0, 255, 0, 0.5)",
+                  transform: "translate(-50%, -50%)",
+                  boxShadow: `0 0 10px ${isGrabbing ? "red" : "green"}`
+                }}
+              />
+            )}
+          </>
+        )}
       </div>
+
       {/* Audio interface outside the bounding box */}
       <AudioInterface
         trackListName="Air Traffic - The Magician's Wife"
@@ -366,6 +567,13 @@ export default function BoundingBox() {
           { id: "6", name: "Outro", startTime: 150, endTime: 180 },
         ]}
       />
+      
+      {/* Add CSS for video mirroring */}
+      <style jsx global>{`
+        .mirror-image {
+          transform: scaleX(-1);
+        }
+      `}</style>
     </div>
   );
 }

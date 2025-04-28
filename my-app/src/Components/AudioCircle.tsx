@@ -8,14 +8,14 @@ import { BoundingBox, AudioControlRef, StartPoint } from "@/app/types/audioType"
 type Props = {
     startPoint: StartPoint;
     boundingBox: BoundingBox;
-    containerOffsetX: number,
-    containerOffsetY: number,
     audioUrl: string;
     instrumentName?: string;
     color: string;
     audioRef?: React.RefObject<AudioControlRef | null>;
     masterIsPlaying?: boolean;  // Control from parent
     onTrackSelect?: () => void; // Callback when circle is clicked
+    isHandControlled?: boolean; // Flag when this circle is being controlled by hand
+    onPositionChange?: (xPercent: number, yPercent: number) => void; // Callback to notify position changes
 }
 
 export default function AudioCircle({
@@ -26,7 +26,9 @@ export default function AudioCircle({
     audioRef,
     instrumentName,
     masterIsPlaying = false,
-    onTrackSelect
+    onTrackSelect,
+    isHandControlled = false,
+    onPositionChange
 }: Props) {
     const {
         play,
@@ -80,7 +82,7 @@ export default function AudioCircle({
         }
     }, [masterIsPlaying, isPlaying, loaded, play, pause]);
 
-    // Fix for hydration issue
+    // Fix for hydration issue and to synchronize with startPoint changes
     useEffect(() => {
         if (!initializedRef.current) {
             setPosition({
@@ -88,6 +90,12 @@ export default function AudioCircle({
                 yPercent: startPoint.y * 100
             });
             initializedRef.current = true;
+        } else {
+            // Update position when startPoint changes (from hand detection)
+            setPosition({
+                xPercent: startPoint.x * 100,
+                yPercent: startPoint.y * 100
+            });
         }
     }, [startPoint.x, startPoint.y]);
 
@@ -100,6 +108,12 @@ export default function AudioCircle({
             }
         };
     }, []);
+
+    // Add effect for handling hand-controlled highlighting
+    useEffect(() => {
+        // Apply visual effect when circle is controlled by hand
+        // This is handled in CircleUI component by passing isHandControlled prop
+    }, [isHandControlled]);
 
     // Throttled audio parameter update function to prevent buzzing
     const updateAudioParams = useCallback((panValue: number, volumeValue: number) => {
@@ -121,7 +135,7 @@ export default function AudioCircle({
                     
                     if (Math.abs(lastVolumeValue.current - volume) > 0.5) {
                         lastVolumeValue.current = volume;
-                        setVolume( lastVolumeValue.current);
+                        setVolume(lastVolumeValue.current);
                     }
                 }
                 
@@ -176,7 +190,7 @@ export default function AudioCircle({
                         const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
                         
                         const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
-                        const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent,silentVolume, 0);
+                        const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, silentVolume, 0);
                         
                         // Use direct parameter setting for initialization
                         setPan(panValue);
@@ -189,7 +203,7 @@ export default function AudioCircle({
                 }
             };
         }
-    }, [silentVolume, audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent]);
+    }, [audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent]);
 
     // Initial parameter setting and updates from position changes
     useEffect(() => {
@@ -244,7 +258,7 @@ export default function AudioCircle({
           const maxYPercent = 100 - (circleSize / boundingBox.y) * 100 - marginPercent;
           
           const panValue = mapRange(position.xPercent, minXPercent, maxXPercent, -1, 1);
-          const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, 0, silentVolume);
+          const volumeValue = mapRange(position.yPercent, minYPercent, maxYPercent, silentVolume, 0);
           
           // Force-apply final parameters
           setPan(panValue);
@@ -271,12 +285,10 @@ export default function AudioCircle({
         const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
             { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
       
-        const relativeX = e.clientX - container.left ;
-        const relativeY = e.clientY - container.top ;
-
         // Calculate position as percentage of container
-        const newXPercent = (relativeX / boundingBox.x) * 100;
-        const newYPercent = (relativeY / boundingBox.y) * 100;
+        const newXPercent = ((e.clientX - container.left) / container.width) * 100;
+        const newYPercent = ((e.clientY - container.top) / container.height) * 100;
+      
         // Apply boundaries to prevent going outside the bounding box
         const minXPercent = marginPercent;
         const maxXPercent = 100 - (circleSize / boundingBox.x) * 100 - marginPercent;
@@ -297,6 +309,11 @@ export default function AudioCircle({
           yPercent: boundedYPercent
         });
         
+        // Notify parent of position change for hand detection synchronization
+        if (onPositionChange) {
+          onPositionChange(boundedXPercent, boundedYPercent);
+        }
+        
         // Map position to audio parameters
         // Pan from left to right (-1 to 1)
         const panValue = mapRange(boundedXPercent, minXPercent, maxXPercent, -1, 1);
@@ -306,7 +323,7 @@ export default function AudioCircle({
         
         // Use the throttled update function for audio parameters during dragging
         updateAudioParams(panValue, mappedVolume);
-      }, [silentVolume,dragging,boundingBox, marginPercent, circleSize, updateAudioParams]);
+      }, [dragging, boundingBox, marginPercent, circleSize, updateAudioParams, onPositionChange]);
       
     useEffect(() => {
         if (dragging) {
@@ -318,7 +335,7 @@ export default function AudioCircle({
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
         };
-    }, [onMouseUp,dragging, onMouseMove]); 
+    }, [dragging, onMouseMove]);
 
     return (
         <>
@@ -327,7 +344,7 @@ export default function AudioCircle({
                 yPercent={position.yPercent}
                 circleSize={circleSize}
                 onMouseDown={onMouseDown}
-                isDragging={dragging}
+                isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback
                 boundingBox={boundingBox}
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
@@ -335,6 +352,7 @@ export default function AudioCircle({
                 isPlaying={masterIsPlaying}  // Use master playing state
                 isMuted={isMuted}
                 audioData={audioData}
+                isHandControlled={isHandControlled} // Pass to CircleUI for visual feedback
             />
 
             <div
@@ -348,7 +366,7 @@ export default function AudioCircle({
                     borderRadius: '3px',
                     fontSize: '10px',
                     pointerEvents: 'none', 
-                    display: dragging ? 'block' : 'none'
+                    display: (dragging || isHandControlled) ? 'block' : 'none'
                 }}
             >
                 Vol: {currentVolume.toFixed(1)}dB | Pan: {currentPan.toFixed(2)}

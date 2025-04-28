@@ -1,7 +1,7 @@
 'use client'
 import React, { useMemo } from "react"
 import { BoundingBox } from "@/app/types/audioType";
-import { SpeakerLoudIcon } from "@radix-ui/react-icons";
+import { SpeakerLoudIcon, HandIcon } from "@radix-ui/react-icons";
 
 type Props = {
     xPercent: number;
@@ -15,6 +15,7 @@ type Props = {
     instrumentName?: string;
     isPlaying?: boolean;
     isMuted?: boolean;
+    isHandControlled?: boolean; // New prop for hand control status
     audioData?: {
         fftData: Float32Array | null;
         waveformData: Float32Array | null;
@@ -35,6 +36,7 @@ export default function CircleUI({
     instrumentName,
     isPlaying = false,
     isMuted = true,
+    isHandControlled = false, // Default to false
     audioData
 }: Props) {
     // Calculate the actual position in pixels
@@ -220,6 +222,12 @@ export default function CircleUI({
         return baseGlow + amplitudeBoost;
     }, [audioData, isPlaying, isMuted, isDragging]);
     
+    // Generate additional styles for hand-controlled circles
+    const handControlStyles = isHandControlled ? {
+        boxShadow: `0 0 25px rgba(0, 255, 0, 0.7), 0 0 15px ${color}`,
+        border: `3px dashed rgba(0, 255, 0, 0.5)`
+    } : {};
+    
     return (
         <div
             onMouseDown={onMouseDown}
@@ -227,7 +235,7 @@ export default function CircleUI({
                 width: circleSize,
                 height: circleSize,
                 borderRadius: "50%",
-                backgroundColor: audioData?.isQuiet? "gray":dynamicColor,
+                backgroundColor: audioData?.isQuiet? "gray" : dynamicColor,
                 position: "absolute",
                 left: 0,
                 top: 0,
@@ -250,9 +258,18 @@ export default function CircleUI({
                 // Add a subtle internal gradient based on audio characteristics if available
                 backgroundImage: (audioData && isPlaying && !isMuted && !audioData.isQuiet) 
                     ? `radial-gradient(circle at center, ${color} 0%, ${dynamicColor} 70%)`
-                    : "none"
+                    : "none",
+                // Apply hand control styles
+                ...handControlStyles
             }}
         >
+            {/* Hand control indicator */}
+            {isHandControlled && (
+                <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                    <HandIcon className="text-green-500 animate-pulse" width={20} height={20} />
+                </div>
+            )}
+            
             {/* Reactive waveform outline when playing */}
             {isPlaying && !isMuted && audioData && !audioData.isQuiet && wavePoints && (
                 <div 
@@ -472,31 +489,21 @@ export default function CircleUI({
                             )
                         }} />
                     )}
+                    
+                    {/* Hand control icon (when being controlled by hand) */}
+                    {isHandControlled && (
+                        <div className="mt-1 animate-pulse">
+                            <HandIcon 
+                                style={{
+                                    width: Math.max(12, circleSize * 0.25),
+                                    height: Math.max(12, circleSize * 0.25),
+                                    color: "rgba(0, 255, 0, 0.8)"
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
-            
-         
-            {/* Audio level meter (only visible when playing) */}
-            {/* {isPlaying && !isMuted && audioData && !audioData.isQuiet && (
-                <div style={{
-                    position: "absolute",
-                    bottom: -10,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    height: 3,
-                    width: circleSize * 0.8,
-                    backgroundColor: "rgba(0, 0, 0, 0.5)",
-                    borderRadius: 2,
-                    overflow: "hidden"
-                }}>
-                    <div style={{
-                        height: "100%",
-                        width: `${Math.max(0, Math.min(100, (audioData.amplitude + 60) / 60 * 100))}%`,
-                        backgroundColor: color,
-                        transition: "width 0.1s ease"
-                    }} />
-                </div>
-            )} */}
             
             {/* Add some CSS animations for the playing state */}
             <style jsx global>{`
@@ -509,6 +516,12 @@ export default function CircleUI({
                 @keyframes bounce {
                     0% { transform: translateY(-1px); }
                     100% { transform: translateY(1px); }
+                }
+                
+                @keyframes hand-glow {
+                    0% { box-shadow: 0 0 10px rgba(0, 255, 0, 0.5); }
+                    50% { box-shadow: 0 0 20px rgba(0, 255, 0, 0.8); }
+                    100% { box-shadow: 0 0 10px rgba(0, 255, 0, 0.5); }
                 }
             `}</style>
         </div>
