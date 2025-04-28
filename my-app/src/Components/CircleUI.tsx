@@ -6,8 +6,10 @@ import { SpeakerLoudIcon, HandIcon } from "@radix-ui/react-icons";
 type Props = {
     xPercent: number;
     yPercent: number;
+    pixelPosition?: { x: number, y: number }; // New prop for direct pixel positioning
     circleSize?: number;
     onMouseDown: (e: React.MouseEvent) => void;
+    onTouchStart: (e: React.TouchEvent) => void;
     isDragging: boolean;
     boundingBox: BoundingBox;
     color?: string;
@@ -27,8 +29,10 @@ type Props = {
 export default function CircleUI({ 
     xPercent,
     yPercent,
+    pixelPosition,
     circleSize = 50,
     onMouseDown,
+    onTouchStart,
     isDragging,
     boundingBox,
     color = "red", 
@@ -40,8 +44,16 @@ export default function CircleUI({
     audioData
 }: Props) {
     // Calculate the actual position in pixels
-    const xPos = (xPercent * boundingBox.x) / 100;
-    const yPos = (yPercent * boundingBox.y) / 100;
+    const position = useMemo(() => {
+        if (pixelPosition) {
+            return pixelPosition;
+        } else {
+            // Calculate the actual position in pixels (fallback to old method)
+            const xPos = (xPercent * boundingBox.x) / 100;
+            const yPos = (yPercent * boundingBox.y) / 100;
+            return { x: xPos, y: yPos };
+        }
+    }, [xPercent, yPercent, boundingBox, pixelPosition]);
     
     // Generate wave points for the reactive waveform when playing
     // This creates a dynamic, pulsating border based on the audio waveform
@@ -231,6 +243,7 @@ export default function CircleUI({
     return (
         <div
             onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
             style={{
                 width: circleSize,
                 height: circleSize,
@@ -239,7 +252,7 @@ export default function CircleUI({
                 position: "absolute",
                 left: 0,
                 top: 0,
-                transform: `translate(${xPos}px, ${yPos}px)`,
+                transform: `translate(${position.x}px, ${position.y}px)`,
                 cursor: isDragging ? "grabbing" : "grab",
                 transition: isDragging ? "none" : "all 0.1s ease",
                 opacity: opacity,

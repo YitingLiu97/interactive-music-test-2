@@ -15,6 +15,8 @@ type Props = {
     audioRef?: React.RefObject<AudioControlRef | null>;
     masterIsPlaying?: boolean;  // Control from parent
     onTrackSelect?: () => void; // Callback when circle is clicked
+    isHandControlled?: boolean; // Flag when this circle is being controlled by hand
+    onPositionChange?: (xPercent: number, yPercent: number) => void; // Callback to notify position changes
 }
 
 export default function AudioCircle({
@@ -26,7 +28,9 @@ export default function AudioCircle({
     audioRef,
     instrumentName,
     masterIsPlaying = false,
-    onTrackSelect
+    onTrackSelect,
+    isHandControlled = false,
+    onPositionChange
 }: Props) {
     const {
         play,
@@ -128,23 +132,23 @@ export default function AudioCircle({
     };
 
     // Check if a position is within the trapezoid boundaries accounting for circle radius
-    const isWithinTrapezoid = (xPos: number, yPercent: number, circleSizeValue: number): boolean => {
-        if (!trapezoid) {
-            return true; // Always true for rectangular bounds
-        }
+    // const isWithinTrapezoid = (xPos: number, yPercent: number, circleSizeValue: number): boolean => {
+    //     if (!trapezoid) {
+    //         return true; // Always true for rectangular bounds
+    //     }
 
-        // Get trapezoid dimensions at this y position
-        const { leftOffset, rightBoundary } = getWidthAtYPosition(yPercent);
+    //     // Get trapezoid dimensions at this y position
+    //     const { leftOffset, rightBoundary } = getWidthAtYPosition(yPercent);
         
-        // Account for circle radius
-        const circleRadius = circleSizeValue / 2;
+    //     // Account for circle radius
+    //     const circleRadius = circleSizeValue / 2;
         
-        // Check if the circle is fully contained within the trapezoid
-        return (
-            xPos - circleRadius >= leftOffset + marginPercent && 
-            xPos + circleRadius <= rightBoundary - marginPercent
-        );
-    };
+    //     // Check if the circle is fully contained within the trapezoid
+    //     return (
+    //         xPos - circleRadius >= leftOffset + marginPercent && 
+    //         xPos + circleRadius <= rightBoundary - marginPercent
+    //     );
+    // };
 
     // Calculate position based on the trapezoid shape
     const calculateTrapezoidPosition = (clientX: number, clientY: number) => {
@@ -157,7 +161,7 @@ export default function AudioCircle({
             100 - marginPercent - (circleSize / boundingBox.y) * 100));
         
         // Get trapezoid dimensions at this y position
-        const { width, leftOffset, rightBoundary } = getWidthAtYPosition(boundedYPercent);
+        const { leftOffset, rightBoundary } = getWidthAtYPosition(boundedYPercent);
         
         // Calculate x position in pixels relative to container
         const absoluteX = clientX - container.left;
@@ -400,7 +404,9 @@ export default function AudioCircle({
       
         // Update position state for UI
         setPosition(newPosition);
-        
+        if (onPositionChange) {
+            onPositionChange(newPosition.xPercent,newPosition.yPercent);
+          }
         // Get trapezoid dimensions at the new y position
         const { leftOffset, width } = getWidthAtYPosition(newPosition.yPercent);
         
@@ -424,7 +430,7 @@ export default function AudioCircle({
         
         // Use the throttled update function for audio parameters during dragging
         updateAudioParams(panValue, volumeValue);
-    }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent]);
+    }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent, onPositionChange]);
 
     // Touch event handlers for multi-touch support
     const onTouchStart = useCallback((e: React.TouchEvent) => {
@@ -555,7 +561,7 @@ export default function AudioCircle({
                 circleSize={circleSize}
                 onMouseDown={onMouseDown}
                 onTouchStart={onTouchStart}
-                isDragging={dragging}
+                isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback               
                 boundingBox={boundingBox}
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
@@ -563,6 +569,7 @@ export default function AudioCircle({
                 isPlaying={masterIsPlaying}  // Use master playing state
                 isMuted={isMuted}
                 audioData={audioData}
+                isHandControlled={isHandControlled} // Pass to CircleUI for visual feedback
             />
 
             <div
@@ -576,8 +583,7 @@ export default function AudioCircle({
                     borderRadius: '3px',
                     fontSize: '10px',
                     pointerEvents: 'none', 
-                    display: dragging ? 'block' : 'none'
-                }}
+                    display: (dragging || isHandControlled) ? 'block' : 'none'                }}
             >
                 Vol: {currentVolume.toFixed(1)}dB | Pan: {currentPan.toFixed(2)}
             </div>

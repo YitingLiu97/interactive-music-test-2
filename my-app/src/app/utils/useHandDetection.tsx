@@ -29,7 +29,7 @@ export function useHandDetection(
   // Use non-null assertion for refs that will be initialized with createRef
   const videoRef = useRef<HTMLVideoElement>(null!) as React.RefObject<HTMLVideoElement>;
   const canvasRef = useRef<HTMLCanvasElement>(null!) as React.RefObject<HTMLCanvasElement>;
-  const handposeModelRef = useRef<any>(null);
+  const handposeModelRef = useRef<handpose.HandPose>(null);
   const requestAnimationFrameId = useRef<number | null>(null);
   
   // Toggle hand detection on/off
@@ -256,7 +256,7 @@ export function useHandDetection(
         cancelAnimationFrame(requestAnimationFrameId.current);
       }
     };
-  }, [isHandDetectionActive]);
+  }, [isHandDetectionActive, startHandDetection]);
 
   
   return {
