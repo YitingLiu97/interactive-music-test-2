@@ -9,6 +9,7 @@ export interface AudioControlRef {
     setLooping?: (loopState: boolean) => void;
     getDuration?: () => number;
     applyPositionMuting: () => void;
+    updatePosition?: (newXPercent: number, newYPercent: number)=> boolean | void;
   }
   
   export interface BoundingBox {

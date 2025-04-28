@@ -94,47 +94,7 @@ export default function BoundingBox() {
       }))
   );
 
-  // Hand detection gesture handlers
-  // Hand detection gesture handlers
-  const handleHandMove = useCallback((x: number, y: number) => {
-    // When hand is open and moving, we just track it without affecting audio circles
-    // This is just for visualization/feedback to the user
-    
-    // Find the closest audio circle to the hand position
-    if (boxRef.current && activeHandCircleIndex === null) {
-      const boxRect = boxRef.current.getBoundingClientRect();
-      
-      // Convert absolute coordinates to percentages
-      const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
-      const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
-      
-      // Check if hand is close enough to any circle to "highlight" it
-      let closestDistance = Infinity;
-      let closestIndex = -1;
-      
-      audioCirclePositions.current.forEach((pos, index) => {
-        const distance = Math.sqrt(
-          Math.pow(xPercent - pos.x, 2) + 
-          Math.pow(yPercent - pos.y, 2)
-        );
-        
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
-        }
-      });
-      
-      // If hand is close enough to a circle, highlight it
-      // This would be implemented in AudioCircle component
-      if (closestDistance < 15) {  // 15% of container as threshold
-        // We could set a state to highlight this circle
-        setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
-      }
-    }
-  }, [activeHandCircleIndex, audioInfos]);
-  
   const handleHandGrab = useCallback((x: number, y: number) => {
-    // When hand makes grabbing gesture
     if (!boxRef.current) return;
     
     const boxRect = boxRef.current.getBoundingClientRect();
@@ -161,45 +121,114 @@ export default function BoundingBox() {
       });
       
       // If close enough to a circle, start dragging it
-      if (closestDistance < 15) {  // 15% of container as threshold
+      if (closestDistance < 30) {  // Increased threshold for better grabbing
         setActiveHandCircleIndex(closestIndex);
         setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
       }
     } else {
-      // Already dragging - update position of active circle
-      // We'll update the position in audioCirclePositions ref
-      // This will be synced to the actual AudioCircle components
-      const newPositions = [...audioCirclePositions.current];
+      // Already controlling a circle
       
-      // Apply boundaries to prevent going outside the bounding box
-      const marginPercent = 10;
-      const circleSize = 50; // Default circle size
+      // Calculate the width and offset at the current y position within the trapezoid
+      const { topLeftOffset, topWidth } = trapezoid;
+      const yRatio = yPercent / 100;
+      const width = topWidth + (boxRect.width - topWidth) * yRatio;
+      const leftOffset = topLeftOffset * (1 - yRatio);
+      const rightBoundary = leftOffset + width;
       
-      const minXPercent = marginPercent;
-      const maxXPercent = 100 - (circleSize / boxRect.width) * 100 - marginPercent;
+      // Convert to percentages
+      const leftOffsetPercent = (leftOffset / boxRect.width) * 100;
+      const rightBoundaryPercent = (rightBoundary / boxRect.width) * 100;
       
+      // Apply smoother movement
+      const currentPos = audioCirclePositions.current[activeHandCircleIndex];
+      const distanceToTarget = Math.sqrt(
+        Math.pow(xPercent - currentPos.x, 2) + 
+        Math.pow(yPercent - currentPos.y, 2)
+      );
+      
+      // Adaptive smoothing - less smoothing for small movements
+      const smoothFactor = Math.min(0.5, Math.max(0.2, distanceToTarget / 100));
+      
+      // Calculate smoothed position
+      const smoothedX = currentPos.x + (xPercent - currentPos.x) * smoothFactor;
+      const smoothedY = currentPos.y + (yPercent - currentPos.y) * smoothFactor;
+      
+      // Apply boundaries
+      const marginPercent = 5;
+      const circleSize = 50; // This should match what's in AudioCircle
+      const circleSizePercent = (circleSize / boxRect.width) * 100;
+      
+      // Calculate min/max bounds with margins
+      const minXPercent = leftOffsetPercent + marginPercent;
+      const maxXPercent = rightBoundaryPercent - marginPercent - circleSizePercent;
       const minYPercent = marginPercent;
-      const maxYPercent = 100 - (circleSize / boxRect.height) * 100 - marginPercent;
+      const maxYPercent = 100 - marginPercent - (circleSize / boxRect.height * 100);
       
-      const boundedXPercent = Math.max(minXPercent, Math.min(xPercent, maxXPercent));
-      const boundedYPercent = Math.max(minYPercent, Math.min(yPercent, maxYPercent));
+      // Clamp position
+      const boundedX = Math.max(minXPercent, Math.min(smoothedX, maxXPercent));
+      const boundedY = Math.max(minYPercent, Math.min(smoothedY, maxYPercent));
       
+      // Update internal tracked positions
+      const newPositions = [...audioCirclePositions.current];
       newPositions[activeHandCircleIndex] = {
-        x: boundedXPercent,
-        y: boundedYPercent
+        x: boundedX,
+        y: boundedY
       };
       
       audioCirclePositions.current = newPositions;
       
-      // Force a re-render to update circle positions
-      setSize(prevSize => ({ ...prevSize }));
+      // Only update component props if significant change to prevent excessive renders
+      if (Math.abs(boundedX - currentPos.x) > 0.2 || Math.abs(boundedY - currentPos.y) > 0.2) {
+        // Force render update via state change
+        setSize(prevSize => ({ ...prevSize }));
+      }
     }
-  }, [activeHandCircleIndex, audioInfos]);
-  
+  }, [activeHandCircleIndex, audioInfos, trapezoid]);
+
+  // Modified handleHandRelease function to ensure clean release
   const handleHandRelease = useCallback(() => {
     // When hand opens from grab, release the active circle
-    setActiveHandCircleIndex(null);
-  }, []);
+    if (activeHandCircleIndex !== null) {
+      // Final position update to ensure audio parameters are applied
+      if (audioRefs.current[activeHandCircleIndex].current) {
+        audioRefs.current[activeHandCircleIndex].current.applyPositionMuting();
+      }
+      setActiveHandCircleIndex(null);
+    }
+  }, [activeHandCircleIndex]);
+  
+  // Improved handleHandMove for better hovering feedback
+  const handleHandMove = useCallback((x: number, y: number) => {
+    // Only track hand position when not already grabbing a circle
+    if (boxRef.current && activeHandCircleIndex === null) {
+      const boxRect = boxRef.current.getBoundingClientRect();
+      
+      // Convert absolute coordinates to percentages
+      const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
+      const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
+      
+      // Find the closest audio circle to highlight
+      let closestDistance = Infinity;
+      let closestIndex = -1;
+      
+      audioCirclePositions.current.forEach((pos, index) => {
+        const distance = Math.sqrt(
+          Math.pow(xPercent - pos.x, 2) + 
+          Math.pow(yPercent - pos.y, 2)
+        );
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+      
+      // If hand is close enough to a circle, highlight it
+      if (closestDistance < 20) {  // Increased threshold for easier targeting
+        setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
+      }
+    }
+  }, [activeHandCircleIndex, audioInfos]);
 
   // Initialize hand detection
   const {

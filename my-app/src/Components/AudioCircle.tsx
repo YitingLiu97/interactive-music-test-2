@@ -67,9 +67,6 @@ export default function AudioCircle({
     const lastPanValue = useRef(0);
     const lastVolumeValue = useRef(0);
     
-    // Track touch points for multi-touch support
-    // const activeTouchesRef = useRef<Record<string, { x: number, y: number }>>({});
-    
     // Throttling for parameter updates during dragging to prevent audio buzzing
     const throttleTimerRef = useRef<number | null>(null);
     const pendingParamUpdateRef = useRef<{pan: number, volume: number} | null>(null);
@@ -87,7 +84,7 @@ export default function AudioCircle({
         }
     }, [masterIsPlaying, isPlaying, loaded, play, pause]);
 
-    // Fix for hydration issue
+    // Fix for hydration issue and to synchronize with startPoint changes
     useEffect(() => {
         if (!initializedRef.current) {
             setPosition({
@@ -95,6 +92,12 @@ export default function AudioCircle({
                 yPercent: startPoint.y * 100
             });
             initializedRef.current = true;
+        } else {
+            // Update position when startPoint changes (from hand detection)
+            setPosition({
+                xPercent: startPoint.x * 100,
+                yPercent: startPoint.y * 100
+            });
         }
     }, [startPoint.x, startPoint.y]);
 
@@ -129,55 +132,6 @@ export default function AudioCircle({
         const rightBoundary = leftOffset + width;
 
         return { width, leftOffset, rightBoundary };
-    };
-
-    // Check if a position is within the trapezoid boundaries accounting for circle radius
-    // const isWithinTrapezoid = (xPos: number, yPercent: number, circleSizeValue: number): boolean => {
-    //     if (!trapezoid) {
-    //         return true; // Always true for rectangular bounds
-    //     }
-
-    //     // Get trapezoid dimensions at this y position
-    //     const { leftOffset, rightBoundary } = getWidthAtYPosition(yPercent);
-        
-    //     // Account for circle radius
-    //     const circleRadius = circleSizeValue / 2;
-        
-    //     // Check if the circle is fully contained within the trapezoid
-    //     return (
-    //         xPos - circleRadius >= leftOffset + marginPercent && 
-    //         xPos + circleRadius <= rightBoundary - marginPercent
-    //     );
-    // };
-
-    // Calculate position based on the trapezoid shape
-    const calculateTrapezoidPosition = (clientX: number, clientY: number) => {
-        const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
-            { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
-          
-        // Calculate raw y position first (as percentage)
-        const yPercent = ((clientY - container.top) / container.height) * 100;
-        const boundedYPercent = Math.max(marginPercent, Math.min(yPercent, 
-            100 - marginPercent - (circleSize / boundingBox.y) * 100));
-        
-        // Get trapezoid dimensions at this y position
-        const { leftOffset, rightBoundary } = getWidthAtYPosition(boundedYPercent);
-        
-        // Calculate x position in pixels relative to container
-        const absoluteX = clientX - container.left;
-        
-        // Ensure the circle stays within the trapezoid boundaries
-        const circleRadius = circleSize / 2;
-        const minX = leftOffset + circleRadius;//leftOffset + marginPercent + circleRadius;
-        const maxX = rightBoundary - circleSize - marginPercent;
-        
-        // Clamp x position to stay within trapezoid
-        const clampedX = Math.max(minX, Math.min(absoluteX, maxX));
-        
-        // Convert back to percentage for consistent state management
-        const xPercent = (clampedX / boundingBox.x) * 100;
-        
-        return { xPercent, yPercent: boundedYPercent };
     };
 
     // Throttled audio parameter update function to prevent buzzing
@@ -279,18 +233,60 @@ export default function AudioCircle({
                         lastPanValue.current = panValue;
                         lastVolumeValue.current = volumeValue;
                     }
+                },
+                updatePosition: (xPercent: number, yPercent: number) => {
+                    if (loaded) {
+                        // Update circle position
+                        setPosition({ xPercent, yPercent });
+                        
+                        // Update circle size based on Y position
+                        const newCircleSize = mapRange(yPercent, 0, 100, 20, 80);
+                        setCircleSize(newCircleSize);
+                        
+                        // Get trapezoid dimensions at this y position
+                        const { leftOffset, width } = getWidthAtYPosition(yPercent);
+                        
+                        // Calculate the x position in pixels
+                        const xPosInPx = (xPercent / 100) * boundingBox.x;
+                        
+                        // Calculate relative position within the trapezoid slice
+                        const relativePos = (xPosInPx - leftOffset) / width;
+                        
+                        // Map to pan value (-1 to 1)
+                        const panValue = (relativePos * 2) - 1;
+                        
+                        // Map volume from top to bottom
+                        const volumeValue = mapRange(
+                            yPercent, 
+                            marginPercent, 
+                            100 - marginPercent - (newCircleSize / boundingBox.y) * 100, 
+                            silentVolume, 
+                            0
+                        );
+                        
+                        // Apply audio parameters directly
+                        setPan(panValue);
+                        setVolume(volumeValue);
+                        
+                        // Store values for reference
+                        lastPanValue.current = panValue;
+                        lastVolumeValue.current = volumeValue;
+                        
+                        return true;
+                    }
+                    return false;
                 }
             };
         }
     }, [
         audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, 
         loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent, 
-        silentVolume
+        silentVolume, getWidthAtYPosition
     ]);
 
     // Initial parameter setting and updates from position changes
     useEffect(() => {
-        if (loaded && !dragging) {
+        if (loaded && !dragging && !isHandControlled) {
             // Get trapezoid dimensions at current y position
             const { leftOffset, width } = getWidthAtYPosition(position.yPercent);
             
@@ -322,7 +318,7 @@ export default function AudioCircle({
         }
     }, [
         loaded, position.xPercent, position.yPercent, setPan, setVolume, 
-        silentVolume, dragging, boundingBox, circleSize, marginPercent
+        silentVolume, dragging, isHandControlled, boundingBox, circleSize, marginPercent, getWidthAtYPosition
     ]);
 
     function onMouseDown(e: React.MouseEvent) {
@@ -392,6 +388,36 @@ export default function AudioCircle({
         setDragging(false);
     }
 
+    // Calculate position based on the trapezoid shape
+    const calculateTrapezoidPosition = (clientX: number, clientY: number) => {
+        const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
+            { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
+          
+        // Calculate raw y position first (as percentage)
+        const yPercent = ((clientY - container.top) / container.height) * 100;
+        const boundedYPercent = Math.max(marginPercent, Math.min(yPercent, 
+            100 - marginPercent - (circleSize / container.height) * 100));
+        
+        // Get trapezoid dimensions at this y position
+        const { leftOffset, rightBoundary } = getWidthAtYPosition(boundedYPercent);
+        
+        // Calculate x position in pixels relative to container
+        const absoluteX = clientX - container.left;
+        
+        // Ensure the circle stays within the trapezoid boundaries
+        const circleRadius = circleSize / 2;
+        const minX = leftOffset + marginPercent + circleRadius;
+        const maxX = rightBoundary - circleRadius - marginPercent;
+        
+        // Clamp x position to stay within trapezoid
+        const clampedX = Math.max(minX, Math.min(absoluteX, maxX));
+        
+        // Convert back to percentage for consistent state management
+        const xPercent = (clampedX / container.width) * 100;
+        
+        return { xPercent, yPercent: boundedYPercent };
+    };
+
     const onMouseMove = useCallback((e: MouseEvent) => {
         if (!dragging || !boundingBox) return;
       
@@ -404,9 +430,12 @@ export default function AudioCircle({
       
         // Update position state for UI
         setPosition(newPosition);
+        
+        // Notify parent of position change for hand detection synchronization
         if (onPositionChange) {
-            onPositionChange(newPosition.xPercent,newPosition.yPercent);
-          }
+            onPositionChange(newPosition.xPercent, newPosition.yPercent);
+        }
+        
         // Get trapezoid dimensions at the new y position
         const { leftOffset, width } = getWidthAtYPosition(newPosition.yPercent);
         
@@ -430,113 +459,18 @@ export default function AudioCircle({
         
         // Use the throttled update function for audio parameters during dragging
         updateAudioParams(panValue, volumeValue);
-    }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent, onPositionChange]);
-
-    // Touch event handlers for multi-touch support
-    // const onTouchStart = useCallback((e: React.TouchEvent) => {
-    //     e.stopPropagation();
-    //     if (!loaded) return;
-        
-    //     setDragging(true);
-        
-    //     // Store all active touch points
-    //     for (let i = 0; i < e.touches.length; i++) {
-    //         const touch = e.touches[i];
-    //         activeTouchesRef.current[touch.identifier] = {
-    //             x: touch.clientX,
-    //             y: touch.clientY
-    //         };
-    //     }
-        
-    //     // Notify parent of track selection
-    //     if (onTrackSelect) {
-    //         onTrackSelect();
-    //     }
-    // }, [loaded, onTrackSelect]);
-
-    // const onTouchMove = useCallback((e: TouchEvent) => {
-    //     e.preventDefault(); // Prevent scrolling
-    //     if (!dragging || !boundingBox) return;
-        
-    //     // Update positions for all touches
-    //     for (let i = 0; i < e.touches.length; i++) {
-    //         const touch = e.touches[i];
-    //         activeTouchesRef.current[touch.identifier] = {
-    //             x: touch.clientX,
-    //             y: touch.clientY 
-    //         };
-    //     }
-        
-    //     // Use the first touch to control this circle
-    //     if (e.touches.length > 0) {
-    //         const primaryTouch = e.touches[0];
-            
-    //         // Calculate new position based on touch coordinates
-    //         const newPosition = calculateTrapezoidPosition(primaryTouch.clientX, primaryTouch.clientY);
-            
-    //         // Update the circle size based on vertical position
-    //         const newCircleSize = mapRange(newPosition.yPercent, 0, 100, 20, 80);
-    //         setCircleSize(newCircleSize);
-            
-    //         // Update position state for UI
-    //         setPosition(newPosition);
-            
-    //         // Get trapezoid dimensions at the new y position
-    //         const { leftOffset, width } = getWidthAtYPosition(newPosition.yPercent);
-            
-    //         // Calculate the x position in pixels
-    //         const xPosInPx = (newPosition.xPercent / 100) * boundingBox.x;
-            
-    //         // Calculate relative position within the current trapezoid slice
-    //         const relativePos = (xPosInPx - leftOffset) / width;
-            
-    //         // Map to pan value (-1 to 1)
-    //         const panValue = (relativePos * 2) - 1;
-            
-    //         // Map volume from top to bottom
-    //         const volumeValue = mapRange(
-    //             newPosition.yPercent, 
-    //             marginPercent, 
-    //             100 - marginPercent - (newCircleSize / boundingBox.y) * 100, 
-    //             silentVolume, 
-    //             0
-    //         );
-            
-    //         // Use the throttled update function for audio parameters during dragging
-    //         updateAudioParams(panValue, volumeValue);
-    //     }
-    // }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent]);
-
-    // const onTouchEnd = useCallback((e: TouchEvent) => {
-    //     // Remove ended touches from the active touches
-    //     for (let i = 0; i < e.changedTouches.length; i++) {
-    //         const touch = e.changedTouches[i];
-    //         delete activeTouchesRef.current[touch.identifier];
-    //     }
-        
-    //     // If no touches remain, end the drag
-    //     if (Object.keys(activeTouchesRef.current).length === 0) {
-    //         onMouseUp(); // Reuse the same logic for finishing parameter updates
-    //     }
-    // }, []);
+    }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent, onPositionChange, getWidthAtYPosition]);
 
     // Add and remove event listeners
     useEffect(() => {
         if (dragging) {
             window.addEventListener("mousemove", onMouseMove);
             window.addEventListener("mouseup", onMouseUp);
-        //     window.addEventListener("touchmove", onTouchMove, { passive: false });
-        //     window.addEventListener("touchend", onTouchEnd);
-        //     window.addEventListener("touchcancel", onTouchEnd);
         }
 
         return () => {
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
-        //     window.removeEventListener("touchmove", onTouchMove);
-        //     window.removeEventListener("touchend", onTouchEnd);
-        //     window.removeEventListener("touchcancel", onTouchEnd);
-        // 
         };
     }, [dragging, onMouseMove]);
 
@@ -558,11 +492,9 @@ export default function AudioCircle({
             <CircleUI
                 xPercent={position.xPercent}
                 yPercent={position.yPercent}
-                // pixelPosition={calculatePixelPosition()}
                 circleSize={circleSize}
                 onMouseDown={onMouseDown}
-                // onTouchStart={onTouchStart}
-                isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback               
+                isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback
                 boundingBox={boundingBox}
                 color={color}
                 opacity={position.yPercent / 100 + 0.2}
@@ -584,7 +516,8 @@ export default function AudioCircle({
                     borderRadius: '3px',
                     fontSize: '10px',
                     pointerEvents: 'none', 
-                    display: (dragging || isHandControlled) ? 'block' : 'none'                }}
+                    display: (dragging || isHandControlled) ? 'block' : 'none'
+                }}
             >
                 Vol: {currentVolume.toFixed(1)}dB | Pan: {currentPan.toFixed(2)}
             </div>

@@ -87,10 +87,10 @@ export function useHandDetection(
         const palmX = (p0[0] + p5[0] + p17[0]) / 3;
         const palmY = (p0[1] + p5[1] + p17[1]) / 3;
 
-        const { left, top, width, height } = boxEl.getBoundingClientRect();
+        const {  top, width, height } = boxEl.getBoundingClientRect();
         const vw = videoEl.videoWidth || videoEl.width;
         const vh = videoEl.videoHeight || videoEl.height;
-        const x = vw-( left + (palmX / vw) * width);// reverse x 
+        const x = width - ((palmX / vw) * width);
         const y = top + (palmY / vh) * height;
 
         const d = Math.hypot(
