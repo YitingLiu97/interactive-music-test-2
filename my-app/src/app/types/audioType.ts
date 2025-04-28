@@ -15,6 +15,11 @@ export interface AudioControlRef {
     x: number;
     y: number;
   }
+
+  export interface Trapezoid{
+    topWidth: number;
+    topLeftOffset: number;
+  }
   
   export interface StartPoint {
     x: number;
