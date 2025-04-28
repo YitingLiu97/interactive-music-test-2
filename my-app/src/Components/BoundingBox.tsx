@@ -7,7 +7,7 @@ import { AudioControlRef } from "@/app/types/audioType";
 import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
-
+import { Trapezoid } from "@/app/types/audioType";
 interface AudioInfo {
   audioUrl: string;
   circleColor: string;
@@ -17,6 +17,7 @@ interface AudioInfo {
 export default function BoundingBox() {
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ x: 100, y: 100 });
+  const [trapezoid, setTrapezoid] = useState<Trapezoid>({topLeftOffset:20, topWidth: 100});
   const [mounted, setMounted] = useState<boolean>(false);
   const [audioRefsCreated, setAudioRefsCreated] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
@@ -225,6 +226,10 @@ export default function BoundingBox() {
           x: rect.width,
           y: rect.height,
         });
+        setTrapezoid({
+          topLeftOffset:rect.width*0.1,
+          topWidth:rect.width*0.8
+        })
       }
     }
 
@@ -463,6 +468,33 @@ export default function BoundingBox() {
           backgroundColor: "#f0f0f0",
         }}
       >
+
+
+           {/* Trapezoid shape overlay */}
+           <svg
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 5,
+          }}
+        >
+          <defs>
+            <linearGradient id="trapezoidGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgba(0,0,0,0.05)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.02)" />
+            </linearGradient>
+          </defs>
+          <path 
+            d={`M ${trapezoid.topLeftOffset} 0 L ${trapezoid.topLeftOffset + trapezoid.topWidth} 0 L ${size.x} ${size.y} L 0 ${size.y} Z`}
+            fill="url(#trapezoidGradient)"
+            stroke="rgba(0,0,0,0.1)"
+            strokeWidth="2"
+          />
+        </svg>
         {audioRefsCreated &&
           audioInfos.map((info, index) => {
             // Get position from our ref to support hand movement
@@ -475,7 +507,8 @@ export default function BoundingBox() {
                   x: position.x / 100, // Convert back to decimal for startPoint
                   y: position.y / 100 
                 }}
-                boundingBox={size}
+                boundingBox={{x:size.x, y:size.y}}
+                trapezoid={trapezoid}
                 audioUrl={info.audioUrl}
                 color={info.circleColor}
                 audioRef={audioRefs.current[index]}
