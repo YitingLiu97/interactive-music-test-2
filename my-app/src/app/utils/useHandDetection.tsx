@@ -1,14 +1,15 @@
 "use client";
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as handpose from '@tensorflow-models/handpose';
 import '@tensorflow/tfjs-backend-webgl';
 import '@tensorflow/tfjs-core';
 
-// Define return types for our hook
+// Hook return types
 interface HandDetectionReturn {
   isHandDetectionActive: boolean;
   toggleHandDetection: () => void;
-  handPosition: { x: number, y: number } | null;
+  handPosition: { x: number; y: number } | null;
   isGrabbing: boolean;
   lastGestureTime: number;
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -22,243 +23,147 @@ export function useHandDetection(
   onHandRelease: () => void
 ): HandDetectionReturn {
   const [isHandDetectionActive, setIsHandDetectionActive] = useState(false);
-  const [handPosition, setHandPosition] = useState<{ x: number, y: number } | null>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
+  const [handPosition, setHandPosition] = useState<{ x: number; y: number } | null>(null);
   const [isGrabbing, setIsGrabbing] = useState(false);
   const [lastGestureTime, setLastGestureTime] = useState(0);
-  
-  // Use non-null assertion for refs that will be initialized with createRef
-  const videoRef = useRef<HTMLVideoElement>(null!) as React.RefObject<HTMLVideoElement>;
-  const canvasRef = useRef<HTMLCanvasElement>(null!) as React.RefObject<HTMLCanvasElement>;
-  const handposeModelRef = useRef<handpose.HandPose>(null);
-  const requestAnimationFrameId = useRef<number | null>(null);
-  
-  // Toggle hand detection on/off
+
+  const videoRef = useRef<HTMLVideoElement>(null!);
+  const canvasRef = useRef<HTMLCanvasElement>(null!);
+  const modelRef = useRef<handpose.HandPose | null>(null);
+  const rafRef = useRef<number>(null);
+  const grabbingRef = useRef(false);
+  const prevPosRef = useRef<{ x: number; y: number } | null>(null);
+  const MOVEMENT_THRESHOLD = 5; // Minimum pixel movement to consider
+
+  // Store callbacks in refs to avoid re-deps
+  const onMoveRef = useRef(onHandMove);
+  const onGrabRef = useRef(onHandGrab);
+  const onReleaseRef = useRef(onHandRelease);
+  useEffect(() => { onMoveRef.current = onHandMove; }, [onHandMove]);
+  useEffect(() => { onGrabRef.current = onHandGrab; }, [onHandGrab]);
+  useEffect(() => { onReleaseRef.current = onHandRelease; }, [onHandRelease]);
+
   const toggleHandDetection = useCallback(() => {
-    setIsHandDetectionActive(prev => !prev);
+    setIsHandDetectionActive(active => !active);
   }, []);
 
-  // Main hand detection loop
-  const startHandDetection = useCallback(async () => {
-    if (!handposeModelRef.current || !videoRef.current || !canvasRef.current || !boundingBoxRef.current) {
-      requestAnimationFrameId.current = requestAnimationFrame(startHandDetection);
+  // 1) Load model once
+  useEffect(() => {
+    let cancelled = false;
+    handpose.load()
+      .then(m => {
+        if (cancelled) return;
+        modelRef.current = m;
+        setModelLoaded(true);
+        console.log('🤖 Handpose model loaded');
+      })
+      .catch(err => console.error('❌ Model load error:', err));
+    return () => { cancelled = true; };
+  }, []);
+
+  // 2) Camera + detection loop
+  useEffect(() => {
+    if (!isHandDetectionActive || !modelLoaded) return;
+
+    let stream: MediaStream;
+    const videoEl = videoRef.current;
+    const canvasEl = canvasRef.current;
+    const boxEl = boundingBoxRef.current;
+    if (!videoEl || !canvasEl || !boxEl) {
+      console.error('🚨 Missing refs', { videoEl, canvasEl, boxEl });
       return;
     }
 
-    try {
-      // Detect hand landmarks
-      const hands = await handposeModelRef.current.estimateHands(videoRef.current);
-      
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      
-      if (hands.length > 0) {
-        // Get the first detected hand
-        const hand = hands[0];
-        
-        // Extract landmarks
-        const landmarks = hand.landmarks;
-        
-        // Calculate palm position (use center of palm)
-        const palmBase = landmarks[0]; // Base of palm
-        const indexFingerBase = landmarks[5]; // Base of index finger
-        const pinkyBase = landmarks[17]; // Base of pinky
-        
-        // Compute palm center
-        const palmX = (palmBase[0] + indexFingerBase[0] + pinkyBase[0]) / 3;
-        const palmY = (palmBase[1] + indexFingerBase[1] + pinkyBase[1]) / 3;
-        
-        // Get bounding box dimensions and position
-        const boxRect = boundingBoxRef.current.getBoundingClientRect();
-        
-        // Map video coordinates to bounding box coordinates
-        const canvasToBoxX = (x: number) => {
-          // Map from canvas space to percentage in box
-          const videoWidth = videoRef.current?.videoWidth || 640;
-          const percentX = 1-x / videoWidth;// mirror x only 
-          return (percentX * boxRect.width) + boxRect.left;
-        };
-        
-        const canvasToBoxY = (y: number) => {
-          // Map from canvas space to percentage in box
-          const videoHeight = videoRef.current?.videoHeight || 480;
-          const percentY = y / videoHeight;
-          return (percentY * boxRect.height) + boxRect.top;
-        };
-        
-        // Convert to box coordinates
-        const boxX = canvasToBoxX(palmX);
-        const boxY = canvasToBoxY(palmY);
-        
-        // Detect if hand is open or closed (grabbing)
-        // A simple heuristic: measure distance between thumb tip and index finger tip
-        const thumbTip = landmarks[4];
-        const indexTip = landmarks[8];
-        
-        const distance = Math.sqrt(
-          Math.pow(thumbTip[0] - indexTip[0], 2) + 
-          Math.pow(thumbTip[1] - indexTip[1], 2)
+    const detectLoop = async () => {
+      const model = modelRef.current!;
+      const hands = await model.estimateHands(videoEl);
+      const ctx = canvasEl.getContext('2d')!;
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+      if (hands.length) {
+        const { landmarks } = hands[0];
+        const [p0, p5, p17] = [landmarks[0], landmarks[5], landmarks[17]];
+        const palmX = (p0[0] + p5[0] + p17[0]) / 3;
+        const palmY = (p0[1] + p5[1] + p17[1]) / 3;
+
+        const { left, top, width, height } = boxEl.getBoundingClientRect();
+        const vw = videoEl.videoWidth || videoEl.width;
+        const vh = videoEl.videoHeight || videoEl.height;
+        const x = left + (palmX / vw) * width;
+        const y = top + (palmY / vh) * height;
+
+        const d = Math.hypot(
+          landmarks[4][0] - landmarks[8][0],
+          landmarks[4][1] - landmarks[8][1]
         );
-        
-        // Threshold for grabbing - may need tuning
-        const isCurrentlyGrabbing = distance < 50; // pixels
-        
-        // Visualize hand landmarks
-        ctx.fillStyle = isCurrentlyGrabbing ? 'red' : 'green';
+        const grab = d < 50;
+
+        ctx.fillStyle = grab ? 'red' : 'green';
         ctx.beginPath();
-        ctx.arc(palmX, palmY, 10, 0, 2 * Math.PI);
+        ctx.arc(palmX, palmY, 8, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Draw lines connecting landmarks
-        ctx.strokeStyle = isCurrentlyGrabbing ? 'red' : 'green';
-        ctx.lineWidth = 2;
-        
-        // Draw hand skeleton
-        const fingerPairs = [
-          // Thumb
-          [0, 1], [1, 2], [2, 3], [3, 4],
-          // Index finger
-          [5, 6], [6, 7], [7, 8],
-          // Middle finger
-          [9, 10], [10, 11], [11, 12],
-          // Ring finger
-          [13, 14], [14, 15], [15, 16],
-          // Pinky
-          [17, 18], [18, 19], [19, 20],
-          // Palm
-          [0, 5], [5, 9], [9, 13], [13, 17]
-        ];
-        
-        for (const [i, j] of fingerPairs) {
-          ctx.beginPath();
-          ctx.moveTo(landmarks[i][0], landmarks[i][1]);
-          ctx.lineTo(landmarks[j][0], landmarks[j][1]);
-          ctx.stroke();
-        }
-        
-        // Update state
-        setHandPosition({ x: boxX, y: boxY });
-        
-        // Handle gesture changes
-        if (isCurrentlyGrabbing !== isGrabbing) {
-          setIsGrabbing(isCurrentlyGrabbing);
+
+        const prev = prevPosRef.current;
+        // On grab state change
+        if (grab !== grabbingRef.current) {
+          prevPosRef.current = { x, y };
+          grabbingRef.current = grab;
+          setIsGrabbing(grab);
           setLastGestureTime(Date.now());
-          
-          if (isCurrentlyGrabbing) {
-            // Hand just closed - grab started
-            onHandGrab(boxX, boxY);
-          } else {
-            // Hand just opened - grab released
-            onHandRelease();
+          setHandPosition({ x, y });
+          if(grab){
+            onGrabRef.current(x, y);
+
           }
-        } else if (isCurrentlyGrabbing) {
-          // Continuous grab/drag
-          onHandGrab(boxX, boxY);
+          else{onReleaseRef.current();
+          }
+        } else if (grab) {
+          // Continuous grab
+          onGrabRef.current(x, y);
         } else {
-          // Continuous move
-          onHandMove(boxX, boxY);
+          // Movement with threshold
+          const dx = prev ? Math.abs(x - prev.x) : Infinity;
+          const dy = prev ? Math.abs(y - prev.y) : Infinity;
+          if (dx > MOVEMENT_THRESHOLD || dy > MOVEMENT_THRESHOLD) {
+            prevPosRef.current = { x, y };
+            setHandPosition({ x, y });
+            onMoveRef.current(x, y);
+          }
         }
       } else {
-        // No hands detected
+        // No hand
         setHandPosition(null);
-        
-        // If was grabbing, release
-        if (isGrabbing) {
+        if (grabbingRef.current) {
+          grabbingRef.current = false;
           setIsGrabbing(false);
-          onHandRelease();
+          onReleaseRef.current();
         }
       }
-    } catch (error) {
-      console.error("Error in hand detection:", error);
-    }
-    
-    // Continue the detection loop
-    requestAnimationFrameId.current = requestAnimationFrame(startHandDetection);
-  }, [isGrabbing, onHandGrab, onHandMove, onHandRelease, boundingBoxRef]);
 
-  
-  // Initialize TensorFlow.js and handpose model
-  useEffect(() => {
-    async function loadHandposeModel() {
+      rafRef.current = requestAnimationFrame(detectLoop);
+    };
+
+    // start camera
+    (async () => {
       try {
-        if (!handposeModelRef.current) {
-          handposeModelRef.current = await handpose.load();
-          console.log("Handpose model loaded successfully");
-        }
-      } catch (error) {
-        console.error("Error loading handpose model:", error);
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+        videoEl.srcObject = stream;
+        await videoEl.play();
+        console.log('📸 Camera started');
+        detectLoop();
+      } catch (err) {
+        console.error('❌ Camera error:', err);
       }
-    }
-
-    if (isHandDetectionActive && !handposeModelRef.current) {
-      loadHandposeModel();
-    }
+    })();
 
     return () => {
-      // Clean up resources when component unmounts
-      if (requestAnimationFrameId.current) {
-        cancelAnimationFrame(requestAnimationFrameId.current);
-      }
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      console.log('🛑 Camera stopped');
     };
-  }, [isHandDetectionActive]);
+  }, [isHandDetectionActive, modelLoaded, boundingBoxRef]);
 
-  // Start webcam when hand detection is active
-  useEffect(() => {
-    async function setupCamera() {
-      if (!videoRef.current) return;
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
-          audio: false,
-        });
-        
-        videoRef.current.srcObject = stream;
-        
-        return new Promise<void>((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = () => {
-              if (videoRef.current) {
-                videoRef.current.play();
-                resolve();
-              }
-            };
-          }
-        });
-      } catch (error) {
-        console.error("Error accessing webcam:", error);
-      }
-    }
-
-    if (isHandDetectionActive) {
-      setupCamera().then(() => {
-        startHandDetection();
-      });
-    } else {
-      // Stop the webcam
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-      }
-
-      // Cancel animation frame
-      if (requestAnimationFrameId.current) {
-        cancelAnimationFrame(requestAnimationFrameId.current);
-      }
-    }
-
-    return () => {
-      if (requestAnimationFrameId.current) {
-        cancelAnimationFrame(requestAnimationFrameId.current);
-      }
-    };
-  }, [isHandDetectionActive, startHandDetection]);
-
-  
   return {
     isHandDetectionActive,
     toggleHandDetection,
@@ -266,6 +171,6 @@ export function useHandDetection(
     isGrabbing,
     lastGestureTime,
     videoRef,
-    canvasRef
+    canvasRef,
   };
 }
