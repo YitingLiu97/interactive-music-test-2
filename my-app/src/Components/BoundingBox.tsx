@@ -535,8 +535,8 @@ export default function BoundingBox() {
               ref={videoRef}
               className="absolute top-0 left-0 object-cover opacity-30 mirror-image"
               style={{ 
-                width: "25%", 
-                height: "25%",
+                width: "100%", 
+                height: "100%",
                 transform: "scaleX(-1)", // Mirror the video
                 zIndex: 5,
                 borderRadius: "0 0 8px 0",
@@ -547,8 +547,8 @@ export default function BoundingBox() {
               ref={canvasRef}
               className="absolute top-0 left-0 object-cover mirror-image"
               style={{ 
-                width: "25%", 
-                height: "25%",
+                width: "100%", 
+                height: "100%",
                 transform: "scaleX(-1)",  // Mirror the canvas
                 zIndex: 6,
                 borderRadius: "0 0 8px 0"
