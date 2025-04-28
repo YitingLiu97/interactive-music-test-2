@@ -447,7 +447,7 @@ export default function BoundingBox() {
   return (
     <div className="flex flex-col h-screen w-screen">
       {/* Hand detection toggle button */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-100">
         <Button
           variant={isHandDetectionActive ? "solid" : "outline"}
           color={isHandDetectionActive ? "green" : "gray"}
@@ -519,7 +519,6 @@ export default function BoundingBox() {
                 }}
                 isHandControlled={activeHandCircleIndex === index}
                 onPositionChange={(xPercent, yPercent) => {
-                  // Update position in our ref
                   const newPositions = [...audioCirclePositions.current];
                   newPositions[index] = { x: xPercent, y: yPercent };
                   audioCirclePositions.current = newPositions;
