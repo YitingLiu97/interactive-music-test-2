@@ -77,7 +77,7 @@ export function useHandDetection(
         const canvasToBoxX = (x: number) => {
           // Map from canvas space to percentage in box
           const videoWidth = videoRef.current?.videoWidth || 640;
-          const percentX = x / videoWidth;
+          const percentX = 1-x / videoWidth;// mirror x only 
           return (percentX * boxRect.width) + boxRect.left;
         };
         
