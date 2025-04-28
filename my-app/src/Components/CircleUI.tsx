@@ -9,7 +9,6 @@ type Props = {
     pixelPosition?: { x: number, y: number }; // New prop for direct pixel positioning
     circleSize?: number;
     onMouseDown: (e: React.MouseEvent) => void;
-    onTouchStart: (e: React.TouchEvent) => void;
     isDragging: boolean;
     boundingBox: BoundingBox;
     color?: string;
@@ -32,7 +31,6 @@ export default function CircleUI({
     pixelPosition,
     circleSize = 50,
     onMouseDown,
-    onTouchStart,
     isDragging,
     boundingBox,
     color = "red", 
@@ -243,7 +241,6 @@ export default function CircleUI({
     return (
         <div
             onMouseDown={onMouseDown}
-            onTouchStart={onTouchStart}
             style={{
                 width: circleSize,
                 height: circleSize,

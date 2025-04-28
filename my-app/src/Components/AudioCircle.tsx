@@ -68,7 +68,7 @@ export default function AudioCircle({
     const lastVolumeValue = useRef(0);
     
     // Track touch points for multi-touch support
-    const activeTouchesRef = useRef<Record<string, { x: number, y: number }>>({});
+    // const activeTouchesRef = useRef<Record<string, { x: number, y: number }>>({});
     
     // Throttling for parameter updates during dragging to prevent audio buzzing
     const throttleTimerRef = useRef<number | null>(null);
@@ -433,111 +433,112 @@ export default function AudioCircle({
     }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent, onPositionChange]);
 
     // Touch event handlers for multi-touch support
-    const onTouchStart = useCallback((e: React.TouchEvent) => {
-        e.stopPropagation();
-        if (!loaded) return;
+    // const onTouchStart = useCallback((e: React.TouchEvent) => {
+    //     e.stopPropagation();
+    //     if (!loaded) return;
         
-        setDragging(true);
+    //     setDragging(true);
         
-        // Store all active touch points
-        for (let i = 0; i < e.touches.length; i++) {
-            const touch = e.touches[i];
-            activeTouchesRef.current[touch.identifier] = {
-                x: touch.clientX,
-                y: touch.clientY
-            };
-        }
+    //     // Store all active touch points
+    //     for (let i = 0; i < e.touches.length; i++) {
+    //         const touch = e.touches[i];
+    //         activeTouchesRef.current[touch.identifier] = {
+    //             x: touch.clientX,
+    //             y: touch.clientY
+    //         };
+    //     }
         
-        // Notify parent of track selection
-        if (onTrackSelect) {
-            onTrackSelect();
-        }
-    }, [loaded, onTrackSelect]);
+    //     // Notify parent of track selection
+    //     if (onTrackSelect) {
+    //         onTrackSelect();
+    //     }
+    // }, [loaded, onTrackSelect]);
 
-    const onTouchMove = useCallback((e: TouchEvent) => {
-        e.preventDefault(); // Prevent scrolling
-        if (!dragging || !boundingBox) return;
+    // const onTouchMove = useCallback((e: TouchEvent) => {
+    //     e.preventDefault(); // Prevent scrolling
+    //     if (!dragging || !boundingBox) return;
         
-        // Update positions for all touches
-        for (let i = 0; i < e.touches.length; i++) {
-            const touch = e.touches[i];
-            activeTouchesRef.current[touch.identifier] = {
-                x: touch.clientX,
-                y: touch.clientY 
-            };
-        }
+    //     // Update positions for all touches
+    //     for (let i = 0; i < e.touches.length; i++) {
+    //         const touch = e.touches[i];
+    //         activeTouchesRef.current[touch.identifier] = {
+    //             x: touch.clientX,
+    //             y: touch.clientY 
+    //         };
+    //     }
         
-        // Use the first touch to control this circle
-        if (e.touches.length > 0) {
-            const primaryTouch = e.touches[0];
+    //     // Use the first touch to control this circle
+    //     if (e.touches.length > 0) {
+    //         const primaryTouch = e.touches[0];
             
-            // Calculate new position based on touch coordinates
-            const newPosition = calculateTrapezoidPosition(primaryTouch.clientX, primaryTouch.clientY);
+    //         // Calculate new position based on touch coordinates
+    //         const newPosition = calculateTrapezoidPosition(primaryTouch.clientX, primaryTouch.clientY);
             
-            // Update the circle size based on vertical position
-            const newCircleSize = mapRange(newPosition.yPercent, 0, 100, 20, 80);
-            setCircleSize(newCircleSize);
+    //         // Update the circle size based on vertical position
+    //         const newCircleSize = mapRange(newPosition.yPercent, 0, 100, 20, 80);
+    //         setCircleSize(newCircleSize);
             
-            // Update position state for UI
-            setPosition(newPosition);
+    //         // Update position state for UI
+    //         setPosition(newPosition);
             
-            // Get trapezoid dimensions at the new y position
-            const { leftOffset, width } = getWidthAtYPosition(newPosition.yPercent);
+    //         // Get trapezoid dimensions at the new y position
+    //         const { leftOffset, width } = getWidthAtYPosition(newPosition.yPercent);
             
-            // Calculate the x position in pixels
-            const xPosInPx = (newPosition.xPercent / 100) * boundingBox.x;
+    //         // Calculate the x position in pixels
+    //         const xPosInPx = (newPosition.xPercent / 100) * boundingBox.x;
             
-            // Calculate relative position within the current trapezoid slice
-            const relativePos = (xPosInPx - leftOffset) / width;
+    //         // Calculate relative position within the current trapezoid slice
+    //         const relativePos = (xPosInPx - leftOffset) / width;
             
-            // Map to pan value (-1 to 1)
-            const panValue = (relativePos * 2) - 1;
+    //         // Map to pan value (-1 to 1)
+    //         const panValue = (relativePos * 2) - 1;
             
-            // Map volume from top to bottom
-            const volumeValue = mapRange(
-                newPosition.yPercent, 
-                marginPercent, 
-                100 - marginPercent - (newCircleSize / boundingBox.y) * 100, 
-                silentVolume, 
-                0
-            );
+    //         // Map volume from top to bottom
+    //         const volumeValue = mapRange(
+    //             newPosition.yPercent, 
+    //             marginPercent, 
+    //             100 - marginPercent - (newCircleSize / boundingBox.y) * 100, 
+    //             silentVolume, 
+    //             0
+    //         );
             
-            // Use the throttled update function for audio parameters during dragging
-            updateAudioParams(panValue, volumeValue);
-        }
-    }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent]);
+    //         // Use the throttled update function for audio parameters during dragging
+    //         updateAudioParams(panValue, volumeValue);
+    //     }
+    // }, [dragging, boundingBox, updateAudioParams, silentVolume, marginPercent]);
 
-    const onTouchEnd = useCallback((e: TouchEvent) => {
-        // Remove ended touches from the active touches
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            delete activeTouchesRef.current[touch.identifier];
-        }
+    // const onTouchEnd = useCallback((e: TouchEvent) => {
+    //     // Remove ended touches from the active touches
+    //     for (let i = 0; i < e.changedTouches.length; i++) {
+    //         const touch = e.changedTouches[i];
+    //         delete activeTouchesRef.current[touch.identifier];
+    //     }
         
-        // If no touches remain, end the drag
-        if (Object.keys(activeTouchesRef.current).length === 0) {
-            onMouseUp(); // Reuse the same logic for finishing parameter updates
-        }
-    }, []);
+    //     // If no touches remain, end the drag
+    //     if (Object.keys(activeTouchesRef.current).length === 0) {
+    //         onMouseUp(); // Reuse the same logic for finishing parameter updates
+    //     }
+    // }, []);
 
     // Add and remove event listeners
     useEffect(() => {
         if (dragging) {
             window.addEventListener("mousemove", onMouseMove);
             window.addEventListener("mouseup", onMouseUp);
-            window.addEventListener("touchmove", onTouchMove, { passive: false });
-            window.addEventListener("touchend", onTouchEnd);
-            window.addEventListener("touchcancel", onTouchEnd);
+        //     window.addEventListener("touchmove", onTouchMove, { passive: false });
+        //     window.addEventListener("touchend", onTouchEnd);
+        //     window.addEventListener("touchcancel", onTouchEnd);
         }
 
         return () => {
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
-            window.removeEventListener("touchmove", onTouchMove);
-            window.removeEventListener("touchend", onTouchEnd);
-            window.removeEventListener("touchcancel", onTouchEnd);
+        //     window.removeEventListener("touchmove", onTouchMove);
+        //     window.removeEventListener("touchend", onTouchEnd);
+        //     window.removeEventListener("touchcancel", onTouchEnd);
+        // 
         };
-    }, [dragging, onMouseMove, onTouchMove, onTouchEnd]);
+    }, [dragging, onMouseMove]);
 
     // Function to calculate the actual position in pixels based on trapezoid
     const calculatePixelPosition = () => {
@@ -560,7 +561,7 @@ export default function AudioCircle({
                 pixelPosition={calculatePixelPosition()}
                 circleSize={circleSize}
                 onMouseDown={onMouseDown}
-                onTouchStart={onTouchStart}
+                // onTouchStart={onTouchStart}
                 isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback               
                 boundingBox={boundingBox}
                 color={color}

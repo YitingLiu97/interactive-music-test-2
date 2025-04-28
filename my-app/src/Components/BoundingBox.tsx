@@ -95,6 +95,7 @@ export default function BoundingBox() {
   );
 
   // Hand detection gesture handlers
+  // Hand detection gesture handlers
   const handleHandMove = useCallback((x: number, y: number) => {
     // When hand is open and moving, we just track it without affecting audio circles
     // This is just for visualization/feedback to the user
@@ -534,10 +535,10 @@ export default function BoundingBox() {
               ref={videoRef}
               className="absolute top-0 left-0 object-cover opacity-30 mirror-image"
               style={{ 
-                width: "100%", 
-                height: "100%",
+                width: "25%", 
+                height: "25%",
                 transform: "scaleX(-1)", // Mirror the video
-                zIndex: 50,
+                zIndex: 5,
                 borderRadius: "0 0 8px 0",
                 opacity: 0.2  // Make video semi-transparent
               }}
@@ -546,10 +547,10 @@ export default function BoundingBox() {
               ref={canvasRef}
               className="absolute top-0 left-0 object-cover mirror-image"
               style={{ 
-                width: "100%", 
-                height: "100%",
+                width: "25%", 
+                height: "25%",
                 transform: "scaleX(-1)",  // Mirror the canvas
-                zIndex: 60,
+                zIndex: 6,
                 borderRadius: "0 0 8px 0"
               }}
               width={640}
