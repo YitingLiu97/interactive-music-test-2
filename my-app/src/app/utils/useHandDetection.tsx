@@ -37,85 +37,6 @@ export function useHandDetection(
     setIsHandDetectionActive(prev => !prev);
   }, []);
 
-  // Initialize TensorFlow.js and handpose model
-  useEffect(() => {
-    async function loadHandposeModel() {
-      try {
-        if (!handposeModelRef.current) {
-          handposeModelRef.current = await handpose.load();
-          console.log("Handpose model loaded successfully");
-        }
-      } catch (error) {
-        console.error("Error loading handpose model:", error);
-      }
-    }
-
-    if (isHandDetectionActive && !handposeModelRef.current) {
-      loadHandposeModel();
-    }
-
-    return () => {
-      // Clean up resources when component unmounts
-      if (requestAnimationFrameId.current) {
-        cancelAnimationFrame(requestAnimationFrameId.current);
-      }
-    };
-  }, [isHandDetectionActive]);
-
-  // Start webcam when hand detection is active
-  useEffect(() => {
-    async function setupCamera() {
-      if (!videoRef.current) return;
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
-          audio: false,
-        });
-        
-        videoRef.current.srcObject = stream;
-        
-        return new Promise<void>((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = () => {
-              if (videoRef.current) {
-                videoRef.current.play();
-                resolve();
-              }
-            };
-          }
-        });
-      } catch (error) {
-        console.error("Error accessing webcam:", error);
-      }
-    }
-
-    if (isHandDetectionActive) {
-      setupCamera().then(() => {
-        startHandDetection();
-      });
-    } else {
-      // Stop the webcam
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-      }
-
-      // Cancel animation frame
-      if (requestAnimationFrameId.current) {
-        cancelAnimationFrame(requestAnimationFrameId.current);
-      }
-    }
-
-    return () => {
-      if (requestAnimationFrameId.current) {
-        cancelAnimationFrame(requestAnimationFrameId.current);
-      }
-    };
-  }, [isHandDetectionActive]);
-
   // Main hand detection loop
   const startHandDetection = useCallback(async () => {
     if (!handposeModelRef.current || !videoRef.current || !canvasRef.current || !boundingBoxRef.current) {
@@ -257,6 +178,87 @@ export function useHandDetection(
     requestAnimationFrameId.current = requestAnimationFrame(startHandDetection);
   }, [isGrabbing, onHandGrab, onHandMove, onHandRelease, boundingBoxRef]);
 
+  
+  // Initialize TensorFlow.js and handpose model
+  useEffect(() => {
+    async function loadHandposeModel() {
+      try {
+        if (!handposeModelRef.current) {
+          handposeModelRef.current = await handpose.load();
+          console.log("Handpose model loaded successfully");
+        }
+      } catch (error) {
+        console.error("Error loading handpose model:", error);
+      }
+    }
+
+    if (isHandDetectionActive && !handposeModelRef.current) {
+      loadHandposeModel();
+    }
+
+    return () => {
+      // Clean up resources when component unmounts
+      if (requestAnimationFrameId.current) {
+        cancelAnimationFrame(requestAnimationFrameId.current);
+      }
+    };
+  }, [isHandDetectionActive]);
+
+  // Start webcam when hand detection is active
+  useEffect(() => {
+    async function setupCamera() {
+      if (!videoRef.current) return;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
+          audio: false,
+        });
+        
+        videoRef.current.srcObject = stream;
+        
+        return new Promise<void>((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => {
+              if (videoRef.current) {
+                videoRef.current.play();
+                resolve();
+              }
+            };
+          }
+        });
+      } catch (error) {
+        console.error("Error accessing webcam:", error);
+      }
+    }
+
+    if (isHandDetectionActive) {
+      setupCamera().then(() => {
+        startHandDetection();
+      });
+    } else {
+      // Stop the webcam
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+
+      // Cancel animation frame
+      if (requestAnimationFrameId.current) {
+        cancelAnimationFrame(requestAnimationFrameId.current);
+      }
+    }
+
+    return () => {
+      if (requestAnimationFrameId.current) {
+        cancelAnimationFrame(requestAnimationFrameId.current);
+      }
+    };
+  }, [isHandDetectionActive, startHandDetection]);
+
+  
   return {
     isHandDetectionActive,
     toggleHandDetection,
