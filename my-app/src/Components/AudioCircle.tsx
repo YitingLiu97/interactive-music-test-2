@@ -154,7 +154,7 @@ export default function AudioCircle({
     const calculateTrapezoidPosition = (clientX: number, clientY: number) => {
         const container = document.querySelector('div[ref="boxRef"]')?.getBoundingClientRect() ||
             { left: 0, top: 0, width: boundingBox.x, height: boundingBox.y };
-        
+          
         // Calculate raw y position first (as percentage)
         const yPercent = ((clientY - container.top) / container.height) * 100;
         const boundedYPercent = Math.max(marginPercent, Math.min(yPercent, 
@@ -558,7 +558,7 @@ export default function AudioCircle({
             <CircleUI
                 xPercent={position.xPercent}
                 yPercent={position.yPercent}
-                pixelPosition={calculatePixelPosition()}
+                // pixelPosition={calculatePixelPosition()}
                 circleSize={circleSize}
                 onMouseDown={onMouseDown}
                 // onTouchStart={onTouchStart}
