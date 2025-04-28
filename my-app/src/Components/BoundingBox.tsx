@@ -27,7 +27,6 @@ export default function BoundingBox() {
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(180); // Default 3 minutes
   const playbackTimerRef = useRef<number | null>(null);
-  
   // Track if we're currently seeking to avoid timer updates
   const isSeekingRef = useRef(false);
   
@@ -503,10 +502,10 @@ export default function BoundingBox() {
               ref={videoRef}
               className="absolute top-0 left-0 object-cover opacity-30 mirror-image"
               style={{ 
-                width: "25%", 
-                height: "25%",
+                width: "100%", 
+                height: "100%",
                 transform: "scaleX(-1)", // Mirror the video
-                zIndex: 5,
+                zIndex: 50,
                 borderRadius: "0 0 8px 0",
                 opacity: 0.2  // Make video semi-transparent
               }}
@@ -515,10 +514,10 @@ export default function BoundingBox() {
               ref={canvasRef}
               className="absolute top-0 left-0 object-cover mirror-image"
               style={{ 
-                width: "25%", 
-                height: "25%",
+                width: "100%", 
+                height: "100%",
                 transform: "scaleX(-1)",  // Mirror the canvas
-                zIndex: 6,
+                zIndex: 60,
                 borderRadius: "0 0 8px 0"
               }}
               width={640}
