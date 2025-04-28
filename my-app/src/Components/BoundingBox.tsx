@@ -568,12 +568,6 @@ export default function BoundingBox() {
         ]}
       />
       
-      {/* Add CSS for video mirroring */}
-      <style jsx global>{`
-        .mirror-image {
-          transform: scaleX(-1);
-        }
-      `}</style>
     </div>
   );
 }
