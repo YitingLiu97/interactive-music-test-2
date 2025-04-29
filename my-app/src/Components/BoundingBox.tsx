@@ -17,7 +17,10 @@ interface AudioInfo {
 export default function BoundingBox() {
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ x: 100, y: 100 });
-  const [trapezoid, setTrapezoid] = useState<Trapezoid>({topLeftOffset:20, topWidth: 100});
+  const [trapezoid, setTrapezoid] = useState<Trapezoid>({
+    topLeftOffset: 20,
+    topWidth: 100,
+  });
   const [mounted, setMounted] = useState<boolean>(false);
   const [audioRefsCreated, setAudioRefsCreated] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
@@ -30,9 +33,11 @@ export default function BoundingBox() {
   const playbackTimerRef = useRef<number | null>(null);
   // Track if we're currently seeking to avoid timer updates
   const isSeekingRef = useRef(false);
-  
+
   // Track which audio circle is being controlled by hand gestures
-  const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<number | null>(null);
+  const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<
+    number | null
+  >(null);
 
   const audioInfos: AudioInfo[] = [
     {
@@ -74,7 +79,7 @@ export default function BoundingBox() {
       audioUrl: "/resources/ATCTimpani_03.mp3",
       circleColor: "pink",
       instrumentName: "Timpani",
-    }
+    },
   ];
 
   // Initialize the refs array with the correct length first
@@ -83,107 +88,129 @@ export default function BoundingBox() {
       .fill(null)
       .map(() => React.createRef<AudioControlRef>())
   );
-  
+
   // Create refs for audio circle positions
-  const audioCirclePositions = useRef<{x: number, y: number}[]>(
+  const audioCirclePositions = useRef<{ x: number; y: number }[]>(
     Array(audioInfos.length)
       .fill(null)
-      .map((_, index) => ({ 
-        x: (0.3 + index * 0.1) * 100,  // Convert to percentage 
-        y: 0.3 * 100 
+      .map((_, index) => ({
+        x: (0.3 + index * 0.1) * 100, // Convert to percentage
+        y: 0.3 * 100,
       }))
   );
 
-  const handleHandGrab = useCallback((x: number, y: number) => {
-    if (!boxRef.current) return;
-    
-    const boxRect = boxRef.current.getBoundingClientRect();
-    
-    // Convert absolute coordinates to percentages
-    const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
-    const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
-    
-    if (activeHandCircleIndex === null) {
-      // Not currently dragging - find closest circle to grab
-      let closestDistance = Infinity;
-      let closestIndex = -1;
-      
-      audioCirclePositions.current.forEach((pos, index) => {
-        const distance = Math.sqrt(
-          Math.pow(xPercent - pos.x, 2) + 
-          Math.pow(yPercent - pos.y, 2)
-        );
-        
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
+  const handleHandGrab = useCallback(
+    (x: number, y: number) => {
+      if (!boxRef.current) return;
+
+      const boxRect = boxRef.current.getBoundingClientRect();
+
+      // Convert absolute coordinates to percentages
+      const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
+      const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
+
+      if (activeHandCircleIndex === null) {
+        // Not currently dragging - find closest circle to grab
+        let closestDistance = Infinity;
+        let closestIndex = -1;
+
+        audioCirclePositions.current.forEach((pos, index) => {
+          const distance = Math.sqrt(
+            Math.pow(xPercent - pos.x, 2) + Math.pow(yPercent - pos.y, 2)
+          );
+
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestIndex = index;
+          }
+        });
+
+        // If close enough to a circle, start dragging it
+        if (closestDistance < 30) {
+          // Increased threshold for better grabbing
+          setActiveHandCircleIndex(closestIndex);
+          setCurrentTrack(
+            audioInfos[closestIndex].instrumentName ||
+              `Track ${closestIndex + 1}`
+          );
         }
-      });
-      
-      // If close enough to a circle, start dragging it
-      if (closestDistance < 30) {  // Increased threshold for better grabbing
-        setActiveHandCircleIndex(closestIndex);
-        setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
+      } else {
+        // Already controlling a circle
+
+        // Calculate the width and offset at the current y position within the trapezoid
+        const { topLeftOffset, topWidth } = trapezoid;
+        const yRatio = yPercent / 100;
+        const width = topWidth + (boxRect.width - topWidth) * yRatio;
+        const leftOffset = topLeftOffset * (1 - yRatio);
+        const rightBoundary = leftOffset + width;
+
+        // Convert to percentages
+        const leftOffsetPercent = (leftOffset / boxRect.width) * 100;
+        const rightBoundaryPercent = (rightBoundary / boxRect.width) * 100;
+
+        // Apply smoother movement
+        const currentPos = audioCirclePositions.current[activeHandCircleIndex];
+        const distanceToTarget = Math.sqrt(
+          Math.pow(xPercent - currentPos.x, 2) +
+            Math.pow(yPercent - currentPos.y, 2)
+        );
+
+        // Adaptive smoothing - less smoothing for small movements
+        const smoothFactor = Math.min(
+          0.5,
+          Math.max(0.2, distanceToTarget / 100)
+        );
+
+        // Calculate smoothed position
+        const smoothedX =
+          currentPos.x + (xPercent - currentPos.x) * smoothFactor;
+        const smoothedY =
+          currentPos.y + (yPercent - currentPos.y) * smoothFactor;
+
+        // Apply boundaries
+        const marginPercent = 5;
+        const circleSize = 50; // This should match what's in AudioCircle
+        const circleSizePercent = (circleSize / boxRect.width) * 100;
+
+        // Calculate min/max bounds with margins
+        const minXPercent = leftOffsetPercent + marginPercent;
+        const maxXPercent =
+          rightBoundaryPercent - marginPercent - circleSizePercent;
+        const minYPercent = marginPercent;
+        const maxYPercent =
+          100 - marginPercent - (circleSize / boxRect.height) * 100;
+
+        // Clamp position
+        const boundedX = Math.max(
+          minXPercent,
+          Math.min(smoothedX, maxXPercent)
+        );
+        const boundedY = Math.max(
+          minYPercent,
+          Math.min(smoothedY, maxYPercent)
+        );
+
+        // Update internal tracked positions
+        const newPositions = [...audioCirclePositions.current];
+        newPositions[activeHandCircleIndex] = {
+          x: boundedX,
+          y: boundedY,
+        };
+
+        audioCirclePositions.current = newPositions;
+
+        // Only update component props if significant change to prevent excessive renders
+        if (
+          Math.abs(boundedX - currentPos.x) > 0.2 ||
+          Math.abs(boundedY - currentPos.y) > 0.2
+        ) {
+          // Force render update via state change
+          setSize((prevSize) => ({ ...prevSize }));
+        }
       }
-    } else {
-      // Already controlling a circle
-      
-      // Calculate the width and offset at the current y position within the trapezoid
-      const { topLeftOffset, topWidth } = trapezoid;
-      const yRatio = yPercent / 100;
-      const width = topWidth + (boxRect.width - topWidth) * yRatio;
-      const leftOffset = topLeftOffset * (1 - yRatio);
-      const rightBoundary = leftOffset + width;
-      
-      // Convert to percentages
-      const leftOffsetPercent = (leftOffset / boxRect.width) * 100;
-      const rightBoundaryPercent = (rightBoundary / boxRect.width) * 100;
-      
-      // Apply smoother movement
-      const currentPos = audioCirclePositions.current[activeHandCircleIndex];
-      const distanceToTarget = Math.sqrt(
-        Math.pow(xPercent - currentPos.x, 2) + 
-        Math.pow(yPercent - currentPos.y, 2)
-      );
-      
-      // Adaptive smoothing - less smoothing for small movements
-      const smoothFactor = Math.min(0.5, Math.max(0.2, distanceToTarget / 100));
-      
-      // Calculate smoothed position
-      const smoothedX = currentPos.x + (xPercent - currentPos.x) * smoothFactor;
-      const smoothedY = currentPos.y + (yPercent - currentPos.y) * smoothFactor;
-      
-      // Apply boundaries
-      const marginPercent = 5;
-      const circleSize = 50; // This should match what's in AudioCircle
-      const circleSizePercent = (circleSize / boxRect.width) * 100;
-      
-      // Calculate min/max bounds with margins
-      const minXPercent = leftOffsetPercent + marginPercent;
-      const maxXPercent = rightBoundaryPercent - marginPercent - circleSizePercent;
-      const minYPercent = marginPercent;
-      const maxYPercent = 100 - marginPercent - (circleSize / boxRect.height * 100);
-      
-      // Clamp position
-      const boundedX = Math.max(minXPercent, Math.min(smoothedX, maxXPercent));
-      const boundedY = Math.max(minYPercent, Math.min(smoothedY, maxYPercent));
-      
-      // Update internal tracked positions
-      const newPositions = [...audioCirclePositions.current];
-      newPositions[activeHandCircleIndex] = {
-        x: boundedX,
-        y: boundedY
-      };
-      
-      audioCirclePositions.current = newPositions;
-      
-      // Only update component props if significant change to prevent excessive renders
-      if (Math.abs(boundedX - currentPos.x) > 0.2 || Math.abs(boundedY - currentPos.y) > 0.2) {
-        // Force render update via state change
-        setSize(prevSize => ({ ...prevSize }));
-      }
-    }
-  }, [activeHandCircleIndex, audioInfos, trapezoid]);
+    },
+    [activeHandCircleIndex, audioInfos, trapezoid]
+  );
 
   // Modified handleHandRelease function to ensure clean release
   const handleHandRelease = useCallback(() => {
@@ -196,39 +223,45 @@ export default function BoundingBox() {
       setActiveHandCircleIndex(null);
     }
   }, [activeHandCircleIndex]);
-  
+
   // Improved handleHandMove for better hovering feedback
-  const handleHandMove = useCallback((x: number, y: number) => {
-    // Only track hand position when not already grabbing a circle
-    if (boxRef.current && activeHandCircleIndex === null) {
-      const boxRect = boxRef.current.getBoundingClientRect();
-      
-      // Convert absolute coordinates to percentages
-      const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
-      const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
-      
-      // Find the closest audio circle to highlight
-      let closestDistance = Infinity;
-      let closestIndex = -1;
-      
-      audioCirclePositions.current.forEach((pos, index) => {
-        const distance = Math.sqrt(
-          Math.pow(xPercent - pos.x, 2) + 
-          Math.pow(yPercent - pos.y, 2)
-        );
-        
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
+  const handleHandMove = useCallback(
+    (x: number, y: number) => {
+      // Only track hand position when not already grabbing a circle
+      if (boxRef.current && activeHandCircleIndex === null) {
+        const boxRect = boxRef.current.getBoundingClientRect();
+
+        // Convert absolute coordinates to percentages
+        const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
+        const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
+
+        // Find the closest audio circle to highlight
+        let closestDistance = Infinity;
+        let closestIndex = -1;
+
+        audioCirclePositions.current.forEach((pos, index) => {
+          const distance = Math.sqrt(
+            Math.pow(xPercent - pos.x, 2) + Math.pow(yPercent - pos.y, 2)
+          );
+
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestIndex = index;
+          }
+        });
+
+        // If hand is close enough to a circle, highlight it
+        if (closestDistance < 20) {
+          // Increased threshold for easier targeting
+          setCurrentTrack(
+            audioInfos[closestIndex].instrumentName ||
+              `Track ${closestIndex + 1}`
+          );
         }
-      });
-      
-      // If hand is close enough to a circle, highlight it
-      if (closestDistance < 20) {  // Increased threshold for easier targeting
-        setCurrentTrack(audioInfos[closestIndex].instrumentName || `Track ${closestIndex + 1}`);
       }
-    }
-  }, [activeHandCircleIndex, audioInfos]);
+    },
+    [activeHandCircleIndex, audioInfos]
+  );
 
   // Initialize hand detection
   const {
@@ -237,12 +270,17 @@ export default function BoundingBox() {
     handPosition,
     isGrabbing,
     videoRef,
-    canvasRef
-  } = useHandDetection(boxRef, handleHandMove, handleHandGrab, handleHandRelease);
+    canvasRef,
+  } = useHandDetection(
+    boxRef,
+    handleHandMove,
+    handleHandGrab,
+    handleHandRelease
+  );
 
   // This useEffect will run only once after component mounts
   useEffect(() => {
-    if(mounted && audioRefsCreated) return;
+    if (mounted && audioRefsCreated) return;
     setMounted(true);
     setAudioRefsCreated(true);
   }, []);
@@ -257,9 +295,9 @@ export default function BoundingBox() {
           y: rect.height,
         });
         setTrapezoid({
-          topLeftOffset:rect.width*0.1,
-          topWidth:rect.width*0.8
-        })
+          topLeftOffset: rect.width * 0.1,
+          topWidth: rect.width * 0.8,
+        });
       }
     }
 
@@ -289,7 +327,7 @@ export default function BoundingBox() {
           }
         }
       }, 1000);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [audioRefsCreated]);
@@ -301,7 +339,7 @@ export default function BoundingBox() {
       clearInterval(playbackTimerRef.current);
       playbackTimerRef.current = null;
     }
-  
+
     // Only start timer when playing and not seeking
     if (isPlaying && !isSeekingRef.current) {
       // Use setTimeout to ensure this code runs AFTER the render completes
@@ -348,7 +386,7 @@ export default function BoundingBox() {
           }
         }, 100);
       }, 0);
-  
+
       return () => {
         clearTimeout(timerStartId);
         if (playbackTimerRef.current) {
@@ -357,7 +395,7 @@ export default function BoundingBox() {
         }
       };
     }
-  
+
     return () => {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
@@ -368,16 +406,19 @@ export default function BoundingBox() {
 
   // Play all audio circles
   function playAll(startTimeSeconds?: number) {
-    console.log("Playing all tracks", startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : "");
-    
+    console.log(
+      "Playing all tracks",
+      startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : ""
+    );
+
     setIsPlaying(true);
     setCurrentTrack("All instruments");
-    
+
     // If time is specified, update UI time
     if (startTimeSeconds !== undefined) {
       setCurrentTime(startTimeSeconds);
     }
-    
+
     // Call play on all audio circles
     let successCount = 0;
     audioRefs.current.forEach((ref) => {
@@ -387,17 +428,19 @@ export default function BoundingBox() {
         if (success) successCount++;
       }
     });
-    
-    console.log(`Successfully started ${successCount} of ${audioRefs.current.length} tracks`);
+
+    console.log(
+      `Successfully started ${successCount} of ${audioRefs.current.length} tracks`
+    );
   }
 
   // Pause all audio circles
   function pauseAll() {
     console.log("Pausing all tracks");
-    
+
     // Set UI state
     setIsPlaying(false);
-    
+
     // Call pause on all audio circles
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.pause) {
@@ -409,23 +452,23 @@ export default function BoundingBox() {
   // Improved seek function that forces playback after seeking
   function seekTo(timeInSeconds: number) {
     console.log(`Seeking to ${timeInSeconds}s`);
-    
+
     // Mark that we're seeking to avoid timer updates
     isSeekingRef.current = true;
-    
+
     // Update UI time immediately
     setCurrentTime(timeInSeconds);
-    
+
     // Always pause first to avoid conflicts
     pauseAll();
-    
+
     console.log("Paused all tracks, now seeking each track...");
-    
+
     // First update all audio track positions
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.seekTo) {
         const success = ref.current.seekTo(timeInSeconds);
-        console.log(`Seeking track: ${success ? 'success' : 'failed'}`);
+        console.log(`Seeking track: ${success ? "success" : "failed"}`);
       }
     });
     playAll();
@@ -434,7 +477,7 @@ export default function BoundingBox() {
     setTimeout(() => {
       // Start playback at the new position
       console.log("Starting playback at new position:", timeInSeconds);
-      
+
       // Clear the seeking flag after everything is done
       setTimeout(() => {
         isSeekingRef.current = false;
@@ -446,7 +489,7 @@ export default function BoundingBox() {
   function toggleAll() {
     const newLoopState = !isLooping;
     setIsLooping(newLoopState);
-    
+
     audioRefs.current.forEach((ref) => {
       if (ref.current && ref.current.setLooping) {
         ref.current.setLooping(newLoopState);
@@ -483,10 +526,11 @@ export default function BoundingBox() {
           color={isHandDetectionActive ? "green" : "gray"}
           onClick={toggleHandDetection}
         >
-          <VideoIcon /> {isHandDetectionActive ? "Disable" : "Enable"} Hand Control
+          <VideoIcon /> {isHandDetectionActive ? "Disable" : "Enable"} Hand
+          Control
         </Button>
       </div>
-      
+
       {/* Main bounding box for audio circles */}
       <div
         ref={boxRef}
@@ -498,10 +542,8 @@ export default function BoundingBox() {
           backgroundColor: "#f0f0f0",
         }}
       >
-
-
-           {/* Trapezoid shape overlay */}
-           <svg
+        {/* Trapezoid shape overlay */}
+        <svg
           style={{
             position: "absolute",
             top: 0,
@@ -509,35 +551,52 @@ export default function BoundingBox() {
             width: "100%",
             height: "100%",
             pointerEvents: "none",
-            zIndex: 5,
+            zIndex: 0,
           }}
         >
           <defs>
-            <linearGradient id="trapezoidGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient
+              id="trapezoidGradient"
+              x1="0%"
+              y1="0%"
+              x2="0%"
+              y2="100%"
+            >
               <stop offset="0%" stopColor="rgba(0,0,0,0.05)" />
               <stop offset="100%" stopColor="rgba(0,0,0,0.02)" />
             </linearGradient>
           </defs>
-          <path 
-            d={`M ${trapezoid.topLeftOffset} 0 L ${trapezoid.topLeftOffset + trapezoid.topWidth} 0 L ${size.x} ${size.y} L 0 ${size.y} Z`}
+          <path
+            d={`M ${trapezoid.topLeftOffset} 0 L ${
+              trapezoid.topLeftOffset + trapezoid.topWidth
+            } 0 L ${size.x} ${size.y} L 0 ${size.y} Z`}
             fill="url(#trapezoidGradient)"
             stroke="rgba(0,0,0,0.1)"
             strokeWidth="2"
           />
+          {!isHandDetectionActive && 
+          <image
+            href="/image/air-traffic-bg.jpg"
+            opacity="0.5"
+            width="100%"
+            height="100%"
+            preserveAspectRatio="xMidYMid slice"
+          />
+        }
         </svg>
         {audioRefsCreated &&
           audioInfos.map((info, index) => {
             // Get position from our ref to support hand movement
             const position = audioCirclePositions.current[index];
-            
+
             return (
               <AudioCircle
                 key={index}
-                startPoint={{ 
+                startPoint={{
                   x: position.x / 100, // Convert back to decimal for startPoint
-                  y: position.y / 100 
+                  y: position.y / 100,
                 }}
-                boundingBox={{x:size.x, y:size.y}}
+                boundingBox={{ x: size.x, y: size.y }}
                 trapezoid={trapezoid}
                 audioUrl={info.audioUrl}
                 color={info.circleColor}
@@ -556,36 +615,36 @@ export default function BoundingBox() {
               />
             );
           })}
-        
+
         {/* Hand detection visualization overlay */}
         {isHandDetectionActive && (
           <>
-            <video 
+            <video
               ref={videoRef}
               className="absolute top-0 left-0 object-cover opacity-30 mirror-image"
-              style={{ 
-                width: "100%", 
+              style={{
+                width: "100%",
                 height: "100%",
                 transform: "scaleX(-1)", // Mirror the video
                 zIndex: 5,
                 borderRadius: "0 0 8px 0",
-                opacity: 0.2  // Make video semi-transparent
+                opacity: 0.2, // Make video semi-transparent
               }}
             />
             <canvas
               ref={canvasRef}
               className="absolute top-0 left-0 object-cover mirror-image"
-              style={{ 
-                width: "100%", 
+              style={{
+                width: "100%",
                 height: "100%",
-                transform: "scaleX(-1)",  // Mirror the canvas
+                transform: "scaleX(-1)", // Mirror the canvas
                 zIndex: 6,
-                borderRadius: "0 0 8px 0"
+                borderRadius: "0 0 8px 0",
               }}
               width={640}
               height={480}
             />
-            
+
             {/* Hand position indicator (optional) */}
             {handPosition && (
               <div
@@ -596,9 +655,11 @@ export default function BoundingBox() {
                   width: "20px",
                   height: "20px",
                   borderRadius: "50%",
-                  backgroundColor: isGrabbing ? "rgba(255, 0, 0, 0.5)" : "rgba(0, 255, 0, 0.5)",
+                  backgroundColor: isGrabbing
+                    ? "rgba(255, 0, 0, 0.5)"
+                    : "rgba(0, 255, 0, 0.5)",
                   transform: "translate(-50%, -50%)",
-                  boxShadow: `0 0 10px ${isGrabbing ? "red" : "green"}`
+                  boxShadow: `0 0 10px ${isGrabbing ? "red" : "green"}`,
                 }}
               />
             )}
@@ -628,7 +689,6 @@ export default function BoundingBox() {
           { id: "6", name: "Outro", startTime: 150, endTime: 180 },
         ]}
       />
-      
     </div>
   );
 }
