@@ -94,7 +94,7 @@ export default function BoundingBox() {
     Array(audioInfos.length)
       .fill(null)
       .map((_, index) => ({
-        x: (0.3 + index * 0.1) * 100, // Convert to percentage
+        x: (0.15 + index * 0.1) * 100, // Convert to percentage
         y: 0.3 * 100,
       }))
   );
@@ -574,15 +574,15 @@ export default function BoundingBox() {
             stroke="rgba(0,0,0,0.1)"
             strokeWidth="2"
           />
-          {!isHandDetectionActive && 
-          <image
-            href="/image/air-traffic-bg.jpg"
-            opacity="0.5"
-            width="100%"
-            height="100%"
-            preserveAspectRatio="xMidYMid slice"
-          />
-        }
+          {!isHandDetectionActive && (
+            <image
+              href="/image/air-traffic-bg.jpg"
+              opacity="0.5"
+              width="100%"
+              height="100%"
+              preserveAspectRatio="xMidYMid slice"
+            />
+          )}
         </svg>
         {audioRefsCreated &&
           audioInfos.map((info, index) => {
@@ -626,7 +626,7 @@ export default function BoundingBox() {
                 width: "100%",
                 height: "100%",
                 transform: "scaleX(-1)", // Mirror the video
-                zIndex: 5,
+                zIndex: 0,
                 borderRadius: "0 0 8px 0",
                 opacity: 0.2, // Make video semi-transparent
               }}
@@ -638,7 +638,7 @@ export default function BoundingBox() {
                 width: "100%",
                 height: "100%",
                 transform: "scaleX(-1)", // Mirror the canvas
-                zIndex: 6,
+                zIndex: -2,
                 borderRadius: "0 0 8px 0",
               }}
               width={640}
