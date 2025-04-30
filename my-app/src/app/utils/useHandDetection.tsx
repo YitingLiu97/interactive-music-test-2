@@ -5,7 +5,7 @@ import * as handpose from '@tensorflow-models/handpose';
 import '@tensorflow/tfjs-backend-webgl';
 import '@tensorflow/tfjs-core';
 
-// Hook return types
+// Return types for our hook
 interface HandDetectionReturn {
   isHandDetectionActive: boolean;
   toggleHandDetection: () => void;
@@ -33,10 +33,7 @@ export function useHandDetection(
   const modelRef = useRef<handpose.HandPose | null>(null);
   const rafRef = useRef<number>(null);
   const grabbingRef = useRef(false);
-  const prevPosRef = useRef<{ x: number; y: number } | null>(null);
-  const MOVEMENT_THRESHOLD = 5; // Minimum pixel movement to consider
 
-  // Store callbacks in refs to avoid re-deps
   const onMoveRef = useRef(onHandMove);
   const onGrabRef = useRef(onHandGrab);
   const onReleaseRef = useRef(onHandRelease);
@@ -48,88 +45,77 @@ export function useHandDetection(
     setIsHandDetectionActive(active => !active);
   }, []);
 
-  // 1) Load model once
+  // Load model once
   useEffect(() => {
     let cancelled = false;
     handpose.load()
-      .then(m => {
-        if (cancelled) return;
-        modelRef.current = m;
-        setModelLoaded(true);
-        console.log('🤖 Handpose model loaded');
+      .then(model => {
+        if (!cancelled) {
+          modelRef.current = model;
+          setModelLoaded(true);
+          console.log('🤖 Model loaded');
+        }
       })
-      .catch(err => console.error('❌ Model load error:', err));
+      .catch(err => console.error('❌ Model error:', err));
     return () => { cancelled = true; };
   }, []);
 
-  // 2) Camera + detection loop
+  // Camera & detection
   useEffect(() => {
     if (!isHandDetectionActive || !modelLoaded) return;
 
     let stream: MediaStream;
-    const videoEl = videoRef.current;
-    const canvasEl = canvasRef.current;
-    const boxEl = boundingBoxRef.current;
-    if (!videoEl || !canvasEl || !boxEl) {
-      console.error('🚨 Missing refs', { videoEl, canvasEl, boxEl });
-      return;
-    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const box = boundingBoxRef.current;
+    if (!video || !canvas || !box) return;
 
     const detectLoop = async () => {
       const model = modelRef.current!;
-      const hands = await model.estimateHands(videoEl);
-      const ctx = canvasEl.getContext('2d')!;
-      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      const hands = await model.estimateHands(video);
+      const ctx = canvas.getContext('2d')!;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (hands.length) {
         const { landmarks } = hands[0];
-        const [p0, p5, p17] = [landmarks[0], landmarks[5], landmarks[17]];
-        const palmX = (p0[0] + p5[0] + p17[0]) / 3;
-        const palmY = (p0[1] + p5[1] + p17[1]) / 3;
+        const [p0,p5,p17] = [landmarks[0],landmarks[5],landmarks[17]];
+        const palmX = (p0[0]+p5[0]+p17[0])/3;
+        const palmY = (p0[1]+p5[1]+p17[1])/3;
+        const rect = box.getBoundingClientRect();
+        const vw = video.videoWidth || video.width;
+        const vh = video.videoHeight || video.height;
+        const x = rect.width - ( rect.left + (palmX/vw)*rect.width);
+        const y = rect.top  + (palmY/vh)*rect.height;
+        setHandPosition({ x, y });
 
-        const {  top, width, height } = boxEl.getBoundingClientRect();
-        const vw = videoEl.videoWidth || videoEl.width;
-        const vh = videoEl.videoHeight || videoEl.height;
-        const x = width - ((palmX / vw) * width);
-        const y = top + (palmY / vh) * height;
-
+        // Heuristic distance
         const d = Math.hypot(
-          landmarks[4][0] - landmarks[8][0],
-          landmarks[4][1] - landmarks[8][1]
+          landmarks[4][0]-landmarks[8][0],
+          landmarks[4][1]-landmarks[8][1]
         );
-        const grab = d < 50;
+        // Hysteresis thresholds
+        const CLOSE_THRESH = 40;
+        const OPEN_THRESH  = 80;
+        const wasGrab = grabbingRef.current;
+        const nowGrab = wasGrab ? d < OPEN_THRESH : d < CLOSE_THRESH;
 
-        // ctx.fillStyle = grab ? 'red' : 'green';
-        // ctx.beginPath();
-        // ctx.arc(palmX, palmY, 8, 0, Math.PI * 2);
-        // ctx.fill();
+        // Visual feedback
+        ctx.fillStyle = nowGrab ? 'red' : 'green';
+        ctx.beginPath(); ctx.arc(palmX, palmY, 8, 0, Math.PI*2); ctx.fill();
 
-        const prev = prevPosRef.current;
-        // On grab state change
-        if (grab !== grabbingRef.current) {
-          prevPosRef.current = { x, y };
-          grabbingRef.current = grab;
-          setIsGrabbing(grab);
+        // Handle transitions
+        if (nowGrab !== grabbingRef.current) {
+          grabbingRef.current = nowGrab;
+          setIsGrabbing(nowGrab);
           setLastGestureTime(Date.now());
-          setHandPosition({ x, y });
-          if(grab){
-            onGrabRef.current(x, y);
-
-          }
-          else{onReleaseRef.current();
-          }
-        } else if (grab) {
-          // Continuous grab
-          onGrabRef.current(x, y);
+          if(nowGrab){
+            onGrabRef.current(x,y);
+          } else{ onReleaseRef.current();}
         } else {
-          // Movement with threshold
-          const dx = prev ? Math.abs(x - prev.x) : Infinity;
-          const dy = prev ? Math.abs(y - prev.y) : Infinity;
-          if (dx > MOVEMENT_THRESHOLD || dy > MOVEMENT_THRESHOLD) {
-            prevPosRef.current = { x, y };
-            setHandPosition({ x, y });
-            onMoveRef.current(x, y);
-          }
+          if(nowGrab){ onGrabRef.current(x,y);}
+          else{
+            onMoveRef.current(x,y);
+          }  
         }
       } else {
         // No hand
@@ -144,23 +130,23 @@ export function useHandDetection(
       rafRef.current = requestAnimationFrame(detectLoop);
     };
 
-    // start camera
+    // Start camera
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
-        videoEl.srcObject = stream;
-        await videoEl.play();
-        console.log('📸 Camera started');
+        stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480},audio:false });
+        video.srcObject = stream;
+        await video.play();
+        console.log('📸 Camera on');
         detectLoop();
-      } catch (err) {
-        console.error('❌ Camera error:', err);
+      } catch(e) {
+        console.error('❌ Cam error:', e);
       }
     })();
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      console.log('🛑 Camera stopped');
+      stream?.getTracks().forEach(t=>t.stop());
+      console.log('🛑 Camera off');
     };
   }, [isHandDetectionActive, modelLoaded, boundingBoxRef]);
 
@@ -171,6 +157,6 @@ export function useHandDetection(
     isGrabbing,
     lastGestureTime,
     videoRef,
-    canvasRef,
+    canvasRef
   };
 }
