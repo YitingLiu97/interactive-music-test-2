@@ -33,7 +33,10 @@ export default function BoundingBox() {
   const playbackTimerRef = useRef<number | null>(null);
   // Track if we're currently seeking to avoid timer updates
   const isSeekingRef = useRef(false);
-
+  const GRAB_THRESHOLD = 5;     // % of container width/height
+  const SMOOTHING_FACTOR = 0.2; // fraction of the distance to move per frame
+  const MOVE_THRESHOLD    = 0.2; // minimum percent change to bother updating
+  
   // Track which audio circle is being controlled by hand gestures
   const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<
     number | null
@@ -102,6 +105,7 @@ export default function BoundingBox() {
   );
 
   const handleHandGrab = useCallback((x: number, y: number) => {
+    // cancel any pending release
     if (releaseDebounceRef.current) {
       clearTimeout(releaseDebounceRef.current);
       releaseDebounceRef.current = null;
@@ -111,26 +115,37 @@ export default function BoundingBox() {
     const xPct = ((x - box.left) / box.width) * 100;
     const yPct = ((y - box.top)  / box.height) * 100;
   
-    // pick once, then stick
+    // 1) If we haven't grabbed yet, pick the closest if within GRAB_THRESHOLD
     if (grabbingIndexRef.current == null) {
       let bestDist = Infinity, bestIdx = -1;
       audioCirclePositions.current.forEach((pos, idx) => {
         const d = Math.hypot(xPct - pos.x, yPct - pos.y);
         if (d < bestDist) { bestDist = d; bestIdx = idx; }
       });
-      if (bestDist < 15) {    // you can tune this
+      if (bestDist < GRAB_THRESHOLD) {
         grabbingIndexRef.current = bestIdx;
         setActiveHandCircleIndex(bestIdx);
         setCurrentTrack(audioInfos[bestIdx].instrumentName!);
       }
-    } else {
-      // move _only_ that same circle
-      const idx = grabbingIndexRef.current;
-      const newPos = { x: Math.max(0, Math.min(100, xPct)), 
-                       y: Math.max(0, Math.min(100, yPct)) };
-      audioCirclePositions.current[idx] = newPos;
-      setSize(s => ({ ...s })); // re-render
+      return;
     }
+  
+    // 2) Once grabbed, only move *that* circle—but smoothly
+    const idx = grabbingIndexRef.current;
+    const prev = audioCirclePositions.current[idx];
+    const dx = xPct - prev.x;
+    const dy = yPct - prev.y;
+    // ignore tiny noise
+    if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) {
+      return;
+    }
+    const newX = prev.x + dx * SMOOTHING_FACTOR;
+    const newY = prev.y + dy * SMOOTHING_FACTOR;
+    audioCirclePositions.current[idx] = {
+      x: Math.max(0, Math.min(100, newX)),
+      y: Math.max(0, Math.min(100, newY))
+    };
+    setSize(s => ({ ...s })); // force a re-render
   }, [audioInfos]);
 
   // Modified handleHandRelease function to ensure clean release
