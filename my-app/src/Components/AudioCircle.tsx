@@ -492,7 +492,7 @@ export default function AudioCircle({
             <CircleUI
                 xPercent={position.xPercent}
                 yPercent={position.yPercent}
-                circleSize={circleSize}
+                circleSize={isHandControlled? circleSize*3: circleSize}
                 onMouseDown={onMouseDown}
                 isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback
                 boundingBox={boundingBox}
