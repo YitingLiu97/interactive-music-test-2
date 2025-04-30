@@ -656,10 +656,10 @@ export default function BoundingBox() {
                   height: "20px",
                   borderRadius: "50%",
                   backgroundColor: isGrabbing
-                    ? "rgba(255, 0, 0, 0.5)"
+                    ? "rgba(255, 0, 0, 0)"// hide red circle
                     : "rgba(0, 255, 0, 0.5)",
                   transform: "translate(-50%, -50%)",
-                  boxShadow: `0 0 10px ${isGrabbing ? "red" : "green"}`,
+                 //boxShadow: `0 0 10px ${!isGrabbing && "green"}`,
                 }}
               />
             )}
