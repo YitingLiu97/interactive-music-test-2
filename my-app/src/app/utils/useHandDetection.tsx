@@ -46,7 +46,7 @@ export function useHandDetection(
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const landmarkerRef = useRef<HandLandmarker | null>(null);
   const rafRef = useRef<number>(0);
   const grabbingRef = useRef<boolean[]>([]);
@@ -172,8 +172,61 @@ const OPEN  = 0.2;
         });
         video.srcObject = stream;
         await video.play();
+
+        const canvas  = canvasRef.current!
+        const ctx     = canvas.getContext('2d')!
+        
+        // size canvas to the box that wraps your video
+        const rect = box.getBoundingClientRect()
+        canvas.width  = rect.width
+        canvas.height = rect.height
+        
+        async function detectLoop() {
+          const result = landmarkerRef.current!.detectForVideo(video, performance.now())
+        
+          // clear
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
+        
+          result.landmarks?.forEach((landmarks, i) => {
+            // map normalized [0–1] landmark coords into canvas pixels
+            const pts = landmarks.map(p => ({
+              x: p.x * canvas.width,
+              y: p.y * canvas.height
+            }))
+        
+            // compute bounding box of those points
+            const xs = pts.map(p => p.x)
+            const ys = pts.map(p => p.y)
+            const minX = Math.min(...xs)
+            const minY = Math.min(...ys)
+            const maxX = Math.max(...xs)
+            const maxY = Math.max(...ys)
+        
+            // draw box
+            ctx.strokeStyle = 'lime'
+            ctx.lineWidth   = 2
+            ctx.strokeRect(minX, minY, maxX - minX, maxY - minY)
+        
+            // draw landmarks
+            ctx.fillStyle = 'cyan'
+            pts.forEach(p => {
+              ctx.beginPath()
+              ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI)
+              ctx.fill()
+            })
+        
+            // open/closed text
+            const closed = grabbingRef.current[i]
+            ctx.fillStyle = 'yellow'
+            ctx.font      = '16px sans-serif'
+            ctx.fillText(closed ? 'closed' : 'open', minX, minY - 6)
+          })
+        
+          rafRef.current = requestAnimationFrame(detectLoop)
+        }
+        
         detectLoop();
-      } catch (err) {
+            } catch (err) {
         console.error("❌ Camera error:", err);
       }
     })();
