@@ -62,14 +62,13 @@ const Demo: React.FC = () => {
     const detectHands = () => {
       if (
         videoRef.current &&
-        videoRef.current.readyState >= 2 &&
-        handLandmarker
+        videoRef.current.readyState >= 2 && handLandmarker
       ) {
         const result: HandLandmarkerResult = handLandmarker.detectForVideo(
           videoRef.current,
           performance.now()
         );
-        setHandPresence((result.handednesses?.length ?? 0) > 0);
+        setHandPresence((result.handedness?.length ?? 0) > 0);
 
         if (result.landmarks) {
           drawLandmarks(result.landmarks);

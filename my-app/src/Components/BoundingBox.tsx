@@ -38,11 +38,12 @@ export default function BoundingBox() {
   const MOVE_THRESHOLD    = 0.2; // minimum percent change to bother updating
   
   // Track which audio circle is being controlled by hand gestures
-  const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<
-    number | null
-  >(null);
-  const grabbingIndexRef = useRef<number | null>(null);
-  const releaseDebounceRef = useRef<number | null>(null);
+  // const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<
+  //   number | null
+  // >(null);
+  // const grabbingIndexRef = useRef<number | null>(null);
+  // const releaseDebounceRef = useRef<number | null>(null);
+  const handToCircle = useRef<Record<number, number>>({});
 
   const audioInfos: AudioInfo[] = [
     {
@@ -87,6 +88,12 @@ export default function BoundingBox() {
     },
   ];
 
+  // function isInCircle(x: number, y: number, circle: Circle) {
+  //   const dx = x - circle.cx
+  //   const dy = y - circle.cy
+  //   return dx*dx + dy*dy <= circle.r*circle.r
+  // }
+  
   // Initialize the refs array with the correct length first
   const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>(
     Array(audioInfos.length)
@@ -103,99 +110,57 @@ export default function BoundingBox() {
         y: 0.3 * 100,
       }))
   );
-
-  const handleHandGrab = useCallback((x: number, y: number) => {
-    // cancel any pending release
-    if (releaseDebounceRef.current) {
-      clearTimeout(releaseDebounceRef.current);
-      releaseDebounceRef.current = null;
-    }
+  const handleHandGrab = useCallback(
+    (handIdx: number, x: number, y: number) => {
+      if (!boxRef.current) return;
+      const { left, top, width, height } = boxRef.current.getBoundingClientRect();
+      const xPct = ((x - left) / width) * 100;
+      const yPct = ((y - top)  / height) * 100;
   
-    const box = boxRef.current!.getBoundingClientRect();
-    const xPct = ((x - box.left) / box.width) * 100;
-    const yPct = ((y - box.top)  / box.height) * 100;
-  
-    // 1) If we haven't grabbed yet, pick the closest if within GRAB_THRESHOLD
-    if (grabbingIndexRef.current == null) {
-      let bestDist = Infinity, bestIdx = -1;
+      // pick closest circle under this hand
+      let best = { dist: Infinity, idx: -1 };
       audioCirclePositions.current.forEach((pos, idx) => {
         const d = Math.hypot(xPct - pos.x, yPct - pos.y);
-        if (d < bestDist) { bestDist = d; bestIdx = idx; }
+        if (d < best.dist) best = { dist: d, idx };
       });
-      if (bestDist < GRAB_THRESHOLD) {
-        grabbingIndexRef.current = bestIdx;
-        setActiveHandCircleIndex(bestIdx);
-        setCurrentTrack(audioInfos[bestIdx].instrumentName!);
-      }
-      return;
-    }
-  
-    // 2) Once grabbed, only move *that* circle—but smoothly
-    const idx = grabbingIndexRef.current;
-    const prev = audioCirclePositions.current[idx];
-    const dx = xPct - prev.x;
-    const dy = yPct - prev.y;
-    // ignore tiny noise
-    if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) {
-      return;
-    }
-    const newX = prev.x + dx * SMOOTHING_FACTOR;
-    const newY = prev.y + dy * SMOOTHING_FACTOR;
-    audioCirclePositions.current[idx] = {
-      x: Math.max(0, Math.min(100, newX)),
-      y: Math.max(0, Math.min(100, newY))
-    };
-    setSize(s => ({ ...s })); // force a re-render
-  }, [audioInfos]);
-
-  // Modified handleHandRelease function to ensure clean release
-const handleHandRelease = useCallback(() => {
-  // wait 300ms of fully open before letting go
-  if (releaseDebounceRef.current) clearTimeout(releaseDebounceRef.current);
-  releaseDebounceRef.current = window.setTimeout(() => {
-    grabbingIndexRef.current = null;
-    setActiveHandCircleIndex(null);
-  }, 300);
-}, []);
-  // Improved handleHandMove for better hovering feedback
-  const handleHandMove = useCallback(
-    (x: number, y: number) => {
-      // Only track hand position when not already grabbing a circle
-      if (boxRef.current && activeHandCircleIndex === null) {
-        const boxRect = boxRef.current.getBoundingClientRect();
-
-        // Convert absolute coordinates to percentages
-        const xPercent = ((x - boxRect.left) / boxRect.width) * 100;
-        const yPercent = ((y - boxRect.top) / boxRect.height) * 100;
-
-        // Find the closest audio circle to highlight
-        let closestDistance = Infinity;
-        let closestIndex = -1;
-
-        audioCirclePositions.current.forEach((pos, index) => {
-          const distance = Math.sqrt(
-            Math.pow(xPercent - pos.x, 2) + Math.pow(yPercent - pos.y, 2)
-          );
-
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            closestIndex = index;
-          }
-        });
-
-        // If hand is close enough to a circle, highlight it
-        if (closestDistance < 20) {
-          // Increased threshold for easier targeting
-          setCurrentTrack(
-            audioInfos[closestIndex].instrumentName ||
-              `Track ${closestIndex + 1}`
-          );
-        }
+      if (best.dist < GRAB_THRESHOLD) {
+        handToCircle.current[handIdx] = best.idx;
+        setCurrentTrack(audioInfos[best.idx].instrumentName!);
       }
     },
-    [activeHandCircleIndex, audioInfos]
+    [audioInfos]
   );
 
+  const handleHandMove = useCallback(
+    (handIdx: number, x: number, y: number) => {
+      const circleIdx = handToCircle.current[handIdx];
+      if (circleIdx == null || !boxRef.current) return;
+      const { left, top, width, height } = boxRef.current.getBoundingClientRect();
+      const xPct = ((x - left) / width) * 100;
+      const yPct = ((y - top)  / height) * 100;
+  
+      const prev = audioCirclePositions.current[circleIdx];
+      const dx   = xPct - prev.x;
+      const dy   = yPct - prev.y;
+      if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
+  
+      audioCirclePositions.current[circleIdx] = {
+        x: Math.max(0, Math.min(100, prev.x + dx * SMOOTHING_FACTOR)),
+        y: Math.max(0, Math.min(100, prev.y + dy * SMOOTHING_FACTOR))
+      };
+      setSize(s => ({ ...s })); // force re-render
+    },
+    []
+  );
+  
+  const handleHandRelease = useCallback(
+    (handIdx: number) => {
+      delete handToCircle.current[handIdx];
+      setCurrentTrack(null);
+    },
+    []
+  );
+  
   // Initialize hand detection
   const {
     isHandDetectionActive,
@@ -539,7 +504,7 @@ const handleHandRelease = useCallback(() => {
                 onTrackSelect={() => {
                   setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
                 }}
-                isHandControlled={activeHandCircleIndex === index}
+                isHandControlled={Object.values(handToCircle.current).includes(index)}
                 onPositionChange={(xPercent, yPercent) => {
                   const newPositions = [...audioCirclePositions.current];
                   newPositions[index] = { x: xPercent, y: yPercent };
