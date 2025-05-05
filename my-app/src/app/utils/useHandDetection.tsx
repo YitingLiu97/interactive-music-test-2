@@ -51,16 +51,21 @@ export function useHandDetection(
   const rafRef = useRef<number>(0);
   const grabbingRef = useRef<boolean[]>([]);
   const handednessRef = useRef<Array<"Left" | "Right">>([]);
+  
+  // Stabilization buffers for grab detection (to reduce flickering)
+  const prevDistancesRef = useRef<number[][]>([]);
+  const gestureStabilityCounterRef = useRef<number[]>([]);
+  
+  // Constants for improved gesture detection
+  const MIN_CONFIDENCE = 0.8; // Increased confidence threshold
+  const CLOSE = 0.08; // Threshold for closed hand (decreased to be more sensitive)
+  const OPEN = 0.15;  // Threshold for open hand (decreased for better hysteresis)
+  const STABILITY_THRESHOLD = 3; // Number of consistent frames before changing state
 
   // Stable callback refs
   const onGrabRef = useRef(onHandGrab);
   const onMoveRef = useRef(onHandMove);
   const onReleaseRef = useRef(onHandRelease);
-
-  // Constants for gesture detection
-  const MIN_CONFIDENCE = 0.75;
-  const CLOSE = 0.1; // Threshold for closed hand (thumb to index finger distance)
-  const OPEN = 0.2;  // Threshold for open hand (hysteresis)
 
   useEffect(() => {
     onGrabRef.current = onHandGrab;
@@ -89,6 +94,9 @@ export function useHandDetection(
           baseOptions: { modelAssetPath: MODEL_URL },
           numHands: 2, // Allow detecting both hands
           runningMode: "VIDEO",
+          minHandDetectionConfidence: 0.5,
+          minHandPresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5
         });
         
         if (cancelled) {
@@ -152,6 +160,12 @@ export function useHandDetection(
           const confidences = categories.map(cats => cats[0].score);
           handednessRef.current = labels;
 
+          // Update history buffers if number of hands changed
+          if (prevDistancesRef.current.length !== result.landmarks?.length) {
+            prevDistancesRef.current = Array(result.landmarks?.length || 0).fill([]).map(() => []);
+            gestureStabilityCounterRef.current = Array(result.landmarks?.length || 0).fill(0);
+          }
+
           result.landmarks?.forEach((landmarks, i) => {
             // 1) confidence filtering
             if (confidences[i] < MIN_CONFIDENCE) return;
@@ -171,20 +185,59 @@ export function useHandDetection(
             // Update hand position state
             setHandPosition({ x, y });
           
-            // 3) Calculate grab gesture for BOTH hands
-            // For both left and right hands, we measure the distance between thumb (landmark 4)
+            // 3) Calculate grab gesture with improved stability
+            // For both hands, measure the distance between thumb (landmark 4)
             // and index finger (landmark 8) tips
             const dx = landmarks[4].x - landmarks[8].x;
             const dy = landmarks[4].y - landmarks[8].y;
             const dist = Math.hypot(dx, dy);
             
-            const was = grabbingRef.current[i] || false;
-            const now = was ? dist < OPEN : dist < CLOSE;
-            grabbingRef.current[i] = now;
-          
-            const handedness = labels[i];
+            // Add to history buffer (keep last 5 values)
+            if (!prevDistancesRef.current[i]) {
+              prevDistancesRef.current[i] = [];
+            }
+            prevDistancesRef.current[i].push(dist);
+            if (prevDistancesRef.current[i].length > 5) {
+              prevDistancesRef.current[i].shift();
+            }
             
-            // Draw hand bounding box
+            // Calculate average distance for stability
+            const avgDist = prevDistancesRef.current[i].reduce((a, b) => a + b, 0) / 
+                           prevDistancesRef.current[i].length;
+            
+            // Get current and determine new state with hysteresis
+            const was = grabbingRef.current[i] || false;
+            const shouldBe = was ? avgDist < OPEN : avgDist < CLOSE;
+            
+            // Stable state change logic
+            if (shouldBe !== was) {
+              // Increment stability counter
+              gestureStabilityCounterRef.current[i]++;
+              
+              // Only change state after consistent readings
+              if (gestureStabilityCounterRef.current[i] >= STABILITY_THRESHOLD) {
+                grabbingRef.current[i] = shouldBe;
+                gestureStabilityCounterRef.current[i] = 0;
+                
+                // Trigger state change events
+                if (shouldBe) {
+                  onGrabRef.current(i, x, y, labels[i]);
+                  setIsGrabbing(true);
+                } else {
+                  onReleaseRef.current(i, labels[i]);
+                  setIsGrabbing(false);
+                }
+                setLastGestureTime(Date.now());
+              }
+            } else {
+              // Reset stability counter if consistent with current state
+              gestureStabilityCounterRef.current[i] = 0;
+            }
+            
+            const handedness = labels[i];
+            const isGrabbing = grabbingRef.current[i] || false;
+            
+            // Convert hand landmarks to canvas coordinates
             const pts = landmarks.map(p => ({
               x: p.x * canvas.width,
               y: p.y * canvas.height
@@ -198,35 +251,57 @@ export function useHandDetection(
             const maxX = Math.max(...xs);
             const maxY = Math.max(...ys);
             
-            // Draw box
-            ctx.strokeStyle = handedness === 'Left' ? 'blue' : 'green';
-            ctx.lineWidth = 2;
+            // Draw box with color based on hand state
+            ctx.strokeStyle = isGrabbing ? 'red' : (handedness === 'Left' ? 'blue' : 'green');
+            ctx.lineWidth = 3;
             ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
             
-            // Draw landmarks
-            ctx.fillStyle = 'cyan';
-            pts.forEach(p => {
-              ctx.beginPath();
-              ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
-              ctx.fill();
+            // Draw landmarks with different colors for key points
+            pts.forEach((p, idx) => {
+              // Different colors for key landmarks
+              if (idx === 4) { // Thumb tip
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+              } else if (idx === 8) { // Index fingertip
+                ctx.fillStyle = 'orange';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+              } else {
+                ctx.fillStyle = 'cyan';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+              }
             });
             
-            // Draw hand state label
-            const grabText = now ? 'closed' : 'open';
-            ctx.fillStyle = 'yellow';
-            ctx.font = '16px sans-serif';
-            ctx.fillText(`${handedness}: ${grabText}`, minX, minY - 10);
+            // Draw a line between thumb and index finger
+            ctx.strokeStyle = isGrabbing ? 'red' : 'lime';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(pts[4].x, pts[4].y); // Thumb tip
+            ctx.lineTo(pts[8].x, pts[8].y); // Index fingertip
+            ctx.stroke();
             
-            // Emit events based on state changes
-            if (now !== was) {
-              setIsGrabbing(now);
-              setLastGestureTime(Date.now());
-              if (now) onGrabRef.current(i, x, y, handedness);
-              else onReleaseRef.current(i, handedness);
-            } else {
-              // Always emit move for smooth tracking
-              onMoveRef.current(i, x, y, handedness);
-            }
+            ctx.save();
+            // Reverse the mirroring for text only
+            ctx.scale(-1, 1);
+            // Since the canvas is mirrored, adjust text position accordingly
+            const textX = -minX - (maxX - minX);
+            const grabText = isGrabbing ? 'CLOSED PALM' : 'OPEN PALM';
+            ctx.fillStyle = 'black';
+            ctx.font = 'bold 16px sans-serif';
+            // Draw text shadow/outline for better visibility
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.strokeText(`${handedness}: ${grabText}`, textX, minY - 10);
+            ctx.fillText(`${handedness}: ${grabText}`, textX, minY - 10);
+            // Restore canvas state
+            ctx.restore();
+            // Always emit move for smooth tracking
+            onMoveRef.current(i, x, y, handedness);
           });
 
           if (!cancelled) {

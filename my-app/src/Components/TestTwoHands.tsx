@@ -101,13 +101,13 @@ const TestTwoHands: React.FC = () => {
       }}>
         {Object.entries(handStates).map(([idx, { handedness, grabbing }]) => (
           <div key={idx}>
-            Hand {Number(idx) + 1} ({handedness}): {grabbing ? "CLOSED" : "OPEN"}
+            Hand {Number(idx) + 1} ({handedness}): {grabbing ? "CLOSED PALM" : "OPEN PALM"}
           </div>
         ))}
         {Object.keys(handStates).length === 0 && "No hands detected"}
       </div>
 
-      {/* Video element with mirror effect */}
+      {/* Video element WITHOUT mirror effect */}
       <video
         ref={videoRef}
         width={640}
@@ -118,12 +118,12 @@ const TestTwoHands: React.FC = () => {
           position: "absolute",
           top: 0,
           left: 0,
-          transform: "scaleX(-1)", // Mirror the video
+          transform: "scaleX(-1)", // Add mirroring
           zIndex: 1,
         }}
       />
 
-      {/* Canvas overlay for visualization */}
+      {/* Canvas overlay for visualization also without mirror */}
       <canvas
         ref={canvasRef}
         width={640}
@@ -132,8 +132,8 @@ const TestTwoHands: React.FC = () => {
           position: "absolute",
           top: 0,
           left: 0,
-          transform: "scaleX(-1)", // Mirror the canvas to match video
           zIndex: 2,
+          transform: "scaleX(-1)", // Add mirroring
           pointerEvents: "none",
         }}
       />
