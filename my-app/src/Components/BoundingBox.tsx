@@ -57,6 +57,7 @@ export default function BoundingBox() {
   // Debounce timer ref for hand release events
   const releaseDebounceRef = useRef<Record<number, number>>({});
   const RELEASE_DEBOUNCE_TIME = 300; // ms to delay release to prevent accidental drops
+  const raf = useRef<number| null>(null)
 
   const audioInfos: AudioInfo[] = [
     {
@@ -209,8 +210,13 @@ export default function BoundingBox() {
       }
       
       // Force re-render to reflect position changes
-      setSize((s) => ({ ...s }));
-    },
+      if (!raf.current) {
+        raf.current = requestAnimationFrame(() => {
+          setSize((s) => ({ ...s }));    
+          raf.current = null
+        })
+      }
+    },  
     []
   );
 
@@ -501,6 +507,14 @@ export default function BoundingBox() {
     
     // Start playback again
     playAll();
+
+    if (isLooping) {
+      audioRefs.current.forEach(ref => {
+        if (ref.current?.setLooping) {
+          ref.current.setLooping(true)
+        }
+      })
+    }
 
     // Use a small delay to ensure all tracks are properly positioned
     setTimeout(() => {
