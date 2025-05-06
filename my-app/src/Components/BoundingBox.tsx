@@ -8,10 +8,18 @@ import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Trapezoid } from "@/app/types/audioType";
+
 interface AudioInfo {
   audioUrl: string;
   circleColor: string;
   instrumentName?: string;
+}
+
+interface HandState {
+  x: number;
+  y: number;
+  handedness: "Left" | "Right";
+  grabbing: boolean;
 }
 
 export default function BoundingBox() {
@@ -31,19 +39,24 @@ export default function BoundingBox() {
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(180); // Default 3 minutes
   const playbackTimerRef = useRef<number | null>(null);
+  
   // Track if we're currently seeking to avoid timer updates
   const isSeekingRef = useRef(false);
-  const GRAB_THRESHOLD = 5;     // % of container width/height
-  const SMOOTHING_FACTOR = 0.2; // fraction of the distance to move per frame
-  const MOVE_THRESHOLD    = 0.2; // minimum percent change to bother updating
   
-  // Track which audio circle is being controlled by hand gestures
-  // const [activeHandCircleIndex, setActiveHandCircleIndex] = useState<
-  //   number | null
-  // >(null);
-  // const grabbingIndexRef = useRef<number | null>(null);
-  // const releaseDebounceRef = useRef<number | null>(null);
+  // Hand detection state
+  const [handStates, setHandStates] = useState<Record<number, HandState>>({});
+  
+  // Thresholds and parameters for optimized hand detection
+  const GRAB_THRESHOLD = 20;       // % of container width/height - increased for easier grabbing
+  const SMOOTHING_FACTOR = 0.3;    // fraction of the distance to move per frame - increased for more responsive feel
+  const MOVE_THRESHOLD = 0.1;      // minimum percent change to bother updating - decreased for more sensitivity
+  
+  // Map to track which hand is controlling which circle
   const handToCircle = useRef<Record<number, number>>({});
+  
+  // Debounce timer ref for hand release events
+  const releaseDebounceRef = useRef<Record<number, number>>({});
+  const RELEASE_DEBOUNCE_TIME = 300; // ms to delay release to prevent accidental drops
 
   const audioInfos: AudioInfo[] = [
     {
@@ -88,12 +101,6 @@ export default function BoundingBox() {
     },
   ];
 
-  // function isInCircle(x: number, y: number, circle: Circle) {
-  //   const dx = x - circle.cx
-  //   const dy = y - circle.cy
-  //   return dx*dx + dy*dy <= circle.r*circle.r
-  // }
-  
   // Initialize the refs array with the correct length first
   const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>(
     Array(audioInfos.length)
@@ -101,80 +108,186 @@ export default function BoundingBox() {
       .map(() => React.createRef<AudioControlRef>())
   );
 
-  // Create refs for audio circle positions
+  // Create refs for audio circle positions with initial staggered layout
   const audioCirclePositions = useRef<{ x: number; y: number }[]>(
     Array(audioInfos.length)
       .fill(null)
       .map((_, index) => ({
-        x: (0.15 + index * 0.1) * 100, // Convert to percentage
+        x: (0.3 + index * 0.1) * 100, // Convert to percentage
         y: 0.3 * 100,
       }))
   );
+
+  // Hand grab event handler - optimized version
   const handleHandGrab = useCallback(
-    (handIdx: number, x: number, y: number) => {
+    (handIdx: number, x: number, y: number, handedness: "Left" | "Right") => {
       if (!boxRef.current) return;
+      
+      console.log(`Hand ${handIdx} (${handedness}) grabbed at ${x},${y}`);
+      
+      // Update the hand state
+      setHandStates((prev) => ({
+        ...prev,
+        [handIdx]: { x, y, handedness, grabbing: true },
+      }));
+      
+      // Convert absolute coordinates to percentage within the box
       const { left, top, width, height } = boxRef.current.getBoundingClientRect();
       const xPct = ((x - left) / width) * 100;
-      const yPct = ((y - top)  / height) * 100;
-  
-      // pick closest circle under this hand
-      let best = { dist: Infinity, idx: -1 };
+      const yPct = ((y - top) / height) * 100;
+      
+      // Clear any existing release debounce timer for this hand
+      if (releaseDebounceRef.current[handIdx]) {
+        window.clearTimeout(releaseDebounceRef.current[handIdx]);
+        delete releaseDebounceRef.current[handIdx];
+      }
+      
+      // Find the closest circle to grab
+      let closestCircle = -1;
+      let closestDistance = Infinity;
+      
       audioCirclePositions.current.forEach((pos, idx) => {
-        const d = Math.hypot(xPct - pos.x, yPct - pos.y);
-        if (d < best.dist) best = { dist: d, idx };
+        const distance = Math.hypot(xPct - pos.x, yPct - pos.y);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestCircle = idx;
+        }
       });
-      if (best.dist < GRAB_THRESHOLD) {
-        handToCircle.current[handIdx] = best.idx;
-        setCurrentTrack(audioInfos[best.idx].instrumentName!);
+      
+      // If we found a close enough circle, assign it to this hand
+      if (closestDistance < GRAB_THRESHOLD) {
+        // Check if this circle is already being controlled
+        const existingController = Object.entries(handToCircle.current).find(
+          ([, circleIdx]) => circleIdx === closestCircle
+        );
+        // If another hand is not controlling it, we take control 
+        if (!existingController) {
+          handToCircle.current[handIdx] = closestCircle;
+          setCurrentTrack(audioInfos[closestCircle].instrumentName || `Track ${closestCircle + 1}`);
+        }
       }
     },
-    [audioInfos]
+    [handStates, audioInfos]
   );
 
+  // Hand move event handler - optimized with smoothing
   const handleHandMove = useCallback(
-    (handIdx: number, x: number, y: number) => {
+    (handIdx: number, x: number, y: number, handedness: "Left" | "Right") => {
+      // Update hand state regardless of whether we're controlling a circle
+      setHandStates((prev) => {
+        const state = prev[handIdx];
+        return {
+          ...prev,
+          [handIdx]: {
+            x,
+            y,
+            handedness,
+            grabbing: state?.grabbing || false,
+          },
+        };
+      });
+      
+      // If this hand isn't controlling a circle, exit early
       const circleIdx = handToCircle.current[handIdx];
-      if (circleIdx == null || !boxRef.current) return;
+      if (circleIdx === undefined || !boxRef.current) return;
+      
+      // Convert absolute coordinates to percentage within the box
       const { left, top, width, height } = boxRef.current.getBoundingClientRect();
       const xPct = ((x - left) / width) * 100;
-      const yPct = ((y - top)  / height) * 100;
-  
-      const prev = audioCirclePositions.current[circleIdx];
-      const dx   = xPct - prev.x;
-      const dy   = yPct - prev.y;
+      const yPct = ((y - top) / height) * 100;
+      
+      // Get the current position of the controlled circle
+      const currentPos = audioCirclePositions.current[circleIdx];
+      
+      // Calculate the distance to move
+      const dx = xPct - currentPos.x;
+      const dy = yPct - currentPos.y;
+      
+      // Skip small movements for better performance
       if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
-  
-      audioCirclePositions.current[circleIdx] = {
-        x: Math.max(0, Math.min(100, prev.x + dx * SMOOTHING_FACTOR)),
-        y: Math.max(0, Math.min(100, prev.y + dy * SMOOTHING_FACTOR))
-      };
-      setSize(s => ({ ...s })); // force re-render
+      
+      // Apply smoothing factor to movement
+      const newX = Math.max(0, Math.min(100, currentPos.x + dx * SMOOTHING_FACTOR));
+      const newY = Math.max(0, Math.min(100, currentPos.y + dy * SMOOTHING_FACTOR));
+      
+      // Update the circle position
+      audioCirclePositions.current[circleIdx] = { x: newX, y: newY };
+      
+      // Update audio parameters using the updatePosition method if available
+      if (audioRefs.current[circleIdx]?.current?.updatePosition) {
+        audioRefs.current[circleIdx].current.updatePosition(newX, newY);
+      }
+      
+      // Force re-render to reflect position changes
+      setSize((s) => ({ ...s }));
     },
     []
   );
-  
-  const handleHandRelease = useCallback(
-    (handIdx: number) => {
-      delete handToCircle.current[handIdx];
-      setCurrentTrack(null);
-    },
-    []
-  );
-  
+
+  // Hand release event handler - with debounce to prevent accidental drops
+  const handleHandRelease = useCallback((handIdx: number, handedness: "Left" | "Right") => {
+    console.log(`Hand ${handIdx} (${handedness}) release detected`);
+    
+    // Check if this hand was controlling a circle
+    if (handToCircle.current[handIdx] !== undefined) {
+      // Set a debounce timer to delay the actual release
+      releaseDebounceRef.current[handIdx] = window.setTimeout(() => {
+        console.log(`Hand ${handIdx} (${handedness}) released`);
+        
+        // Update hand state
+        setHandStates((prev) => {
+          const state = prev[handIdx];
+          if (!state) return prev;
+          return {
+            ...prev,
+            [handIdx]: { ...state, grabbing: false, handedness },
+          };
+        });
+        
+        // Clear the hand-to-circle mapping
+        delete handToCircle.current[handIdx];
+        delete releaseDebounceRef.current[handIdx];
+        
+        // Reset current track if no other hands are controlling circles
+        if (Object.keys(handToCircle.current).length === 0) {
+          setCurrentTrack(null);
+        }
+      }, RELEASE_DEBOUNCE_TIME);
+    } else {
+      // Hand wasn't controlling anything, update state immediately
+      setHandStates((prev) => {
+        const state = prev[handIdx];
+        if (!state) return prev;
+        return {
+          ...prev,
+          [handIdx]: { ...state, grabbing: false, handedness },
+        };
+      });
+    }
+  }, []);
+
   // Initialize hand detection
   const {
     isHandDetectionActive,
     toggleHandDetection,
-    handPosition,
-    isGrabbing,
     videoRef,
     canvasRef,
   } = useHandDetection(
     boxRef,
+    handleHandGrab,  
     handleHandMove,
-    handleHandGrab,
     handleHandRelease
   );
+
+  // Cleanup function for debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all release debounce timers
+      Object.values(releaseDebounceRef.current).forEach((timerId) => {
+        if (timerId) window.clearTimeout(timerId);
+      });
+    };
+  }, []);
 
   // This useEffect will run only once after component mounts
   useEffect(() => {
@@ -369,6 +482,8 @@ export default function BoundingBox() {
         console.log(`Seeking track: ${success ? "success" : "failed"}`);
       }
     });
+    
+    // Start playback again
     playAll();
 
     // Use a small delay to ensure all tracks are properly positioned
@@ -418,7 +533,7 @@ export default function BoundingBox() {
   return (
     <div className="flex flex-col h-screen w-screen">
       {/* Hand detection toggle button */}
-      <div className="absolute top-4 right-4 z-100">
+      <div className="absolute top-4 right-4 z-10">
         <Button
           variant={isHandDetectionActive ? "solid" : "outline"}
           color={isHandDetectionActive ? "green" : "gray"}
@@ -482,10 +597,14 @@ export default function BoundingBox() {
             />
           )}
         </svg>
+        
         {audioRefsCreated &&
           audioInfos.map((info, index) => {
             // Get position from our ref to support hand movement
             const position = audioCirclePositions.current[index];
+            
+            // Check if this circle is being controlled by hand
+            const isHandControlled = Object.values(handToCircle.current).includes(index);
 
             return (
               <AudioCircle
@@ -494,7 +613,7 @@ export default function BoundingBox() {
                   x: position.x / 100, // Convert back to decimal for startPoint
                   y: position.y / 100,
                 }}
-                boundingBox={{ x: size.x, y: size.y }}
+                boundingBox={size}
                 trapezoid={trapezoid}
                 audioUrl={info.audioUrl}
                 color={info.circleColor}
@@ -504,7 +623,7 @@ export default function BoundingBox() {
                 onTrackSelect={() => {
                   setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
                 }}
-                isHandControlled={Object.values(handToCircle.current).includes(index)}
+                isHandControlled={isHandControlled}
                 onPositionChange={(xPercent, yPercent) => {
                   const newPositions = [...audioCirclePositions.current];
                   newPositions[index] = { x: xPercent, y: yPercent };
@@ -513,6 +632,39 @@ export default function BoundingBox() {
               />
             );
           })}
+
+        {/* Hand detection status display */}
+        <div style={{
+          position: "absolute",
+          bottom: 10,
+          left: 10,
+          zIndex: 10,
+          background: "rgba(0,0,0,0.7)",
+          color: "white",
+          padding: "8px",
+          borderRadius: "4px",
+          fontSize: "14px",
+          display: isHandDetectionActive ? "block" : "none"
+        }}>
+          {Object.entries(handStates).map(([idx, { handedness, grabbing }]) => {
+            const controllingCircleIdx = handToCircle.current[Number(idx)];
+            const controllingInstrument = controllingCircleIdx !== undefined
+              ? audioInfos[controllingCircleIdx].instrumentName
+              : null;
+              
+            return (
+              <div key={idx}>
+                Hand {Number(idx) + 1} ({handedness}): {grabbing ? "CLOSED PALM" : "OPEN PALM"}
+                {controllingInstrument && grabbing && (
+                  <span style={{ color: audioInfos[controllingCircleIdx].circleColor }}>
+                    {" - controlling "}{controllingInstrument}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {Object.keys(handStates).length === 0 && "No hands detected"}
+        </div>
 
         {/* Hand detection visualization overlay */}
         {isHandDetectionActive && (
@@ -536,31 +688,13 @@ export default function BoundingBox() {
                 width: "100%",
                 height: "100%",
                 transform: "scaleX(-1)", // Mirror the canvas
-                zIndex: -2,
+                zIndex: 1,
+                pointerEvents: "none",
                 borderRadius: "0 0 8px 0",
               }}
               width={640}
               height={480}
             />
-
-            {/* Hand position indicator (optional) */}
-            {handPosition && (
-              <div
-                className="absolute z-10 pointer-events-none"
-                style={{
-                  left: `${handPosition.x}px`,
-                  top: `${handPosition.y}px`,
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "50%",
-                  backgroundColor: isGrabbing
-                    ? "rgba(255, 0, 0, 0)"// hide red circle
-                    : "rgba(0, 255, 0, 0.5)",
-                  transform: "translate(-50%, -50%)",
-                 //boxShadow: `0 0 10px ${!isGrabbing && "green"}`,
-                }}
-              />
-            )}
           </>
         )}
       </div>

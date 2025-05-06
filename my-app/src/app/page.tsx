@@ -4,8 +4,8 @@ export default function Home() {
   return (
     <div >
       {/* <HandTracker/> */}
-       {/* <BoundingBox/> */}
-       <TestTwoHands/>
+       <BoundingBox/>
+       {/* <TestTwoHands/> */}
        {/* <HandDetector/> */}
        {/* <Demo/> */}
     </div>
