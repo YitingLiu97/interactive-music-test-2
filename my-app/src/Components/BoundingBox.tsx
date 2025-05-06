@@ -37,7 +37,7 @@ export default function BoundingBox() {
 
   // Add current playback time tracking for UI
   const [currentTime, setCurrentTime] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(180); // Default 3 minutes
+  const [totalDuration, setTotalDuration] = useState<number>(180); // Default 3 minutes
   const playbackTimerRef = useRef<number | null>(null);
   
   // Track if we're currently seeking to avoid timer updates
@@ -743,12 +743,12 @@ export default function BoundingBox() {
         totalDuration={totalDuration}
         onSeekTo={seekTo}
         sections={[
-          { id: "1", name: "Intro", startTime: 0, endTime: 30 },
-          { id: "2", name: "Verse 1", startTime: 30, endTime: 60 },
-          { id: "3", name: "Chorus", startTime: 60, endTime: 90 },
-          { id: "4", name: "Verse 2", startTime: 90, endTime: 120 },
-          { id: "5", name: "Bridge", startTime: 120, endTime: 150 },
-          { id: "6", name: "Outro", startTime: 150, endTime: 180 },
+          { id: "1", name: "Intro", startTime: 0, endTime: 3},
+          { id: "2", name: "Verse 1", startTime: 3, endTime: 8 },
+          { id: "3", name: "Chorus", startTime: 8, endTime: 15 },
+          { id: "4", name: "Verse 2", startTime: 15, endTime: 22 },
+          { id: "5", name: "Bridge", startTime: 22, endTime: 30 },
+          { id: "6", name: "Outro", startTime: 30, endTime: 38 },
         ]}
       />
     </div>
