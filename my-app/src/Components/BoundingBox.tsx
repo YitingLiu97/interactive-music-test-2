@@ -81,7 +81,7 @@ export default function BoundingBox() {
       instrumentName: "Xiao",
     },
     {
-      audioUrl: "/resources/Justion/cx.ai_ Xun_1.mp3",
+      audioUrl: "/resources/Justin/cx.ai_ Xun_1.mp3",
       circleColor: "teal",
       instrumentName: "Xun",
     },
@@ -641,7 +641,7 @@ export default function BoundingBox() {
           />
           {!isHandDetectionActive && (
             <image
-              href="/image/air-traffic-bg.jpg"
+              href="/image/guilin-mountain.jpg"
               opacity="0.5"
               width="100%"
               height="100%"
@@ -727,6 +727,7 @@ export default function BoundingBox() {
               style={{
                 width: "100%",
                 height: "100%",
+                objectFit: "cover",       
                 transform: "scaleX(-1)", // Mirror the video
                 zIndex: 0,
                 borderRadius: "0 0 8px 0",
@@ -740,6 +741,7 @@ export default function BoundingBox() {
                 width: "100%",
                 height: "100%",
                 transform: "scaleX(-1)", // Mirror the canvas
+                objectFit: "cover",       
                 zIndex: 1,
                 pointerEvents: "none",
                 borderRadius: "0 0 8px 0",
