@@ -208,7 +208,7 @@ export function useHandDetection(
             const palmY = (p0.y + p5.y + p17.y) / 3;
             
             // Convert normalized coordinates to screen coordinates
-            const x = palmX * rect.width;
+            const x = (1-palmX) * rect.width;// reverse x?
             const y = palmY * rect.height;
             
             // Update hand position state
