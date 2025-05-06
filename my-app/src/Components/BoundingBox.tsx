@@ -8,6 +8,7 @@ import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Trapezoid } from "@/app/types/audioType";
+import { stat } from "fs";
 
 interface AudioInfo {
   audioUrl: string;
@@ -266,6 +267,31 @@ export default function BoundingBox() {
     }
   }, []);
 
+  const handleHandLost = useCallback((handIdx: number) => {
+    // 1) If that hand was controlling a circle, drop it immediately:
+    if (handToCircle.current[handIdx] !== undefined) {
+      // if no more hands are controlling anything, clear your track label
+      if (Object.keys(handToCircle.current).length === 0) {
+        setCurrentTrack(null)
+      }     
+       delete handToCircle.current[handIdx]
+    }
+  
+    // 2) Kill any pending release‐debounce for that hand:
+    if (releaseDebounceRef.current[handIdx]) {
+      clearTimeout(releaseDebounceRef.current[handIdx])
+      delete releaseDebounceRef.current[handIdx]
+    }
+  
+    // 3) Remove it from your handStates entirely:
+    setHandStates(prev => {
+      const next = { ...prev }
+      delete next[handIdx]
+      return next
+    })
+  }, [])
+
+
   // Initialize hand detection
   const {
     isHandDetectionActive,
@@ -276,7 +302,8 @@ export default function BoundingBox() {
     boxRef,
     handleHandGrab,  
     handleHandMove,
-    handleHandRelease
+    handleHandRelease,
+    handleHandLost
   );
 
   // Cleanup function for debounce timers on unmount
@@ -654,7 +681,7 @@ export default function BoundingBox() {
               
             return (
               <div key={idx}>
-                Hand {Number(idx) + 1} ({handedness}): {grabbing ? "CLOSED PALM" : "OPEN PALM"}
+                Hand {Number(idx) + 1}({handedness}): {grabbing ? "CLOSED PALM" : "OPEN PALM"}
                 {controllingInstrument && grabbing && (
                   <span style={{ color: audioInfos[controllingCircleIdx].circleColor }}>
                     {" - controlling "}{controllingInstrument}

@@ -33,7 +33,9 @@ export function useHandDetection(
     y: number,
     handedness: "Left" | "Right"
   ) => void,
-  onHandRelease: (handIndex: number, handedness: "Left" | "Right") => void
+  onHandRelease: (handIndex: number, handedness: "Left" | "Right") => void,
+  onHandLost: (handIndex: number) => void,
+  onAllHandsLost?: () => void
 ): HandDetectionReturn {
   const [isHandDetectionActive, setIsHandDetectionActive] = useState(false);
   const [modelLoaded, setModelLoaded] = useState(false);
@@ -43,7 +45,6 @@ export function useHandDetection(
   } | null>(null);
   const [isGrabbing, setIsGrabbing] = useState(false);
   const [lastGestureTime, setLastGestureTime] = useState(0);
-
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -52,7 +53,7 @@ export function useHandDetection(
   const grabbingRef = useRef<boolean[]>([]);
   const handednessRef = useRef<Array<"Left" | "Right">>([]);
   
-  // Stabilization buffers for grab detection (to reduce flickering)
+  const prevPresence = useRef<Record<number, boolean>>({0: false, 1: false});
   const prevDistancesRef = useRef<number[][]>([]);
   const gestureStabilityCounterRef = useRef<number[]>([]);
   
@@ -66,6 +67,7 @@ export function useHandDetection(
   const onGrabRef = useRef(onHandGrab);
   const onMoveRef = useRef(onHandMove);
   const onReleaseRef = useRef(onHandRelease);
+  const onHandLostRef = useRef(onHandLost);
 
   useEffect(() => {
     onGrabRef.current = onHandGrab;
@@ -79,6 +81,10 @@ export function useHandDetection(
     onReleaseRef.current = onHandRelease;
   }, [onHandRelease]);
 
+  useEffect(() => {
+    onHandLostRef.current = onHandLost;
+  }, [onHandLost]);
+  
   const toggleHandDetection = useCallback(() => {
     setIsHandDetectionActive((active) => !active);
   }, []);
@@ -145,17 +151,40 @@ export function useHandDetection(
         
         function detectLoop() {
           if (!landmarkerRef.current || !video) return;
-          
           const result: HandLandmarkerResult = landmarkerRef.current.detectForVideo(
             video,
             performance.now()
+
           );
+
+          const currentPresence: Record<number, boolean> = {0:false, 1:false};
+          result.handedness.forEach((h,idx) => {
+            currentPresence[idx] = true;
+          });
+
+          Object.keys(currentPresence).forEach((key) => {
+            const idx = Number(key);
+            const prev = prevPresence.current[idx];
+            const now = currentPresence[idx];
+            
+            if(prev && !now)
+            {
+              onHandLostRef.current(idx);
+            }
+          });
+
+          const hasAny  = Object.values(prevPresence.current).some(Boolean);
+          const hasAnyNow = Object.values(currentPresence).some(Boolean);
+          if(hasAny && !hasAnyNow && onAllHandsLost){
+            onAllHandsLost();
+          }
+          prevPresence.current = currentPresence;
 
           // Clear the canvas for new drawing
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           
           // Map Category[] to string labels
-          const categories = result.handednesses || [];
+          const categories = result.handedness || [];
           const labels = categories.map(cats => cats[0].categoryName as 'Left' | 'Right');
           const confidences = categories.map(cats => cats[0].score);
           handednessRef.current = labels;
