@@ -60,46 +60,35 @@ export default function BoundingBox() {
 
   const audioInfos: AudioInfo[] = [
     {
-      audioUrl: "/resources/ATCBaritoneGuitar_03.mp3",
+      audioUrl: "/resources/Justin/cx.ai_ Erhu_1.mp3",
       circleColor: "red",
-      instrumentName: "BaritoneGuitar",
+      instrumentName: "Erhu",
     },
     {
-      audioUrl: "/resources/ATCBass_03.mp3",
+      audioUrl: "/resources/Justin/cx.ai_ Forest_1.mp3",
       circleColor: "orange",
-      instrumentName: "Bass",
+      instrumentName: "Forest",
     },
     {
-      audioUrl: "/resources/ATCBGVocals_03.mp3",
+      audioUrl: "/resources/Justin/cx.ai_ Main_1.mp3",
       circleColor: "yellow",
-      instrumentName: "BGVocals",
+      instrumentName: "Main",
     },
     {
-      audioUrl: "/resources/ATCDrums_03.mp3",
+      audioUrl: "/resources/Justin/cx.ai_ Xiao_1.mp3",
       circleColor: "green",
-      instrumentName: "Drums",
+      instrumentName: "Xiao",
     },
     {
-      audioUrl: "/resources/ATCLeadVocals_03.mp3",
+      audioUrl: "/resources/Justion/cx.ai_ Xun_1.mp3",
       circleColor: "teal",
-      instrumentName: "LeadVocals",
+      instrumentName: "Xun",
     },
     {
-      audioUrl: "/resources/ATCPedalSteel_03.mp3",
+      audioUrl: "/resources/Justin/cx.ai_ Zheng_1.mp3",
       circleColor: "blue",
-      instrumentName: "PedalSteel",
-    },
-    {
-      audioUrl: "/resources/ATCPiano_03.mp3",
-      circleColor: "purple",
-      instrumentName: "Piano",
-    },
-    {
-      audioUrl: "/resources/ATCTimpani_03.mp3",
-      circleColor: "pink",
-      instrumentName: "Timpani",
-    },
-  ];
+      instrumentName: "Zheng",
+    }];
 
   // Initialize the refs array with the correct length first
   const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>(
