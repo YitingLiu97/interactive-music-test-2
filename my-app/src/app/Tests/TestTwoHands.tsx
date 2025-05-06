@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { useHandDetection } from "@/app/utils/useHandDetection";
 
 interface HandState {
@@ -41,6 +41,7 @@ const TestTwoHands: React.FC = () => {
     },
     []
   );
+  const handleLost = useCallback(() => {},[]);
 
   const handleRelease = useCallback((handIdx: number, handedness: "Left" | "Right") => {
     console.log(`Hand ${handIdx} (${handedness}) released`);
@@ -55,7 +56,7 @@ const TestTwoHands: React.FC = () => {
   }, []);
 
   const { isHandDetectionActive, toggleHandDetection, videoRef, canvasRef } =
-    useHandDetection(boxRef, handleGrab, handleMove, handleRelease);
+    useHandDetection(boxRef, handleGrab, handleMove, handleRelease,handleLost);
 
   return (
     <div 

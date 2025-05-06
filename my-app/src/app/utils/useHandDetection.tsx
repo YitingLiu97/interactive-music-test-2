@@ -68,8 +68,8 @@ export function useHandDetection(
   const onMoveRef = useRef(onHandMove);
   const onReleaseRef = useRef(onHandRelease);
   const onHandLostRef = useRef(onHandLost);
-  const lastTime = useRef(performance.now())
-  const MIN_DELTA = 1000 / 15  // 15 fps
+  // const lastTime = useRef(performance.now())
+  // const MIN_DELTA = 1000 / 15  // 15 fps
   useEffect(() => {
     onGrabRef.current = onHandGrab;
   }, [onHandGrab]);
