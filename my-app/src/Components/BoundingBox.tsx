@@ -8,7 +8,6 @@ import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Trapezoid } from "@/app/types/audioType";
-import { stat } from "fs";
 
 interface AudioInfo {
   audioUrl: string;
@@ -134,7 +133,8 @@ export default function BoundingBox() {
       
       // Convert absolute coordinates to percentage within the box
       const { left, top, width, height } = boxRef.current.getBoundingClientRect();
-      const xPct = ((x - left) / width) * 100;
+      const rawPct = (x - left) / width;
+      const xPct   =   rawPct * 100;// (1 - rawPct) * 100;
       const yPct = ((y - top) / height) * 100;
       
       // Clear any existing release debounce timer for this hand

@@ -58,9 +58,9 @@ export function useHandDetection(
   const gestureStabilityCounterRef = useRef<number[]>([]);
   
   // Constants for improved gesture detection
-  const MIN_CONFIDENCE = 0.8; // Increased confidence threshold
+  const MIN_CONFIDENCE = 0.75; // Increased confidence threshold
   const CLOSE = 0.08; // Threshold for closed hand (decreased to be more sensitive)
-  const OPEN = 0.15;  // Threshold for open hand (decreased for better hysteresis)
+  const OPEN = 0.10;  // Threshold for open hand (decreased for better hysteresis)
   const STABILITY_THRESHOLD = 3; // Number of consistent frames before changing state
 
   // Stable callback refs
@@ -229,7 +229,6 @@ export function useHandDetection(
             if (prevDistancesRef.current[i].length > 5) {
               prevDistancesRef.current[i].shift();
             }
-            
             // Calculate average distance for stability
             const avgDist = prevDistancesRef.current[i].reduce((a, b) => a + b, 0) / 
                            prevDistancesRef.current[i].length;
