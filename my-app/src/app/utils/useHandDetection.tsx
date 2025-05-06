@@ -123,6 +123,27 @@ export function useHandDetection(
     };
   }, []);
 
+  useEffect(() => {
+    const vid = videoRef.current;
+    const cnv = canvasRef.current;
+    if (!vid || !cnv) return;
+  
+    // Handler to sync canvas size to video’s intrinsic size
+    const resize = () => {
+      cnv.width  = vid.videoWidth;
+      cnv.height = vid.videoHeight;
+    };
+  
+    // Run once in case metadata is already loaded
+    resize();
+    // Also run when metadata finally arrives
+    vid.addEventListener("loadedmetadata", resize);
+  
+    return () => {
+      vid.removeEventListener("loadedmetadata", resize);
+    };
+  }, [videoRef, canvasRef]);
+  
   // Camera and detection loop
   useEffect(() => {
     if (!isHandDetectionActive || !modelLoaded) return;
@@ -130,6 +151,13 @@ export function useHandDetection(
     let cancelled = false;
     let stream: MediaStream;
     const video = videoRef.current;
+    videoRef.current!.addEventListener("loadedmetadata", () => {
+      const vid = videoRef.current!
+      const cnv = canvasRef.current!
+      cnv.width  = vid.videoWidth
+      cnv.height = vid.videoHeight
+    })
+    
     const box = boundingBoxRef.current;
     
     if (!video || !box) return;
