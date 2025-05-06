@@ -205,10 +205,11 @@ export default function BoundingBox() {
       audioCirclePositions.current[circleIdx] = { x: newX, y: newY };
       
       // Update audio parameters using the updatePosition method if available
-      if (audioRefs.current[circleIdx]?.current?.updatePosition) {
+      if (audioRefs.current[circleIdx].current?.updatePosition) {
+        console.log("update position");
         audioRefs.current[circleIdx].current.updatePosition(newX, newY);
       }
-      
+
       // Force re-render to reflect position changes
       if (!raf.current) {
         raf.current = requestAnimationFrame(() => {
@@ -505,6 +506,27 @@ export default function BoundingBox() {
       }
     });
     
+     // 1) Stop everything first
+  // audioRefs.current.forEach(r => r.current?.stop())
+
+  // // 2) Jump each track to the right spot
+  // audioRefs.current.forEach(r => r.current?.seekTo?.(timeSec))
+
+  // // 3) Restart playback
+  // audioRefs.current.forEach(r => {
+  //   const ok = r.current?.play(timeInSeconds)
+  //   // 4) Re-assert loop flag on each
+  //   if (isLooping) {
+  //     r.current?.setLooping?.(true)
+  //   }
+  //   r.current?.play()
+
+  // })
+
+  // 5) Update your UI
+  // setCurrentTime(timeInSeconds)
+  // setIsPlaying(true)
+
     // Start playback again
     playAll();
 

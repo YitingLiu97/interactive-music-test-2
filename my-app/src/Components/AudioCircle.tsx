@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect,useImperativeHandle, useState, useRef, useCallback } from "react";
 import { useAudioCircle } from "@/app/utils/useAudioCircle";
 import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
@@ -166,9 +166,7 @@ export default function AudioCircle({
     }, [loaded, setPan, setVolume]);
 
     // Expose methods to the parent component via ref
-    useEffect(() => {
-        if (audioRef && audioRef.current === null) {
-            audioRef.current = {
+    useImperativeHandle(audioRef, () => ({        
                 play: (startTime?: number) => {
                     if (loaded) {
                         return play(startTime);
@@ -276,9 +274,7 @@ export default function AudioCircle({
                     }
                     return false;
                 }
-            };
-        }
-    }, [
+    }), [
         audioRef, play, stop, pause, seekTo, toggleLoop, setLooping, getDuration, 
         loaded, setPan, setVolume, position, boundingBox, circleSize, marginPercent, 
         silentVolume, getWidthAtYPosition
