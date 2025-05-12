@@ -1,18 +1,13 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
+import { InitState } from "./types";
 
-// State machine for tracking initialization
-type InitState =
-  | "idle" // Initial state
-  | "permission" // Requesting microphone permission
-  | "devices" // Enumerating devices
-  | "tone" // Initializing Tone.js
-  | "setup" // Setting up recorder
-  | "ready" // Ready to record
-  | "failed"; // Initialization failed
+// Handle device selection
+// Manage Tone.js initialization
+// Set up the basic Tone.UserMedia and Recorder
 
-export function useAudioRecorder() {
+export function useAudioSystem() {
   // ===== Device/Media States =====
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
@@ -38,17 +33,8 @@ export function useAudioRecorder() {
 
   // ===== Initialization Tracking =====
   const [initState, setInitState] = useState<InitState>("idle");
-  const [isReady, setIsReady] = useState<boolean>(false);
+  const [isRecorderReady, setIsRecorderReady] = useState<boolean>(false);
   const [initAttempts, setInitAttempts] = useState<number>(0);
-
-   // First, add these additional state variables to your hook:
-  const [isLoopRecording, setIsLoopRecording] = useState(false);
-  const [loopDuration, setLoopDuration] = useState(5); // Default 5 seconds
-  const [loopBuffer, setLoopBuffer] = useState<AudioBuffer | null>(null);
-  const loopPlayerRef = useRef<Tone.Player | null>(null);
-  const loopStartTimeRef = useRef<number>(0);
-
-
   // ========== DEVICE HANDLING ==========
 
   // Get available audio devices
@@ -214,7 +200,7 @@ export function useAudioRecorder() {
   // Set up Tone recorder with selected device
   const setupRecorder = useCallback(async () => {
     try {
-      setInitState("setup");
+      setInitState("recorder");
       console.log("Setting up audio recorder");
 
       if (!deviceId) {
@@ -261,7 +247,7 @@ export function useAudioRecorder() {
 
       console.log("Recorder setup complete");
       setInitState("ready");
-      setIsReady(true);
+      setIsRecorderReady(true);
       setError(null);
 
       return true;
@@ -269,7 +255,7 @@ export function useAudioRecorder() {
       console.error("Error setting up recorder:", error);
       setError(`Failed to set up recorder: ${error || "Unknown error"}`);
       setInitState("failed");
-      setIsReady(false);
+      setIsRecorderReady(false);
       return false;
     }
   }, [deviceId, isToneInitialized, initializeTone]);
@@ -279,7 +265,7 @@ export function useAudioRecorder() {
   // Start recording
   const startRecording = useCallback(async () => {
     try {
-      if (!isReady) {
+      if (!isRecorderReady) {
         console.error("Recorder not ready");
         return false;
       }
@@ -304,7 +290,7 @@ export function useAudioRecorder() {
       setError(`Failed to start recording: ${error || "Unknown error"}`);
       return false;
     }
-  }, [isReady]);
+  }, [isRecorderReady]);
 
   // Stop recording
   const stopRecording = useCallback(async () => {
@@ -385,11 +371,11 @@ export function useAudioRecorder() {
 
   // Effect to handle device changes
   useEffect(() => {
-    if (deviceId && isToneInitialized && !isReady) {
+    if (deviceId && isToneInitialized && !isRecorderReady) {
       console.log("Device ID and Tone.js ready, setting up recorder");
       setupRecorder();
     }
-  }, [deviceId, isToneInitialized, isReady, setupRecorder]);
+  }, [deviceId, isToneInitialized, isRecorderReady, setupRecorder]);
 
   // Cleanup effect
   useEffect(() => {
@@ -415,194 +401,15 @@ export function useAudioRecorder() {
     };
   }, [mediaStream, recordedBlob]);
 
-  // ========== LOOP RECORDING FUNCTIONALITY ==========
-
- 
-  // Function to start loop recording
-  const startLoopRecording = useCallback(async () => {
-    try {
-      if (!isReady) {
-        console.error("Recorder not ready");
-        return false;
-      }
-
-      if (!recorderRef.current) {
-        console.error("No recorder instance");
-        return false;
-      }
-
-      // Ensure Tone.js is running
-      if (Tone.context.state !== "running") {
-        console.log("Tone context not running, starting it");
-        await Tone.start();
-      }
-
-      // Start recording
-      console.log(`Starting loop recording (${loopDuration}s loop)`);
-      recorderRef.current.start();
-      setIsLoopRecording(true);
-      setIsRecording(true);
-      loopStartTimeRef.current = Date.now();
-
-      // Set a timeout to stop recording after loop duration
-      setTimeout(() => {
-        if (isLoopRecording) {
-          stopLoopRecording();
-        }
-      }, loopDuration * 1000);
-
-      return true;
-    } catch (error) {
-      console.error("Error starting loop recording:", error);
-      setError(
-        `Failed to start loop recording: ${error || "Unknown error"}`
-      );
-      return false;
-    }
-  }, [isReady, loopDuration]);
-
-  // Function to stop loop recording and process the loop
-  const stopLoopRecording = useCallback(async () => {
-    try {
-      if (!isLoopRecording || !recorderRef.current) {
-        console.error("Not loop recording or no recorder instance");
-        return null;
-      }
-
-      // Calculate actual duration
-      const actualDuration = (Date.now() - loopStartTimeRef.current) / 1000;
-      console.log(
-        `Stopping loop recording (actual duration: ${actualDuration.toFixed(
-          2
-        )}s)`
-      );
-
-      // Stop recording and get blob
-      const recording = await recorderRef.current.stop();
-      const url = URL.createObjectURL(recording);
-      const result = { blob: recording, url };
-
-      // Process the recording into a buffer
-      await processLoopBuffer(recording);
-
-      setRecordedBlob(result);
-      setIsRecording(false);
-      setIsLoopRecording(false);
-
-      return result;
-    } catch (error) {
-      console.error("Error stopping loop recording:", error);
-      setError(
-        `Failed to stop loop recording: ${error || "Unknown error"}`
-      );
-      setIsRecording(false);
-      setIsLoopRecording(false);
-      return null;
-    }
-  }, [isLoopRecording]);
-
-  // Process the recorded blob into an audio buffer
-  const processLoopBuffer = useCallback(async (blob: Blob) => {
-    try {
-      console.log("Processing loop recording into buffer");
-
-      // Convert blob to array buffer
-      const arrayBuffer = await blob.arrayBuffer();
-
-      // Decode the audio data
-      const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
-
-      console.log(
-        `Loop buffer created: ${audioBuffer.duration.toFixed(2)}s, ${
-          audioBuffer.numberOfChannels
-        } channels`
-      );
-      setLoopBuffer(audioBuffer);
-
-      // If we already have a player, update its buffer
-      if (loopPlayerRef.current) {
-        loopPlayerRef.current.buffer.set(audioBuffer);
-      } else {
-        // Create new player with the buffer
-        const player = new Tone.Player(audioBuffer).toDestination();
-        player.loop = true;
-        loopPlayerRef.current = player;
-      }
-
-      return audioBuffer;
-    } catch (error) {
-      console.error("Error processing loop buffer:", error);
-      setError(
-        `Failed to process audio loop: ${error || "Unknown error"}`
-      );
-      return null;
-    }
-  }, []);
-
-  // Play the loop
-  const playLoop = useCallback(async () => {
-    try {
-      if (!loopBuffer || !loopPlayerRef.current) {
-        console.error("No loop buffer available");
-        return false;
-      }
-
-      // Ensure Tone.js is running
-      if (Tone.context.state !== "running") {
-        console.log("Tone context not running, starting it");
-        await Tone.start();
-      }
-
-      console.log("Starting loop playback");
-      loopPlayerRef.current.start();
-      return true;
-    } catch (error) {
-      console.error("Error playing loop:", error);
-      setError(`Failed to play loop: ${error || "Unknown error"}`);
-      return false;
-    }
-  }, [loopBuffer]);
-
-  // Stop playing the loop
-  const stopLoop = useCallback(() => {
-    try {
-      if (!loopPlayerRef.current) {
-        console.error("No loop player available");
-        return false;
-      }
-
-      console.log("Stopping loop playback");
-      loopPlayerRef.current.stop();
-      return true;
-    } catch (error) {
-      console.error("Error stopping loop:", error);
-      setError(`Failed to stop loop: ${error || "Unknown error"}`);
-      return false;
-    }
-  }, []);
-
-  // Set the loop duration
-  const setLoopLength = useCallback((seconds: number) => {
-    if (seconds < 1 || seconds > 60) {
-      console.error("Loop duration must be between 1 and 60 seconds");
-      return false;
-    }
-
-    console.log(`Setting loop duration to ${seconds} seconds`);
-    setLoopDuration(seconds);
-    return true;
-  }, []);
-
-  // ========== RETURN VALUES ==========
-
   return {
     // State
     mediaStream,
     audioDevices,
     deviceIndex,
+    deviceId,
     isPermissionGranted,
     error,
-    isReady,
+    isRecorderReady,
     isRecording,
     isToneInitialized,
     recordedBlob,
@@ -618,22 +425,12 @@ export function useAudioRecorder() {
     startRecording,
     stopRecording,
 
-    // loop
-    isLoopRecording,
-    loopDuration,
-    loopBuffer,
-    startLoopRecording,
-    stopLoopRecording,
-    playLoop,
-    stopLoop,
-    setLoopLength,
-
     // Debug
-    getStatus: () => ({
+    audioSystemStatus: () => ({
       initState,
       deviceId,
       toneState: Tone.context.state,
-      isReady,
+      isRecorderReady,
       mediaStreamActive: mediaStream ? mediaStream.active : false,
     }),
   };
