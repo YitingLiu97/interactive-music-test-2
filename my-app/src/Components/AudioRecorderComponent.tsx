@@ -76,6 +76,10 @@ const AudioRecorderComponent = () => {
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
+    loopBlob,
+    loopBlobUrl,
+    exportLoopToBlob,
+
     startRecordingAtCurrentPosition,
     
     // Visualization data
@@ -184,7 +188,7 @@ const AudioRecorderComponent = () => {
   };
 
   // Reinitialize recorder
-  const handleStartRecorder = () => {
+  const handleStartRecorder = async () => {
     try {
       if (!isRecorderReady) {
         setStatusMessage("Recorder not ready. Please initialize first.");
@@ -192,8 +196,7 @@ const AudioRecorderComponent = () => {
       }
 
       setStatusMessage("Setting up recorder...");
-      const success = setupRecorder();
-
+      const success = await setupRecorder();
       if (success) {
         setStatusMessage(null);
       } else {
@@ -335,6 +338,11 @@ const AudioRecorderComponent = () => {
     }
   };
 
+  const handleLoopRecord = ()=>{
+    if(loopBuffer){
+      exportLoopToBlob();
+    }
+  }
   // Stop all loop activity
   const handleStopAll = () => {
     if (isLoopRecording) {
@@ -695,8 +703,21 @@ const AudioRecorderComponent = () => {
                       {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
                       {isLoopRecording ? "Stop Recording" : "Record"}
                     </Button>
-                  </Flex>
-                </Flex>
+                  {loopBlobUrl && (
+                    <>
+                    <Button
+                          onClick={handleLoopRecord}>
+                          Download
+                        </Button>
+                      <audio
+                        src={loopBlobUrl!}
+                        controls
+                        className="w-full mt-2"
+                      />  </>   
+                    ) 
+                  }
+                     </Flex>
+                     </Flex>
               </Card>
             ) : (
               /* Normal Recording Mode UI */

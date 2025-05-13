@@ -1,4 +1,5 @@
 // src/hooks/useAudioRecorder/index.ts
+'use '
 import { useAudioSystem } from './useAudioSystem';
 import { useLoopBuffer } from './useLoopBuffer';
 import { useEffect, useState, useCallback } from 'react';
@@ -25,6 +26,8 @@ export function useAudioRecorder() {
     
     // Errors
     error: audioSystemError,
+    initState,
+    initAttempts,
     
     // Functions
     initialize: initializeAudioSystem,
@@ -47,12 +50,19 @@ export function useAudioRecorder() {
     isLoopRecording,
     loopRecordingError,
     
+    // Download state
+    loopBlob,
+    loopBlobUrl,
+    isExportingLoop,
+    
     // Functions
     initializeLoopBuffer,
     startLoopRecordingAt,
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
+    startRecordingAtCurrentPosition,
+    exportLoopToBlob,
     
     // Visualization data
     getWaveformData,
@@ -107,30 +117,6 @@ export function useAudioRecorder() {
     }
   }, [initializeAudioSystem]);
   
-//   const getStatus = useCallback(() => {
-//   const status = {
-//     isPermissionGranted,
-//     isToneInitialized,
-//     isRecorderReady,
-//     isRecording,
-//     hasRecordedBlob: !!recordedBlob,
-//     deviceIndex,
-//     deviceCount: audioDevices.length,
-//     loopMode,
-//     hasLoopBuffer: !!loopBuffer,
-//     isLoopPlaybackActive,
-//     isLoopRecording,
-//     loopPosition: Math.round(loopPosition * 100) / 100
-//   };
-  
-//   console.table(status);
-//   return status;
-// }, [
-//   isPermissionGranted, isToneInitialized, isRecorderReady, 
-//   isRecording, recordedBlob, deviceIndex, audioDevices, 
-//   loopMode, loopBuffer, isLoopPlaybackActive, isLoopRecording, loopPosition
-// ]);
-
   // Return a unified API
   return {
     // State
@@ -143,7 +129,16 @@ export function useAudioRecorder() {
     isRecording,
     recordedBlob,
     error,
+    initState,
+    initAttempts,
+    
+    // Functions
+    initialize,
+    selectAudioDevice,
+    startRecording,
+    stopRecording,
     setupRecorder,
+    
     // Loop state
     loopBuffer,
     loopDuration,
@@ -151,11 +146,10 @@ export function useAudioRecorder() {
     isLoopPlaybackActive,
     isLoopRecording,
     
-    // Functions
-    initialize,
-    selectAudioDevice,
-    startRecording,
-    stopRecording,
+    // Loop download state
+    loopBlob,
+    loopBlobUrl,
+    isExportingLoop,
     
     // Loop functions
     initializeLoopBuffer,
@@ -163,6 +157,8 @@ export function useAudioRecorder() {
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
+    startRecordingAtCurrentPosition,
+    exportLoopToBlob,
     
     // Visualization
     getWaveformData,
@@ -172,7 +168,8 @@ export function useAudioRecorder() {
     status: {
       ...audioSystemStatus,
       hasLoopBuffer: !!loopBuffer,
-      loopDuration: loopDuration
+      loopDuration: loopDuration,
+      hasLoopRecording: !!loopBlob
     }
   };
 }
