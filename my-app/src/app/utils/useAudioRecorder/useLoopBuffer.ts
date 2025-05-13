@@ -35,7 +35,7 @@ export function useLoopBuffer({
   const loopStartTimeRef = useRef<number>(0);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  
+  const positionAnimationRef = useRef<number>(null);
   // ========== INITIALIZE LOOP BUFFER ==========
   
   // Create an empty loop buffer of the specified duration
@@ -276,7 +276,29 @@ export function useLoopBuffer({
       return false;
     }
   }, [isLoopRecording]);
+  // 1. Enhanced position tracking for smooth visualization
+const trackPosition = useCallback(() => {
+  if (!isLoopPlaybackActive || !loopBuffer) return;
   
+  // Use precise timing with Tone.js transport
+  const elapsed = Tone.Transport.seconds % loopDuration;
+  setLoopPosition(elapsed);
+  
+  // Request animation frame for smooth updates
+  positionAnimationRef.current = requestAnimationFrame(trackPosition);
+}, [isLoopPlaybackActive, loopBuffer, loopDuration]);
+
+// 2. Record at current position while loop is playing
+const startRecordingAtCurrentPosition = useCallback(async () => {
+  if (!loopBuffer || !isLoopPlaybackActive) return false;
+  
+  // Get current position in the loop
+  const currentPos = loopPosition;
+  
+  // Start recording at current position
+  return startLoopRecordingAt(currentPos);
+}, [loopBuffer, isLoopPlaybackActive, loopPosition, startLoopRecordingAt]);
+
   // Merge new recording into the existing loop buffer
   const mergeRecordingIntoLoop = useCallback(async (blob: Blob) => {
     try {
@@ -335,11 +357,28 @@ export function useLoopBuffer({
         console.log(`Overlaying ${recordingSampleCount} samples from recording at position ${startSample} for channel ${channel}`);
         
         // Replace specific segment with recording data
-        for (let i = 0; i < recordingSampleCount; i++) {
-          if (startSample + i < mergedData.length) {
-            mergedData[startSample + i] = newData[i];
-          }
+        // Smart mixing - fade in/out at boundaries for smoother transitions
+    for (let i = 0; i < recordingSampleCount; i++) {
+      if (startSample + i < mergedData.length) {
+        // Crossfade at boundaries (first and last 100ms)
+        const fadeLength = Math.min(4410, recordingSampleCount / 10); // ~100ms at 44.1kHz
+        
+        if (i < fadeLength) {
+          // Fade in - gradually increase new recording, decrease original
+          const fadeRatio = i / fadeLength;
+          mergedData[startSample + i] = newData[i] * fadeRatio + originalData[startSample + i] * (1 - fadeRatio);
+        } 
+        else if (i > recordingSampleCount - fadeLength) {
+          // Fade out - gradually decrease new recording, increase original
+          const fadeRatio = (recordingSampleCount - i) / fadeLength;
+          mergedData[startSample + i] = newData[i] * fadeRatio + originalData[startSample + i] * (1 - fadeRatio);
         }
+        else {
+          // Middle - replace completely
+          mergedData[startSample + i] = newData[i];
+        }
+      }
+    }
       }
       
       // Update loop buffer
@@ -551,6 +590,7 @@ export function useLoopBuffer({
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
+    startRecordingAtCurrentPosition,
     
     // Visualization
     getWaveformData,
