@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button, Flex, Text, Card, Badge } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -8,11 +8,13 @@ import {
   DotFilledIcon,
   ReloadIcon,
   DiscIcon,
-  LoopIcon, // Add this for loop functionality
-  TimerIcon, // Add this for loop functionality
+  LoopIcon,
+  TimerIcon,
 } from "@radix-ui/react-icons";
 import LoopControls from "./LoopControls";
+import LoopVisualizer from "./LoopVisualizer"; // Import the LoopVisualizer component
 import { useAudioRecorder } from "../app/utils/useAudioRecorder";
+
 // Simple Record Button Icon Component
 const RecordButtonIcon = () => (
   <svg
@@ -60,6 +62,7 @@ const AudioRecorderComponent = () => {
     stopRecording,
     setupRecorder,
   
+    // Loop-related state
     loopPosition,
     loopBuffer,
     loopDuration,
@@ -67,54 +70,59 @@ const AudioRecorderComponent = () => {
     isLoopRecording,
     loopRecordingError,
 
+    // Loop-related functions
     initializeLoopBuffer,
     startLoopRecordingAt,
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
-
-    getStatus,
+    startRecordingAtCurrentPosition,
+    
+    // Visualization data
+    getWaveformData,
+    getLoopPositionRatio,
   } = useAudioRecorder();
 
   // Local component state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
-    null
-  );
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(
-    null
-  );
-  const [statusMessage, setStatusMessage] = useState<string | null>(
-    "Please initialize audio system"
-  );
+  const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>("Please initialize audio system");
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [visualizationActive, setVisualizationActive] = useState(false);
   const [isLoopPlaying, setIsLoopPlaying] = useState(false);
   const [loopDurationInput, setLoopDurationInput] = useState("5");
   const [loopMode, setLoopMode] = useState(false);
   const [showLoopUI, setShowLoopUI] = useState(true);
-
+  const [recordingSegments, setRecordingSegments] = useState<{start: number; end: number | null}[]>([]);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  
   // Check for browser support of key features
   useEffect(() => {
     const checkBrowserSupport = () => {
-      const checks = {
-        audioContext:
-          typeof (window.AudioContext || window.webkitAudioContext()) !==
-          "undefined",
-        mediaDevices: !!navigator.mediaDevices,
-        getUserMedia: !!navigator.mediaDevices?.getUserMedia,
-        enumerateDevices: !!navigator.mediaDevices?.enumerateDevices,
-      };
+      try {
+        const AudioContextClass = window.AudioContext || (window as WindowWithAudioContext).webkitAudioContext;
+        
+        const checks = {
+          audioContext: typeof AudioContextClass !== "undefined",
+          mediaDevices: !!navigator.mediaDevices,
+          getUserMedia: !!navigator.mediaDevices?.getUserMedia,
+          enumerateDevices: !!navigator.mediaDevices?.enumerateDevices,
+        };
 
-      console.log("Browser support checks:", checks);
+        console.log("Browser support checks:", checks);
 
-      if (!checks.audioContext) {
-        setStatusMessage("Warning: Your browser doesn't support AudioContext");
-      }
+        if (!checks.audioContext) {
+          setStatusMessage("Warning: Your browser doesn't support AudioContext");
+        }
 
-      if (!checks.mediaDevices || !checks.getUserMedia) {
-        setStatusMessage("Warning: Your browser doesn't support media devices");
+        if (!checks.mediaDevices || !checks.getUserMedia) {
+          setStatusMessage("Warning: Your browser doesn't support media devices");
+        }
+      } catch (e) {
+        console.error("Error checking browser support:", e);
+        setStatusMessage("Warning: Error checking browser compatibility");
       }
     };
 
@@ -161,7 +169,22 @@ const AudioRecorderComponent = () => {
     }
   };
 
-  const handleStartRecorder = ()=>{
+  // Handle position change from visualizer
+  const handlePositionChange = (newPosition: number) => {
+    // Only allow position changes when not recording
+    if (!isLoopRecording) {
+      // If playing, restart from new position
+      if (isLoopPlaybackActive) {
+        stopLoopPlayback();
+        setTimeout(() => {
+          playLoopWithTracking(newPosition);
+        }, 100);
+      }
+    }
+  };
+
+  // Reinitialize recorder
+  const handleStartRecorder = () => {
     try {
       if (!isRecorderReady) {
         setStatusMessage("Recorder not ready. Please initialize first.");
@@ -180,7 +203,8 @@ const AudioRecorderComponent = () => {
       console.error("Setting up recorder error:", err);
       setStatusMessage(`Setting up recorder error: ${err || "Unknown error"}`);
     }
-  }
+  };
+
   // Handle recording start
   const handleStartRecording = async () => {
     try {
@@ -221,7 +245,6 @@ const AudioRecorderComponent = () => {
   };
 
   // Handle loop duration input
-  // Fix the handleLoopDurationChange function
   const handleLoopDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow positive numbers
     const value = e.target.value.replace(/[^0-9]/g, "");
@@ -230,10 +253,10 @@ const AudioRecorderComponent = () => {
     // Update the actual duration in the hook
     const duration = parseInt(value, 10);
     if (!isNaN(duration) && duration >= 1 && duration <= 60) {
-      // This function doesn't exist - change to initializeLoopBuffer
-      initializeLoopBuffer(duration); // Instead of setLoopLength(duration)
+      initializeLoopBuffer(duration);
     }
   };
+
   // Toggle loop mode
   const handleToggleLoopMode = () => {
     setLoopMode((prev) => !prev);
@@ -248,11 +271,21 @@ const AudioRecorderComponent = () => {
       }
 
       setStatusMessage(`Starting ${loopDuration} second loop recording...`);
-      const success = await startLoopRecordingAt();
+      
+      // Add a new recording segment that starts now
+      const newSegment = {
+        start: loopPosition,
+        end: null // Will be set when recording stops
+      };
+      setRecordingSegments(prev => [...prev, newSegment]);
+      
+      const success = await startLoopRecordingAt(loopPosition, loopDuration); // Pass the full loop duration
 
       if (success) {
-        setStatusMessage(`Recording ${loopDuration} second loop...`);
+        setStatusMessage(`Recording ${loopDuration} second loop at position ${loopPosition.toFixed(2)}s...`);
       } else {
+        // Remove the segment if recording failed to start
+        setRecordingSegments(prev => prev.slice(0, -1));
         setStatusMessage("Failed to start loop recording. Please try again.");
       }
     } catch (err) {
@@ -261,29 +294,63 @@ const AudioRecorderComponent = () => {
     }
   };
 
-  // Stop loop recording
-  const handleStopLoopRecording = async () => {
+  // Stop loop recording or start recording at current position
+  const handleLoopRecordToggle = async () => {
     try {
-      setStatusMessage("Stopping loop recording...");
-      const result = await stopLoopRecordingAndMerge(); // Use the correct function
+      if (isLoopRecording) {
+        // If currently recording, stop it
+        setStatusMessage("Stopping loop recording...");
+        const result = await stopLoopRecordingAndMerge();
+        
+        // Update the last recording segment with its end position
+        setRecordingSegments(prev => {
+          if (prev.length === 0) return prev;
+          const updated = [...prev];
+          updated[updated.length - 1].end = loopPosition;
+          return updated;
+        });
 
-      if (result) {
-        setStatusMessage("Loop recording complete. Ready to play.");
+        if (result) {
+          setStatusMessage("Loop recording complete. Ready to play.");
+        } else {
+          setStatusMessage("Failed to create loop.");
+        }
       } else {
-        setStatusMessage("Failed to create loop.");
+        // If not recording, start recording at current position
+        if (isLoopPlaybackActive) {
+          // If loop is playing, record at current position
+          await handleStartLoopRecording();
+        } else {
+          // If loop is not playing, start it and then record
+          setStatusMessage("Starting loop playback and recording...");
+          await playLoopWithTracking();
+          setTimeout(() => {
+            handleStartLoopRecording();
+          }, 300); // Small delay to ensure playback has started
+        }
       }
     } catch (err) {
-      console.error("Loop recording stop error:", err);
-      setStatusMessage(
-        `Error stopping loop recording: ${err || "Unknown error"}`
-      );
+      console.error("Loop recording toggle error:", err);
+      setStatusMessage(`Error with loop recording: ${err || "Unknown error"}`);
     }
+  };
+
+  // Stop all loop activity
+  const handleStopAll = () => {
+    if (isLoopRecording) {
+      stopLoopRecordingAndMerge();
+    }
+    if (isLoopPlaybackActive) {
+      stopLoopPlayback();
+      setIsLoopPlaying(false);
+    }
+    setStatusMessage("All loop operations stopped.");
   };
 
   // Toggle loop playback
   const handleToggleLoopPlayback = async () => {
     try {
-      if (isLoopPlaying) {
+      if (isLoopPlaybackActive) {
         await stopLoopPlayback();
         setIsLoopPlaying(false);
         setStatusMessage("Loop playback stopped.");
@@ -331,7 +398,6 @@ const AudioRecorderComponent = () => {
     source.connect(analyzer);
 
     const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-    // Debug the visualizer itself
     console.log("Visualization active with mediaStream:", mediaStream.id);
 
     let animationFrame: number;
@@ -388,25 +454,47 @@ const AudioRecorderComponent = () => {
     };
   }, [isRecording]);
 
-  // Handle playback
+  // Set up audio element for playback when recording is available
   useEffect(() => {
-    if(recordedBlob===null) return;
+    if (!recordedBlob?.url) return;
 
-    if (recordedBlob.url) {
-      const audio = new Audio(recordedBlob.url);
-      audio.addEventListener("ended", () => setIsPlaying(false));
-      setAudioElement(audio);
+    // Clean up previous audio element
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.src = '';
     }
 
+    const audio = new Audio(recordedBlob.url);
+    
+    audio.addEventListener("ended", () => {
+      setIsPlaying(false);
+    });
+    
+    audio.addEventListener("error", (e) => {
+      console.error("Audio element error:", e);
+      setStatusMessage("Error with audio playback");
+      setIsPlaying(false);
+    });
+    
+    setAudioElement(audio);
+
     return () => {
-      if (audioElement) {
-        audioElement.pause();
-        audioElement.src = "";
-        setIsPlaying(false);
+      if (audio) {
+        audio.pause();
+        audio.src = "";
       }
     };
-  }, []);
+  }, [recordedBlob]);
 
+  // Update waveform data when loop buffer changes
+  useEffect(() => {
+    if (typeof getWaveformData === 'function') {
+      const data = getWaveformData(200);
+      setWaveformData(data);
+    }
+  }, [loopBuffer, getWaveformData]);
+
+  // Toggle audio playback
   const togglePlayback = () => {
     if (!audioElement) return;
 
@@ -442,6 +530,10 @@ const AudioRecorderComponent = () => {
       return <Badge color="red">Recording</Badge>;
     }
 
+    if (isLoopRecording) {
+      return <Badge color="red">Loop Recording</Badge>;
+    }
+
     if (isRecorderReady) {
       return <Badge color="green">Ready</Badge>;
     }
@@ -458,11 +550,11 @@ const AudioRecorderComponent = () => {
   };
 
   return (
-    <Card className="p-6 max-w-md mx-auto bg-white rounded-xl shadow-lg">
+    <Card className="p-6 max-w-lg mx-auto bg-white rounded-xl shadow-lg">
       <Flex direction="column" gap="4">
         <Flex justify="between" align="center">
           <Text size="5" weight="bold">
-            Voice Recorder
+            Audio Recorder
           </Text>
           {getStatusBadge()}
         </Flex>
@@ -493,7 +585,8 @@ const AudioRecorderComponent = () => {
             <strong>Status:</strong> {initState} |<strong> Tone:</strong>{" "}
             {isToneInitialized ? "Initialized" : "Not Initialized"} |
             <strong> Ready:</strong> {isRecorderReady ? "Yes" : "No"} |
-            <strong> Devices:</strong> {audioDevices.length}
+            <strong> Devices:</strong> {audioDevices.length} |
+            <strong> LoopMode:</strong> {loopMode ? "On" : "Off"}
           </Text>
         </Card>
 
@@ -517,13 +610,31 @@ const AudioRecorderComponent = () => {
               </select>
             </Flex>
 
-            {loopMode && (
-              <Card className="p-3 bg-blue-50">
+            {visualizationActive && (
+              <Flex direction="column" gap="1">
+                <Text size="2" weight="medium">
+                  Audio Level:
+                </Text>
+                <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-100 ease-out ${
+                      isRecording || isLoopRecording ? "bg-red-500" : "bg-green-600"
+                    }`}
+                    style={{ width: `${audioLevel}%` }}
+                  ></div>
+                </div>
+              </Flex>
+            )}
+
+            {loopMode ? (
+              /* Loop Recording Mode UI */
+              <Card className="p-4 bg-blue-50 rounded-lg">
                 <Flex direction="column" gap="3">
-                  <Text size="2" weight="medium">
+                  <Text size="3" weight="medium">
                     Loop Recording Mode
                   </Text>
 
+                  {/* Loop Duration Input */}
                   <Flex gap="2" align="center">
                     <Text size="2">Duration:</Text>
                     <input
@@ -533,84 +644,128 @@ const AudioRecorderComponent = () => {
                       value={loopDurationInput}
                       onChange={handleLoopDurationChange}
                       className="w-16 px-2 py-1 border border-gray-300 rounded-md"
-                      disabled={isRecording}
+                      disabled={isLoopRecording || isLoopPlaybackActive}
                     />
                     <Text size="2">seconds</Text>
+                    
+                    <Button
+                      variant="soft"
+                      size="1"
+                      onClick={() => initializeLoopBuffer(parseInt(loopDurationInput))}
+                      disabled={isLoopRecording || isLoopPlaybackActive}
+                    >
+                      <ReloadIcon /> New Loop
+                    </Button>
                   </Flex>
 
-                  <Flex gap="2" justify="center">
-                    {isRecording ? (
-                      <Button color="red" onClick={handleStopLoopRecording}>
-                        <StopIcon /> Stop Loop Recording
-                      </Button>
-                    ) : (
-                      <Button
-                        color="blue"
-                        onClick={handleStartLoopRecording}
-                        disabled={!isRecorderReady}
-                      >
-                        <LoopIcon /> Record Loop
-                      </Button>
-                    )}
+                  {/* Loop Visualizer */}
+                  {loopBuffer && (
+                    <div className="mt-2 mb-2">
+                      <LoopVisualizer
+                        loopBuffer={loopBuffer}
+                        loopDuration={loopDuration}
+                        loopPosition={loopPosition}
+                        isLoopPlaybackActive={isLoopPlaybackActive}
+                        isLoopRecording={isLoopRecording}
+                        recordingSegments={recordingSegments}
+                        onPlayPause={handleToggleLoopPlayback}
+                        onRecord={handleLoopRecordToggle}
+                        onStop={handleStopAll}
+                        onPositionChange={handlePositionChange}
+                        waveformData={waveformData}
+                      />
+                    </div>
+                  )}
 
-                    {loopBuffer && (
-                      <Button
-                        variant="soft"
-                        color={isLoopPlaying ? "amber" : "green"}
-                        onClick={handleToggleLoopPlayback}
-                      >
-                        {isLoopPlaying ? <StopIcon /> : <PlayIcon />}
-                        {isLoopPlaying ? "Stop Loop" : "Play Loop"}
-                      </Button>
-                    )}
+                  {/* Loop Transport Controls */}
+                  <Flex gap="2" justify="center">
+                    <Button
+                      color={isLoopPlaybackActive ? "amber" : "green"}
+                      onClick={handleToggleLoopPlayback}
+                    >
+                      {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
+                      {isLoopPlaybackActive ? "Stop Loop" : "Play Loop"}
+                    </Button>
+                    
+                    <Button
+                      color={isLoopRecording ? "red" : "blue"}
+                      onClick={handleLoopRecordToggle}
+                      disabled={!loopBuffer}
+                    >
+                      {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
+                      {isLoopRecording ? "Stop Recording" : "Record"}
+                    </Button>
                   </Flex>
                 </Flex>
               </Card>
-            )}
+            ) : (
+              /* Normal Recording Mode UI */
+              <>
+                {isRecording && (
+                  <Flex align="center" gap="2">
+                    <DotFilledIcon className="text-red-500 animate-pulse" />
+                    <Text size="2" color="red">
+                      Recording: {formatDuration(recordingDuration)}
+                    </Text>
+                  </Flex>
+                )}
 
-            {visualizationActive && (
-              <Flex direction="column" gap="1">
-                <Text size="2" weight="medium">
-                  Audio Level:
-                </Text>
-                <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-100 ease-out ${
-                      isRecording ? "bg-red-500" : "bg-green-600"
-                    }`}
-                    style={{ width: `${audioLevel}%` }}
-                  ></div>
-                </div>
-              </Flex>
-            )}
+                <Flex gap="2" justify="center">
+                  <Button color="yellow" onClick={handleStartRecorder}>
+                    <DiscIcon /> Setup Recorder
+                  </Button>
+                  {isRecording ? (
+                    <Button color="red" onClick={handleStopRecording}>
+                      <StopIcon /> Stop Recording
+                    </Button>
+                  ) : (
+                    <Button
+                      color="red"
+                      onClick={handleStartRecording}
+                      disabled={!isRecorderReady}
+                    >
+                      <RecordButtonIcon /> Start Recording
+                    </Button>
+                  )}
+                </Flex>
 
-            {isRecording && (
-              <Flex align="center" gap="2">
-                <DotFilledIcon className="text-red-500 animate-pulse" />
-                <Text size="2" color="red">
-                  Recording: {formatDuration(recordingDuration)}
-                </Text>
-              </Flex>
+                {recordedBlob && (
+                  <Card className="p-3 bg-gray-50">
+                    <Flex direction="column" gap="2">
+                      <Text size="2" weight="medium">
+                        Recording:
+                      </Text>
+                      <Flex gap="2">
+                        <Button
+                          variant="soft"
+                          color={isPlaying ? "amber" : "green"}
+                          onClick={togglePlayback}
+                        >
+                          {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                          {isPlaying ? "Pause" : "Play"}
+                        </Button>
+                        <Button
+                          variant="soft"
+                          onClick={() => {
+                            const anchor = document.createElement("a");
+                            anchor.download = "recording.webm";
+                            anchor.href = recordedBlob.url;
+                            anchor.click();
+                          }}
+                        >
+                          Download
+                        </Button>
+                      </Flex>
+                      <audio
+                        src={recordedBlob.url}
+                        controls
+                        className="w-full mt-2"
+                      />
+                    </Flex>
+                  </Card>
+                )}
+              </>
             )}
-
-            <Flex gap="2" justify="center">
-               <Button color="yellow" onClick={handleStartRecorder}>
-                  <DiscIcon /> Start Recorder
-                </Button>
-              {isRecording ? (
-                <Button color="red" onClick={handleStopRecording}>
-                  <StopIcon /> Stop Recording
-                </Button>
-              ) : (
-                <Button
-                  color="red"
-                  onClick={handleStartRecording}
-                  disabled={!isRecorderReady}
-                >
-                  <RecordButtonIcon /> Start Recording
-                </Button>
-              )}
-            </Flex>
 
             <Flex justify="center" mt="2">
               <Button
@@ -623,42 +778,6 @@ const AudioRecorderComponent = () => {
                 {loopMode ? "Switch to Normal Mode" : "Switch to Loop Mode"}
               </Button>
             </Flex>
-
-            {recordedBlob && (
-              <Card className="p-3 bg-gray-50">
-                <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium">
-                    Recording:
-                  </Text>
-                  <Flex gap="2">
-                    <Button
-                      variant="soft"
-                      color={isPlaying ? "amber" : "green"}
-                      onClick={togglePlayback}
-                    >
-                      {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                      {isPlaying ? "Pause" : "Play"}
-                    </Button>
-                    <Button
-                      variant="soft"
-                      onClick={() => {
-                        const anchor = document.createElement("a");
-                        anchor.download = "recording.webm";
-                        anchor.href = recordedBlob.url;
-                        anchor.click();
-                      }}
-                    >
-                      Download
-                    </Button>
-                  </Flex>
-                  <audio
-                    src={recordedBlob.url}
-                    controls
-                    className="w-full mt-2"
-                  />
-                </Flex>
-              </Card>
-            )}
 
             <Text size="2" color="gray">
               {mediaStream ? (
@@ -674,32 +793,6 @@ const AudioRecorderComponent = () => {
           </>
         )}
       </Flex>
-
-      {/* Toggle for loop UI */}
-      <Button
-        variant="soft"
-        color={showLoopUI ? "blue" : "gray"}
-        onClick={() => setShowLoopUI(!showLoopUI)}
-        className="mt-4"
-      >
-        {showLoopUI ? "Hide Loop Controls" : "Show Loop Controls"}
-      </Button>
-
-      {/* Conditionally render loop controls */}
-      {showLoopUI && (
-        <LoopControls
-          loopDuration={loopDuration}
-          loopPosition={loopPosition}
-          isLoopPlaybackActive={isLoopPlaybackActive}
-          isLoopRecording={isLoopRecording}
-          initializeLoopBuffer={initializeLoopBuffer}
-          startLoopRecordingAt={startLoopRecordingAt}
-          playLoopWithTracking={playLoopWithTracking}
-          stopLoopPlayback={stopLoopPlayback}
-          // Add error info if needed
-          loopRecordingError={statusMessage}
-        />
-      )}
     </Card>
   );
 };

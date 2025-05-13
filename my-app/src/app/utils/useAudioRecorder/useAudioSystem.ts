@@ -317,51 +317,112 @@ export function useAudioSystem() {
   // ========== RECORDING FUNCTIONS ==========
 
   // Start recording
+// Start recording
 const startRecording = useCallback(async () => {
   if (!isRecorderReady || !micRef.current) {
     console.error("Recorder not ready or mic missing");
-      return false;
+    return false;
   }
 
-  await  setupRecorder();
-
-  // 1) dispose any previous recorder
-  if (recorderRef.current) {
-    try { recorderRef.current.dispose(); } catch (e) {}
-  }
-
-  // 2) create & hook up a brand-new recorder
-  const freshRecorder = new Tone.Recorder({ mimeType: "audio/webm" });
-  micRef.current.connect(freshRecorder);
-  recorderRef.current = freshRecorder;
-
-  // 3) start
-  await Tone.start();
-  freshRecorder.start();
-  recordingStartTimeRef.current = Date.now();
-  setIsRecording(true);
-
-  return true;
-}, [isRecorderReady]);
-
-  // Stop recording
-const stopRecording = useCallback(async () => {
-  if (!isRecording || !recorderRef.current) return null;
-
-  const rawBlob = await recorderRef.current.stop();
-  const newUrl = URL.createObjectURL(rawBlob);
-
-  // *now* it’s safe to clear the old URL:
+  // If there's a previous recording, revoke its URL
   if (recordedBlob?.url) {
     URL.revokeObjectURL(recordedBlob.url);
+    setRecordedBlob(null);
   }
 
-  setRecordedBlob({ blob: rawBlob, url: newUrl });
-  setIsRecording(false);
-  return { blob: rawBlob, url: newUrl };
-}, [isRecording, recordedBlob]);
+  try {
+    // We don't need to call setupRecorder() every time - that's overkill
+    // Instead, just create a new recorder instance with the existing mic
 
+    // 1) dispose any previous recorder if it exists
+    if (recorderRef.current) {
+      try { 
+        recorderRef.current.dispose(); 
+      } catch (e) {
+        console.warn("Error disposing previous recorder:", e);
+      }
+    }
 
+    // 2) create a brand-new recorder
+    console.log("Creating fresh recorder for this recording session");
+    const freshRecorder = new Tone.Recorder({ mimeType: "audio/webm" });
+    
+    // 3) connect mic to the new recorder
+    if (micRef.current.state !== "started") {
+      console.log("Mic not started, reopening...");
+      if (deviceId) await micRef.current.open(deviceId);
+    }
+    
+    micRef.current.connect(freshRecorder);
+    recorderRef.current = freshRecorder;
+
+    // 4) ensure Tone.js context is running
+    if (Tone.context.state !== "running") {
+      console.log("Starting Tone.js context");
+      await Tone.start();
+    }
+    
+    // 5) start recording
+    console.log("Starting recording with fresh recorder");
+    freshRecorder.start();
+    recordingStartTimeRef.current = Date.now();
+    setIsRecording(true);
+
+    return true;
+  } catch (error) {
+    console.error("Error starting recording:", error);
+    setError(`Failed to start recording: ${error || "Unknown error"}`);
+    return false;
+  }
+}, [isRecorderReady, deviceId, recordedBlob]);
+
+// Stop recording
+const stopRecording = useCallback(async () => {
+  if (!isRecording || !recorderRef.current) {
+    console.error("Not recording or no recorder instance");
+    return null;
+  }
+
+  try {
+    // Check if minimum recording duration has elapsed
+    const recordingDuration = Date.now() - recordingStartTimeRef.current;
+    if (recordingDuration < 500) {
+      console.log("Recording too short, waiting to ensure data capture");
+      await new Promise(resolve => 
+        setTimeout(resolve, 500 - recordingDuration)
+      );
+    }
+
+    console.log("Stopping recording after " + recordingDuration + "ms");
+
+    // Stop recording and get blob
+    const rawBlob = await recorderRef.current.stop();
+    console.log("Recording stopped, blob type:", 
+              rawBlob.type, "size:", rawBlob.size);
+
+    // Verify we got a valid recording
+    if (!rawBlob || rawBlob.size === 0) {
+      console.error("Empty recording blob! Audio not captured.");
+      setError("Recording failed - no audio captured. Try again.");
+      setIsRecording(false);
+      return null;
+    }
+
+    // Create the blob URL
+    const newUrl = URL.createObjectURL(rawBlob);
+    
+    const result = { blob: rawBlob, url: newUrl };
+    setRecordedBlob(result);
+    setIsRecording(false);
+
+    return result;
+  } catch (error) {
+    console.error("Error stopping recording:", error);
+    setError(`Failed to stop recording: ${error || "Unknown error"}`);
+    setIsRecording(false);
+    return null;
+  }
+}, [isRecording]);
   // ========== INITIALIZATION SEQUENCE ==========
 
   // Complete initialization sequence

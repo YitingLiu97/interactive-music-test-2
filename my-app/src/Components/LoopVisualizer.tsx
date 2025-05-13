@@ -1,7 +1,26 @@
-// Enhanced LoopVisualizer.tsx
 import React, { useRef, useEffect, useState } from 'react';
-import { Button, Flex, Text, Slider } from '@radix-ui/themes';
-import { PlayIcon, PauseIcon, RecordButtonIcon, StopIcon } from '@radix-ui/react-icons';
+import { Button, Flex, Text } from '@radix-ui/themes';
+import { PlayIcon, PauseIcon, StopIcon } from '@radix-ui/react-icons';
+
+// Simple Record Button Icon Component
+const RecordButtonIcon = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 15 15"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle
+      cx="7.5"
+      cy="7.5"
+      r="7"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1"
+    />
+  </svg>
+);
 
 interface LoopVisualizerProps {
   // Loop properties
@@ -23,7 +42,10 @@ interface LoopVisualizerProps {
   onPositionChange?: (position: number) => void;
   
   // Optional waveform data for visualization
-  waveformData?: Float32Array[];
+  waveformData?: number[] | Float32Array[];
+  
+  // Audio level for real-time reactivity (new prop)
+  audioLevel?: number;
 }
 
 const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
@@ -37,22 +59,40 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   onRecord,
   onStop,
   onPositionChange,
-  waveformData
+  waveformData,
+  audioLevel = 0
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   
+  // Audio level position (for animation)
+  const [levelX, setLevelX] = useState(0);
+  
+  // Update level X position based on current loop position
+  useEffect(() => {
+    if (canvasRef.current) {
+      const width = canvasRef.current.width;
+      setLevelX((loopPosition / loopDuration) * width);
+    }
+  }, [loopPosition, loopDuration]);
+  
   // Calculate waveform data from buffer if not provided
   const getWaveformData = () => {
-    if (waveformData) return waveformData;
-    
-    if (!loopBuffer) return [new Float32Array(0)];
-    
-    const channelData: Float32Array[] = [];
-    for (let i = 0; i < loopBuffer.numberOfChannels; i++) {
-      channelData.push(loopBuffer.getChannelData(i));
+    if (waveformData) {
+      if (Array.isArray(waveformData) && waveformData.length > 0) {
+        if (waveformData[0] instanceof Float32Array) {
+          // It's an array of Float32Arrays, use the first one
+          return waveformData[0];
+        }
+        // It's a simple array of numbers
+        return waveformData;
+      }
     }
-    return channelData;
+    
+    if (!loopBuffer) return new Float32Array(0);
+    
+    // If we have a buffer but no waveform data, extract from buffer
+    return loopBuffer.getChannelData(0);
   };
   
   // Draw the canvas with all visualization elements
@@ -119,9 +159,8 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     
     // Draw waveform if available
     const data = getWaveformData();
-    if (data.length > 0 && data[0].length > 0) {
-      const channelData = data[0]; // Use first channel for visualization
-      const samplesPerPixel = Math.floor(channelData.length / width);
+    if (data && data.length > 0) {
+      const samplesPerPixel = Math.floor(data.length / width);
       
       ctx.strokeStyle = '#3b82f6'; // Blue waveform
       ctx.lineWidth = 1.5;
@@ -134,8 +173,9 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
       // Draw waveform
       for (let x = 0; x < width; x++) {
         const sampleIndex = Math.floor(x * samplesPerPixel);
-        if (sampleIndex < channelData.length) {
-          const sampleValue = channelData[sampleIndex];
+        if (sampleIndex < data.length) {
+          const sampleValue = typeof data[sampleIndex] === 'number' ? 
+            data[sampleIndex] : 0;
           // Scale to half the canvas height
           const y = centerY - (sampleValue * (height / 2) * 0.9);
           ctx.lineTo(x, y);
@@ -146,6 +186,45 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     
     // Draw current position indicator (playhead)
     const playheadX = (loopPosition / loopDuration) * width;
+    
+    // Draw audio level indicator at playhead if recording
+    if (isLoopRecording && audioLevel > 0) {
+      // Calculate level height as percentage of canvas height
+      const levelHeight = (audioLevel / 100) * (height * 0.8);
+      
+      // Draw level meter at current position
+      const levelBarWidth = 8; // Width of level indicator
+      
+      // Gradient for level meter
+      const gradient = ctx.createLinearGradient(0, height, 0, height - levelHeight);
+      gradient.addColorStop(0, '#ef4444'); // Red at bottom
+      gradient.addColorStop(0.6, '#f97316'); // Orange in middle
+      gradient.addColorStop(1, '#22c55e'); // Green at top
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(
+        playheadX - levelBarWidth / 2, 
+        height - levelHeight, 
+        levelBarWidth, 
+        levelHeight
+      );
+      
+      // Draw outline
+      ctx.strokeStyle = '#6b7280';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        playheadX - levelBarWidth / 2, 
+        height - levelHeight, 
+        levelBarWidth, 
+        levelHeight
+      );
+      
+      // Add "ripple" effect at current recording position
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'; // Transparent red
+      ctx.arc(playheadX, height/2, audioLevel * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
     
     // Playhead line
     ctx.strokeStyle = isLoopRecording ? '#ef4444' : '#3b82f6'; // Red if recording, blue otherwise
@@ -170,6 +249,17 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
         10, 
         20
       );
+      
+      // Add audio level text when recording
+      if (isLoopRecording) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(
+          `Level: ${audioLevel}%`, 
+          90, 
+          20
+        );
+      }
     }
     
     // Current time indicator
@@ -188,7 +278,9 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     isLoopRecording, 
     isLoopPlaybackActive, 
     recordingSegments,
-    waveformData
+    waveformData,
+    audioLevel,
+    levelX
   ]);
   
   // Handle canvas mouse events for position control
@@ -258,7 +350,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
           variant="soft" 
           color={isLoopPlaybackActive ? "amber" : "green"} 
           onClick={onPlayPause}
-          disabled={false}
         >
           {isLoopPlaybackActive ? <PauseIcon /> : <PlayIcon />}
           {isLoopPlaybackActive ? "Pause" : "Play"}
