@@ -732,9 +732,6 @@ const AudioRecorderComponent = () => {
                 )}
 
                 <Flex gap="2" justify="center">
-                  <Button color="yellow" onClick={handleStartRecorder}>
-                    <DiscIcon /> Setup Recorder
-                  </Button>
                   {isRecording ? (
                     <Button color="red" onClick={handleStopRecording}>
                       <StopIcon /> Stop Recording
