@@ -31,6 +31,7 @@ export function useAudioRecorder() {
     selectAudioDevice,
     startRecording,
     stopRecording,
+    setupRecorder,
     
     // Status
     audioSystemStatus
@@ -106,6 +107,30 @@ export function useAudioRecorder() {
     }
   }, [initializeAudioSystem]);
   
+//   const getStatus = useCallback(() => {
+//   const status = {
+//     isPermissionGranted,
+//     isToneInitialized,
+//     isRecorderReady,
+//     isRecording,
+//     hasRecordedBlob: !!recordedBlob,
+//     deviceIndex,
+//     deviceCount: audioDevices.length,
+//     loopMode,
+//     hasLoopBuffer: !!loopBuffer,
+//     isLoopPlaybackActive,
+//     isLoopRecording,
+//     loopPosition: Math.round(loopPosition * 100) / 100
+//   };
+  
+//   console.table(status);
+//   return status;
+// }, [
+//   isPermissionGranted, isToneInitialized, isRecorderReady, 
+//   isRecording, recordedBlob, deviceIndex, audioDevices, 
+//   loopMode, loopBuffer, isLoopPlaybackActive, isLoopRecording, loopPosition
+// ]);
+
   // Return a unified API
   return {
     // State
@@ -118,7 +143,7 @@ export function useAudioRecorder() {
     isRecording,
     recordedBlob,
     error,
-    
+    setupRecorder,
     // Loop state
     loopBuffer,
     loopDuration,

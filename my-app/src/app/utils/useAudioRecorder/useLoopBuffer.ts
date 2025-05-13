@@ -1,4 +1,5 @@
-// src/hooks/useAudioRecorder/useLoopBuffer.ts
+// Enhanced useLoopBuffer.ts with fixes for loop recording and playback issues
+'use client'
 import { useState, useRef, useCallback, useEffect } from 'react';
 import * as Tone from 'tone';
 
@@ -30,8 +31,10 @@ export function useLoopBuffer({
   // ===== Refs =====
   const loopPlayerRef = useRef<Tone.Player | null>(null);
   const segmentRecorderRef = useRef<Tone.Recorder | null>(null);
+  const micRef = useRef<Tone.UserMedia | null>(null);
   const loopStartTimeRef = useRef<number>(0);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   
   // ========== INITIALIZE LOOP BUFFER ==========
   
@@ -67,14 +70,20 @@ export function useLoopBuffer({
       setLoopBuffer(newBuffer);
       setLoopDuration(duration);
       
-      // Create or update player
+      // Cleanup and recreate player
       if (loopPlayerRef.current) {
-        loopPlayerRef.current.buffer.set(newBuffer);
-      } else {
-        const player = new Tone.Player(newBuffer).toDestination();
-        player.loop = true;
-        loopPlayerRef.current = player;
+        try {
+          loopPlayerRef.current.stop();
+          loopPlayerRef.current.dispose();
+        } catch (e) {
+          console.warn("Error disposing player:", e);
+        }
       }
+      
+      // Create new player
+      const player = new Tone.Player(newBuffer).toDestination();
+      player.loop = true;
+      loopPlayerRef.current = player;
       
       console.log("Empty loop buffer created successfully");
       return true;
@@ -94,24 +103,50 @@ export function useLoopBuffer({
       return null;
     }
     
+    // Clean up previous recorder if it exists
     if (segmentRecorderRef.current) {
-      return segmentRecorderRef.current;
+      try {
+        segmentRecorderRef.current.dispose();
+      } catch (e) {
+        console.warn("Error disposing segment recorder:", e);
+      }
+      segmentRecorderRef.current = null;
+    }
+    
+    // Clean up previous mic if it exists
+    if (micRef.current) {
+      try {
+        micRef.current.disconnect();
+        micRef.current.close();
+      } catch (e) {
+        console.warn("Error closing mic:", e);
+      }
+      micRef.current = null;
     }
     
     try {
-      // Create a new recorder
-      const recorder = new Tone.Recorder();
+      // Create a new recorder with explicit format
+      console.log("Creating new segment recorder");
+      const recorder = new Tone.Recorder({
+        mimeType: "audio/webm" // Most widely supported format
+      });
       segmentRecorderRef.current = recorder;
       
       // Create and connect user media if needed
       if (deviceId) {
+        console.log(`Creating UserMedia for device ${deviceId}`);
         const mic = new Tone.UserMedia();
+        micRef.current = mic;
+        
         mic.open(deviceId).then(() => {
+          console.log("Mic opened, connecting to recorder");
           mic.connect(recorder);
         }).catch(err => {
           console.error("Error connecting mic to segment recorder:", err);
           setLoopRecordingError(`Microphone connection error: ${err.message}`);
         });
+      } else {
+        console.error("No device ID available for segment recorder");
       }
       
       return recorder;
@@ -123,7 +158,7 @@ export function useLoopBuffer({
   }, [isRecorderReady, deviceId]);
   
   // Start recording a segment at a specific position
-  const startLoopRecordingAt = useCallback(async (startPosition: number, duration: number) => {
+  const startLoopRecordingAt = useCallback(async (startPosition: number = 0, duration: number = 1) => {
     try {
       if (!loopBuffer) {
         console.error("No loop buffer available");
@@ -177,6 +212,7 @@ export function useLoopBuffer({
       }
       
       // Start recording
+      console.log("Starting segment recorder");
       recorder.start();
       setIsLoopRecording(true);
       loopStartTimeRef.current = Date.now();
@@ -184,6 +220,7 @@ export function useLoopBuffer({
       // Set a timeout to stop recording after duration
       setTimeout(() => {
         if (isLoopRecording) {
+          console.log("Auto-stopping loop recording after timeout");
           stopLoopRecordingAndMerge();
         }
       }, actualDuration * 1000);
@@ -216,6 +253,15 @@ export function useLoopBuffer({
       
       // Stop recording and get blob
       const recording = await recorder.stop();
+      console.log("Recording stopped, blob type:", recording.type, "size:", recording.size);
+      
+      // Validate recording
+      if (!recording || recording.size === 0) {
+        console.error("Empty recording blob");
+        setLoopRecordingError("Recording failed - no audio captured");
+        setIsLoopRecording(false);
+        return false;
+      }
       
       // Process and merge recording into loop
       const success = await mergeRecordingIntoLoop(recording);
@@ -246,6 +292,7 @@ export function useLoopBuffer({
       
       // Decode the audio data
       const newRecordingBuffer = await Tone.context.decodeAudioData(arrayBuffer);
+      console.log(`Decoded recording: ${newRecordingBuffer.duration.toFixed(2)}s, ${newRecordingBuffer.numberOfChannels} channels`);
       
       // Create a new buffer for the merged result
       const mergedBuffer = Tone.context.createBuffer(
@@ -261,32 +308,37 @@ export function useLoopBuffer({
         loopBuffer.length
       );
       
+      console.log(`Merging from sample ${startSample} to ${endSample} (out of ${loopBuffer.length} total samples)`);
+      
       // For each channel, copy data appropriately
       for (let channel = 0; channel < loopBuffer.numberOfChannels; channel++) {
         const originalData = loopBuffer.getChannelData(channel);
-        const newData = newRecordingBuffer.getChannelData(channel);
+        
+        // Handle case where recording might have fewer channels
+        const newData = channel < newRecordingBuffer.numberOfChannels ? 
+                        newRecordingBuffer.getChannelData(channel) : 
+                        new Float32Array(newRecordingBuffer.length).fill(0);
+                        
         const mergedData = mergedBuffer.getChannelData(channel);
         
-        // Copy part before recording (preserve original)
-        for (let i = 0; i < startSample; i++) {
+        // Copy original data as the base layer
+        for (let i = 0; i < loopBuffer.length; i++) {
           mergedData[i] = originalData[i];
         }
         
-        // Copy the new recording (overwrite in the middle section)
+        // Calculate how many samples to copy from the new recording
         const recordingSampleCount = Math.min(
           newRecordingBuffer.length,
           endSample - startSample
         );
         
+        console.log(`Overlaying ${recordingSampleCount} samples from recording at position ${startSample} for channel ${channel}`);
+        
+        // Replace specific segment with recording data
         for (let i = 0; i < recordingSampleCount; i++) {
           if (startSample + i < mergedData.length) {
             mergedData[startSample + i] = newData[i];
           }
-        }
-        
-        // Copy part after recording (preserve original)
-        for (let i = startSample + recordingSampleCount; i < loopBuffer.length; i++) {
-          mergedData[i] = originalData[i];
         }
       }
       
@@ -300,9 +352,25 @@ export function useLoopBuffer({
       }
       setLoopChannelData(channelData);
       
-      // Update player
+      // Update player with new buffer
       if (loopPlayerRef.current) {
+        // Need to stop player first if active
+        const wasPlaying = isLoopPlaybackActive;
+        if (wasPlaying) {
+          loopPlayerRef.current.stop();
+        }
+        
+        // Set new buffer 
         loopPlayerRef.current.buffer.set(mergedBuffer);
+        
+        // Restart if it was playing
+        if (wasPlaying) {
+          setTimeout(() => {
+            if (loopPlayerRef.current) {
+              loopPlayerRef.current.start();
+            }
+          }, 100);
+        }
       }
       
       console.log("Successfully merged recording into loop");
@@ -312,7 +380,7 @@ export function useLoopBuffer({
       setLoopRecordingError(`Failed to merge recording: ${error || "Unknown error"}`);
       return false;
     }
-  }, [loopBuffer, loopRecordStartPosition, loopRecordEndPosition]);
+  }, [loopBuffer, loopRecordStartPosition, loopRecordEndPosition, isLoopPlaybackActive]);
   
   // ========== PLAYBACK WITH POSITION TRACKING ==========
   
@@ -437,13 +505,31 @@ export function useLoopBuffer({
       
       // Stop and dispose player
       if (loopPlayerRef.current) {
-        loopPlayerRef.current.stop();
-        loopPlayerRef.current.dispose();
+        try {
+          loopPlayerRef.current.stop();
+          loopPlayerRef.current.dispose();
+        } catch (e) {
+          console.warn("Error disposing player:", e);
+        }
       }
       
       // Dispose recorder
       if (segmentRecorderRef.current) {
-        segmentRecorderRef.current.dispose();
+        try {
+          segmentRecorderRef.current.dispose();
+        } catch (e) {
+          console.warn("Error disposing recorder:", e);
+        }
+      }
+      
+      // Close mic
+      if (micRef.current) {
+        try {
+          micRef.current.disconnect();
+          micRef.current.close();
+        } catch (e) {
+          console.warn("Error closing mic:", e);
+        }
       }
     };
   }, []);

@@ -1,8 +1,9 @@
 // 1. LoopControls.tsx - Just the loop controls
-import React, { useState } from 'react';
+'use client'
+import React, { useState, useEffect } from 'react';
 import { Button, Flex, Text, Card } from '@radix-ui/themes';
 import { ReloadIcon, TimerIcon, PlayIcon, StopIcon } from '@radix-ui/react-icons';
-
+import LoopVisualizer from './LoopVisualizer';
 interface LoopControlsProps {
   loopDuration: number; 
   loopPosition: number;
@@ -12,6 +13,7 @@ interface LoopControlsProps {
   startLoopRecordingAt: (startPosition: number, duration: number) => Promise<boolean>;
   playLoopWithTracking: () => Promise<boolean>;
   stopLoopPlayback: () => boolean;
+  loopRecordingError: string | null;
 }
 
 const LoopControls: React.FC<LoopControlsProps> = ({
@@ -20,6 +22,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
   isLoopPlaybackActive,
   isLoopRecording,
   initializeLoopBuffer,
+
   startLoopRecordingAt,
   playLoopWithTracking,
   stopLoopPlayback
@@ -29,7 +32,49 @@ const LoopControls: React.FC<LoopControlsProps> = ({
   const [recordSegmentStart, setRecordSegmentStart] = useState(0);
   const [recordSegmentDuration, setRecordSegmentDuration] = useState(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+    
+  // New state for tracking recording segments
+  const [recordingSegments, setRecordingSegments] = useState<Array<{start: number; end: number | null}>>([]);
   
+  // Example waveform data (replace with actual data from your audio buffer)
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+    useEffect(() => {
+    // Generate placeholder waveform data
+    const generateWaveform = () => {
+      const data = [];
+      for (let i = 0; i < 1000; i++) {
+        const x = i / 1000;
+        const y = Math.sin(x * Math.PI * 20) * 0.3 + Math.sin(x * Math.PI * 7) * 0.4;
+        data.push(y);
+      }
+      return data;
+    };
+    
+    setWaveformData(generateWaveform());
+  }, []);
+  
+  // Track recording segments
+  useEffect(() => {
+    if (isLoopRecording && recordingSegments.length === 0) {
+      // If we just started recording, add a new segment
+      setRecordingSegments([{ start: loopPosition, end: null }]);
+    } else if (isLoopRecording && recordingSegments.length > 0) {
+      // Update the current recording segment's end position
+      setRecordingSegments(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1].end = null; // Still recording
+        return updated;
+      });
+    } else if (!isLoopRecording && recordingSegments.length > 0 && recordingSegments[recordingSegments.length - 1].end === null) {
+      // If we just stopped recording, update the end position
+      setRecordingSegments(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1].end = loopPosition;
+        return updated;
+      });
+    }
+  }, [isLoopRecording, loopPosition]);
+
   // Handle creating a new loop
   const handleCreateNewLoop = async () => {
     try {
@@ -39,7 +84,8 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       const success = await initializeLoopBuffer(duration);
       if (success) {
         setStatusMessage("New loop created");
-      } else {
+          setRecordingSegments([]);
+} else {
         setStatusMessage("Failed to create new loop");
       }
     } catch (err) {
@@ -55,6 +101,11 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       const success = await startLoopRecordingAt(recordSegmentStart, recordSegmentDuration);
       if (!success) {
         setStatusMessage("Failed to start recording");
+      }else{
+           setRecordingSegments(prev => [
+          ...prev, 
+          { start: recordSegmentStart, end: null }
+        ]);
       }
     } catch (err) {
       console.error("Error starting recording:", err);
@@ -90,6 +141,27 @@ const LoopControls: React.FC<LoopControlsProps> = ({
         <Text size="2" className="text-amber-500 mb-2">{statusMessage}</Text>
       )}
       
+        {/* Add the new visualizer at the top */}
+      <Card className="p-4 bg-white border border-gray-200 mb-4">
+        <Text size="2" weight="medium" mb="2">Loop Visualizer</Text>
+        <LoopVisualizer
+          waveformData={waveformData}
+          loopDuration={loopDuration}
+          loopPosition={loopPosition}
+          isLoopRecording={isLoopRecording}
+          isLoopPlaybackActive={isLoopPlaybackActive}
+          recordingSegments={recordingSegments}
+        />
+        {/* Position indicator */}
+        <Flex justify="between" mt="2">
+          <Text size="2">0s</Text>
+          <Text size="2">
+            Position: {loopPosition.toFixed(1)}s / {loopDuration}s
+          </Text>
+          <Text size="2">{loopDuration}s</Text>
+        </Flex>
+      </Card>
+
       {/* Loop Configuration */}
       <Flex direction="column" gap="3">
         <Flex justify="between" align="center">
