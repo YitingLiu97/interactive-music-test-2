@@ -1,9 +1,9 @@
 // Complete updated LoopControls component with fixed LoopVisualizer usage
 
-import React, { useState, useEffect } from 'react';
-import { Button, Flex, Text, Card } from '@radix-ui/themes';
-import { ReloadIcon, PlayIcon, StopIcon } from '@radix-ui/react-icons';
-import LoopVisualizer from './LoopVisualizer'; // Make sure this import is correct
+import React, { useState, useEffect } from "react";
+import { Button, Flex, Text, Card } from "@radix-ui/themes";
+import { ReloadIcon, PlayIcon, StopIcon } from "@radix-ui/react-icons";
+import LoopVisualizer from "./LoopVisualizer"; // Make sure this import is correct
 
 // Simple Record Button Icon Component
 const RecordButtonIcon = () => (
@@ -26,25 +26,31 @@ const RecordButtonIcon = () => (
 );
 
 interface LoopControlsProps {
-  loopDuration: number; 
+  loopDuration: number;
   loopPosition: number;
   isLoopPlaybackActive: boolean;
   isLoopRecording: boolean;
   loopBuffer: AudioBuffer | null; // Added for the visualizer
   audioLevel?: number; // Optional audio level for visualization
   initializeLoopBuffer: (duration: number) => Promise<boolean>;
-  startLoopRecordingAt: (startPosition: number, duration?: number) => Promise<boolean>;
+  startLoopRecordingAt: (
+    startPosition: number,
+    duration?: number
+  ) => Promise<boolean>;
   playLoopWithTracking: (startPosition?: number) => Promise<boolean>;
   stopLoopPlayback: () => boolean;
   stopLoopRecordingAndMerge: () => Promise<boolean>;
   onPositionChange?: (position: number) => void; // Optional callback
+  loopBlobUrl: string | null;
+  isExportingLoop: boolean;
+  exportLoopToBlob: () => Promise<{ blob: Blob; url: string } | null>;
   loopRecordingError?: string | null;
-  waveformData?: number[] ; // For visualization | Float32Array[]
+  waveformData?: number[]; // For visualization | Float32Array[]
 }
 
 const LoopControls: React.FC<LoopControlsProps> = ({
   loopDuration,
-  loopPosition, 
+  loopPosition,
   isLoopPlaybackActive,
   isLoopRecording,
   loopBuffer,
@@ -56,49 +62,71 @@ const LoopControls: React.FC<LoopControlsProps> = ({
   stopLoopRecordingAndMerge,
   onPositionChange,
   loopRecordingError,
-  waveformData
+  waveformData,
+  exportLoopToBlob,
+  isExportingLoop,
 }) => {
   // Local state for this component only
   const [loopDurationInput, setLoopDurationInput] = useState("4");
   // const [recordSegmentStart, setRecordSegmentStart] = useState(0);
   // const [recordSegmentDuration, setRecordSegmentDuration] = useState(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [recordingSegments, setRecordingSegments] = useState<{start: number; end: number | null}[]>([]);
-  
+  const [recordingSegments, setRecordingSegments] = useState<
+    { start: number; end: number | null }[]
+  >([]);
+  const [canDownload, setCanDownload] = useState(false);
+
   // Effect to update recording segments when recording state changes
-  useEffect(() => {
-    if (isLoopRecording && recordingSegments.length === 0) {
-      // New recording started
-      setRecordingSegments([{ start: loopPosition, end: null }]);
-    } 
-    else if (isLoopRecording && recordingSegments.length > 0) {
-      // Update existing recording position
-      setRecordingSegments(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1].end = null;
-        return updated;
-      });
+useEffect(()=>{
+  if (!isLoopRecording && recordingSegments.length > 0 && 
+       recordingSegments[recordingSegments.length - 1].end !== null) {
+    // Recording stopped
+    setRecordingSegments(prev => {
+      const updated = [...prev];
+      updated[updated.length - 1].end = loopPosition;
+      return updated;
+    });
+    
+    // Enable download
+    setCanDownload(true);
+  }
+}, [isLoopRecording, loopPosition, recordingSegments]);
+
+  // Add download handler
+  const handleDownloadLoop = async () => {
+    if (!canDownload) return;
+    
+    setStatusMessage("Preparing download...");
+    try {
+      const result = await exportLoopToBlob();
+      if (result) {
+        // Create a download link and trigger it
+        const downloadLink = document.createElement('a');
+        downloadLink.href = result.url;
+        downloadLink.download = `loop-recording-${new Date().toISOString().slice(0,10)}.wav`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        setStatusMessage("Download started!");
+      } else {
+        setStatusMessage("Error: Could not create download");
+      }
+    } catch (err) {
+      console.error("Error exporting loop:", err);
+      setStatusMessage(`Export error: ${err}`);
     }
-    else if (!isLoopRecording && recordingSegments.length > 0 && 
-             recordingSegments[recordingSegments.length - 1].end === null) {
-      // Recording stopped
-      setRecordingSegments(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1].end = loopPosition;
-        return updated;
-      });
-    }
-  }, [isLoopRecording, loopPosition, recordingSegments]);
+  };
   
+
   // Handle creating a new loop
   const handleCreateNewLoop = async () => {
     try {
       const duration = parseInt(loopDurationInput, 10) || 4;
       setStatusMessage(`Creating new ${duration}s loop...`);
-      
+
       // Reset recording segments
       setRecordingSegments([]);
-      
+
       const success = await initializeLoopBuffer(duration);
       if (success) {
         setStatusMessage("New loop created");
@@ -110,7 +138,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       setStatusMessage(`Loop creation error: ${err}`);
     }
   };
-  
+
   // Handle playback controls
   const handleToggleLoopPlayback = async () => {
     try {
@@ -120,7 +148,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       } else {
         setStatusMessage("Starting playback...");
         const success = await playLoopWithTracking();
-        
+
         if (success) {
           setStatusMessage(null);
         } else {
@@ -132,7 +160,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       setStatusMessage(`Playback error: ${err}`);
     }
   };
-  
+
   // Handle recording controls
   const handleToggleRecording = async () => {
     try {
@@ -140,7 +168,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
         // Stop recording
         setStatusMessage("Stopping recording...");
         const success = await stopLoopRecordingAndMerge();
-        
+
         if (success) {
           setStatusMessage("Recording complete");
         } else {
@@ -149,10 +177,10 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       } else {
         // Start recording
         setStatusMessage("Starting recording...");
-        
+
         // Make sure to pass the full loop duration to ensure it records for the entire time
         const success = await startLoopRecordingAt(loopPosition, loopDuration);
-        
+
         if (success) {
           setStatusMessage("Recording in progress...");
         } else {
@@ -164,7 +192,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
       setStatusMessage(`Recording error: ${err}`);
     }
   };
-  
+
   // Handle stop all
   const handleStop = () => {
     if (isLoopRecording) {
@@ -176,46 +204,68 @@ const LoopControls: React.FC<LoopControlsProps> = ({
     setStatusMessage("All operations stopped");
   };
 
-
-  // Handle position change from visualizer
-  const handlePositionChange = (newPosition: number) => {
-    if (!isLoopRecording && typeof onPositionChange === 'function') {
-      onPositionChange(newPosition);
-    }
-  };
+  const handlePositionChange = async (newPosition: number) => {
+  console.log("Position change requested:", newPosition);
   
+  // This assumes you have access to setLoopPosition from props or context
+  if (typeof onPositionChange === 'function') {
+    onPositionChange(newPosition);
+  }
+  
+  // If playing, restart at the new position
+  if (isLoopPlaybackActive) {
+    // Stop first
+    stopLoopPlayback();
+    
+    // Brief delay to ensure playback stops
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Start at new position
+    playLoopWithTracking(newPosition);
+  }
+};
   return (
     <Card className="p-4 mt-4">
       {statusMessage && (
-        <Text size="2" className="text-amber-500 mb-2">{statusMessage}</Text>
+        <Text size="2" className="text-amber-500 mb-2">
+          {statusMessage}
+        </Text>
       )}
-      
-      {loopRecordingError && (
-        <Text size="2" className="text-red-500 mb-2">{loopRecordingError}</Text>
-      )}
-      
-      {/* Loop Visualizer */}
-<Text size="2" weight="medium" mb="2">Loop Visualizer</Text>
-<LoopVisualizer
-  loopBuffer={loopBuffer} // Add this prop
-  waveformData={waveformData}
-  loopDuration={loopDuration}
-  loopPosition={loopPosition}
-  isLoopRecording={isLoopRecording}
-  isLoopPlaybackActive={isLoopPlaybackActive}
-  recordingSegments={recordingSegments || []}
-  onPlayPause={handleToggleLoopPlayback} // Add these handler functions
-  onRecord={handleToggleRecording}
-  onStop={handleStop}
-  onPositionChange={handlePositionChange}
-  audioLevel={audioLevel} // Optional - add if you have audio level data
-/>
 
-      
+      {loopRecordingError && (
+        <Text size="2" className="text-red-500 mb-2">
+          {loopRecordingError}
+        </Text>
+      )}
+
+      {/* Loop Visualizer */}
+      <Text size="2" weight="medium" mb="2">
+        Loop Visualizer
+      </Text>
+      <LoopVisualizer
+        loopBuffer={loopBuffer} // Add this prop
+        waveformData={waveformData}
+        loopDuration={loopDuration}
+        loopPosition={loopPosition}
+        isLoopRecording={isLoopRecording}
+        isLoopPlaybackActive={isLoopPlaybackActive}
+        recordingSegments={recordingSegments || []}
+        onPlayPause={handleToggleLoopPlayback} // Add these handler functions
+        onRecord={handleToggleRecording}
+        onStop={handleStop}
+        onPositionChange={handlePositionChange}
+        audioLevel={audioLevel} // Optional - add if you have audio level data
+      />
+<Text size="2" color="red">
+  Current Position: {loopPosition.toFixed(2)}s
+  {isLoopPlaybackActive ? " (Playing)" : " (Stopped)"}
+</Text>
       {/* Loop Configuration */}
       <Flex direction="column" gap="3" className="mt-4">
         <Flex justify="between" align="center">
-          <Text size="2" weight="medium">Loop Configuration</Text>
+          <Text size="2" weight="medium">
+            Loop Configuration
+          </Text>
           <Flex gap="2" align="center">
             <Text size="2">Duration:</Text>
             <input
@@ -228,9 +278,9 @@ const LoopControls: React.FC<LoopControlsProps> = ({
               disabled={isLoopRecording || isLoopPlaybackActive}
             />
             <Text size="2">sec</Text>
-            <Button 
-              size="1" 
-              variant="soft" 
+            <Button
+              size="1"
+              variant="soft"
               onClick={handleCreateNewLoop}
               disabled={isLoopRecording || isLoopPlaybackActive}
             >
@@ -239,10 +289,26 @@ const LoopControls: React.FC<LoopControlsProps> = ({
           </Flex>
         </Flex>
       </Flex>
-      
+
+        <Button>Can download is {canDownload}</Button>
+     {canDownload && (
+        <Flex direction="column" gap="3" className="mt-4">
+          <Text size="2" weight="medium">Export Loop</Text>
+          <Button
+            size="2"
+            color="green"
+            onClick={handleDownloadLoop}
+            disabled={isExportingLoop}
+          >
+            {isExportingLoop ? "Preparing..." : "Download WAV"}
+          </Button>
+        </Flex>
+      )}
       {/* Recording Position */}
       <Flex direction="column" gap="3" className="mt-4">
-        <Text size="2" weight="medium">Recording Position</Text>
+        <Text size="2" weight="medium">
+          Recording Position
+        </Text>
         <Text size="2">
           Current: {loopPosition.toFixed(2)}s / {loopDuration}s
         </Text>
@@ -256,7 +322,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
             {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
             {isLoopPlaybackActive ? "Stop" : "Play"}
           </Button>
-          
+
           <Button
             size="2"
             color={isLoopRecording ? "red" : "blue"}

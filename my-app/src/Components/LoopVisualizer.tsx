@@ -1,4 +1,4 @@
-'use client'
+"use client";
 import React, { useRef, useEffect, useState } from "react";
 import { Button, Flex, Text } from "@radix-ui/themes";
 import { PlayIcon, StopIcon } from "@radix-ui/react-icons";
@@ -21,7 +21,7 @@ interface LoopVisualizerProps {
   onStop: () => void;
   onPositionChange: (position: number) => void;
   waveformData?: number[];
-  audioLevel?: number;
+  audioLevel?: number; 
 }
 
 // Simple Record Button Icon Component
@@ -55,34 +55,34 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   onRecord,
   onPositionChange,
   waveformData = [],
-  audioLevel
+  audioLevel,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [canvasWidth, setCanvasWidth] = useState<number>(0);
   const [canvasHeight, setCanvasHeight] = useState<number>(0);
   const [isUserDragging, setIsUserDragging] = useState<boolean>(false);
-  
+
   // Animation frame reference for smooth rendering
   const animationFrameRef = useRef<number | null>(null);
 
-  // Set up canvas size on mount and resize
-  useEffect(() => {
-    const updateCanvasSize = (): void => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setCanvasWidth(rect.width);
-        setCanvasHeight(100); // Fixed height
-      }
-    };
-
-    // Initial size
-    updateCanvasSize();
-
-    // Update on resize
-    window.addEventListener("resize", updateCanvasSize);
-    return () => window.removeEventListener("resize", updateCanvasSize);
-  }, []);
+useEffect(() => {
+  const updateCanvasSize = (): void => {
+    if (containerRef.current && canvasRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setCanvasWidth(rect.width);
+      setCanvasHeight(100);
+      
+      // Important: also set the actual canvas dimensions
+      canvasRef.current.width = rect.width;
+      canvasRef.current.height = 100;
+    }
+  };
+  
+  updateCanvasSize();
+  window.addEventListener("resize", updateCanvasSize);
+  return () => window.removeEventListener("resize", updateCanvasSize);
+}, []);
 
   // Handle mouse interactions for scrubbing
   useEffect(() => {
@@ -90,14 +90,18 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
     const canvas = canvasRef.current;
 
-    const handleMouseDown = (e: MouseEvent): void => {
-      if (isLoopRecording) return; // Don't allow scrubbing while recording
-      setIsUserDragging(true);
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const newPosition = (x / rect.width) * loopDuration;
-      onPositionChange(Math.max(0, Math.min(newPosition, loopDuration)));
-    };
+  const handleMouseDown = (e: MouseEvent): void => {
+    console.log("Mouse down on canvas");
+    if (isLoopRecording) return; // Don't allow scrubbing while recording
+    
+    setIsUserDragging(true);
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const newPosition = (x / rect.width) * loopDuration;
+    
+    console.log("Setting new position:", newPosition, "from x:", x, "width:", rect.width);
+    onPositionChange(Math.max(0, Math.min(newPosition, loopDuration)));
+  };
 
     const handleMouseMove = (e: MouseEvent): void => {
       if (!isUserDragging) return;
@@ -113,23 +117,23 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
     // Add event listeners
     canvas.addEventListener("mousedown", handleMouseDown as EventListener);
-    window.addEventListener("mousemove", handleMouseMove as EventListener);
-    window.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("mousemove", handleMouseMove as EventListener);
+    canvas.addEventListener("mouseup", handleMouseUp);
 
     return () => {
       canvas.removeEventListener("mousedown", handleMouseDown as EventListener);
-      window.removeEventListener("mousemove", handleMouseMove as EventListener);
-      window.removeEventListener("mouseup", handleMouseUp);
+      canvas.removeEventListener("mousemove", handleMouseMove as EventListener);
+      canvas.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [canvasRef, isUserDragging, loopDuration, onPositionChange, isLoopRecording]);
-
+}, [canvasRef, loopDuration, onPositionChange, isLoopRecording]);
+  
   // Draw the visualizer with animation frame for smooth rendering
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    
+
     const draw = (): void => {
       if (!ctx) return;
 
@@ -147,6 +151,48 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
         ctx.fillRect(x - 1, 0, 1, canvas.height);
       }
 
+       // Draw audio level meter if recording or playing
+  if ((isLoopPlaybackActive || isLoopRecording) && audioLevel) {
+    // Map the audio level (0-100) to canvas height
+    const levelHeight = (audioLevel / 100) * canvas.height;
+    
+    // Draw level meter in the right side of canvas
+    const meterWidth = 15;
+    const meterX = canvas.width - meterWidth - 10;
+    
+    // Background for meter
+    ctx.fillStyle = "#e2e8f0"; 
+    ctx.fillRect(meterX, 0, meterWidth, canvas.height);
+    
+    // Level fill - green to yellow to red based on level
+    const levelColor = audioLevel < 30 ? "green" : 
+                      audioLevel < 70 ? "orange" : 
+                      "red";
+    
+    ctx.fillStyle = levelColor;
+    ctx.fillRect(meterX, canvas.height - levelHeight, meterWidth, levelHeight);
+    
+    // Border
+    ctx.strokeStyle = "#64748b";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(meterX, 0, meterWidth, canvas.height);
+    
+    // Add dB markers
+    for (let i = 0; i <= 4; i++) {
+      const y = i * (canvas.height / 4);
+      ctx.fillStyle = "#64748b";
+      ctx.fillRect(meterX, y, meterWidth, 1);
+      
+      // Add level labels
+      if (i > 0) { // Skip 0 label
+        ctx.fillStyle = "#334155";
+        ctx.font = "9px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(`${(100 - i * 25)}%`, meterX - 2, y + 3);
+      }
+    }
+  }
+
       // Draw waveform (if data available)
       if (waveformData && waveformData.length > 0) {
         ctx.beginPath();
@@ -159,7 +205,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
         waveformData.forEach((amplitude, index) => {
           const x = (index / waveformData.length) * canvas.width;
           const y = middle - amplitude * amplitudeScale;
-          
+
           if (index === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -183,16 +229,20 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
       // Draw recording segments with visual distinction
       if (recordingSegments && recordingSegments.length > 0) {
         recordingSegments.forEach((segment, index) => {
-          if (segment.start !== undefined && segment.end !== undefined && segment.end !== null) {
+          if (
+            segment.start !== undefined &&
+            segment.end !== undefined &&
+            segment.end !== null
+          ) {
             const startX = (segment.start / loopDuration) * canvas.width;
             const endX = (segment.end / loopDuration) * canvas.width;
             const width = endX - startX;
-            
+
             // Use different colors for different segments
             const hue = (index * 30) % 360; // Cycle through different hues
             ctx.fillStyle = `hsla(${hue}, 90%, 60%, 0.3)`;
             ctx.fillRect(startX, 0, width, canvas.height);
-            
+
             // Add border
             ctx.strokeStyle = `hsla(${hue}, 90%, 50%, 0.8)`;
             ctx.lineWidth = 2;
@@ -203,27 +253,28 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
       // Draw current recording segment if actively recording
       if (isLoopRecording) {
-        const startPosition = recordingSegments.length > 0 
-          ? recordingSegments[recordingSegments.length - 1].start 
-          : 0;
-        
+        const startPosition =
+          recordingSegments.length > 0
+            ? recordingSegments[recordingSegments.length - 1].start
+            : 0;
+
         if (startPosition !== undefined) {
           const startX = (startPosition / loopDuration) * canvas.width;
           const currentX = (loopPosition / loopDuration) * canvas.width;
           const width = currentX - startX;
-          
+
           // Highlight current recording with a vibrant red
           ctx.fillStyle = "rgba(239, 68, 68, 0.4)"; // Bright red with transparency
           ctx.fillRect(startX, 0, width, canvas.height);
-          
+
           // Animated border for recording section
-          const animPhase = Date.now() % 1000 / 1000; // 0-1 pulsing animation
+          const animPhase = (Date.now() % 1000) / 1000; // 0-1 pulsing animation
           const pulseOpacity = 0.5 + 0.5 * Math.sin(animPhase * Math.PI * 2);
-          
+
           ctx.strokeStyle = `rgba(239, 68, 68, ${pulseOpacity})`;
           ctx.lineWidth = 3;
           ctx.strokeRect(startX, 0, width, canvas.height);
-          
+
           // Label for "RECORDING"
           ctx.fillStyle = "rgba(239, 68, 68, 0.9)";
           ctx.font = "bold 14px sans-serif";
@@ -232,15 +283,29 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
           const labelY = canvas.height / 2;
           ctx.fillText("RECORDING", labelX, labelY);
         }
+
+         if (audioLevel) {
+    // Draw a level meter
+    const levelHeight = canvas.height * (audioLevel / 100); // Scale to appropriate range
+    ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
+    ctx.fillRect(canvas.width - 20, canvas.height - levelHeight, 15, levelHeight);
+    
+    // Add level text
+    ctx.fillStyle = "#000";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`${audioLevel.toFixed(0)}`, canvas.width - 12, canvas.height - 5);
+  }
+
       }
 
       // Draw playhead/needle with animation
       const needleX = (loopPosition / loopDuration) * canvas.width;
-      
+
       // Shadow for needle
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
       ctx.shadowBlur = 5;
-      
+
       // Draw needle line with glow effect
       ctx.beginPath();
       ctx.strokeStyle = isLoopRecording ? "#ef4444" : "#3b82f6"; // Red when recording, blue otherwise
@@ -248,26 +313,25 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
       ctx.moveTo(needleX, 0);
       ctx.lineTo(needleX, canvas.height);
       ctx.stroke();
-      
+
       // Reset shadow
-      ctx.shadowColor = 'transparent';
+      ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
-      
+
       // Draw needle handle/grip at the top
       ctx.fillStyle = isLoopRecording ? "#ef4444" : "#3b82f6";
       ctx.beginPath();
       ctx.arc(needleX, 10, 8, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Display current position text
       ctx.fillStyle = "#1e293b";
       ctx.font = "12px sans-serif";
       ctx.textAlign = "center";
-      const formattedPosition = loopPosition.toFixed(1) ;
-      if(audioLevel){
-      const audioLevelInfo = "audio level "+audioLevel?.toFixed(1);
-     ctx.fillText(`${audioLevelInfo}s`, needleX, canvas.height - 10);
-
+      const formattedPosition = loopPosition.toFixed(1);
+      if (audioLevel) {
+        const audioLevelInfo = "audio level " + audioLevel?.toFixed(1);
+        ctx.fillText(`${audioLevelInfo}s`, needleX, canvas.height - 10);
       }
       ctx.fillText(`${formattedPosition}s`, needleX, canvas.height - 5);
 
@@ -280,6 +344,10 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     // Initial draw
     draw();
 
+     if (canvasRef.current && ctx) {
+    draw(); // Force a redraw when any audio prop changes
+  };
+  
     // Continuous redraw if playing or recording
     if (isLoopPlaybackActive || isLoopRecording) {
       animationFrameRef.current = requestAnimationFrame(draw);
@@ -291,15 +359,14 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [
-    canvasWidth, 
-    canvasHeight, 
-    waveformData, 
-    loopPosition, 
-    loopDuration, 
+  }, [canvasWidth,
+    canvasHeight,
+    waveformData,
+    loopPosition,
+    loopDuration,
     isLoopPlaybackActive,
     isLoopRecording,
-    recordingSegments
+    recordingSegments,audioLevel
   ]);
 
   // Format seconds as mm:ss
@@ -312,19 +379,25 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   return (
     <div className="loop-visualizer" ref={containerRef}>
       <Flex direction="column" gap="2">
-        <div className="timeline-container" style={{ position: "relative", cursor: isLoopRecording ? "not-allowed" : "pointer" }}>
+        <div
+          className="timeline-container"
+          style={{
+            position: "relative",
+            cursor: isLoopRecording ? "not-allowed" : "pointer",
+          }}
+        >
           <canvas
             ref={canvasRef}
             width={canvasWidth}
             height={canvasHeight}
-            style={{ 
-              width: "100%", 
-              height: "100px", 
+            style={{
+              width: "100%",
+              height: "100px",
               borderRadius: "6px",
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
             }}
           />
-          
+
           {/* Time indicators */}
           <Flex justify="between" mt="1">
             <Text size="1">0:00</Text>
@@ -342,10 +415,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
             {isLoopPlaybackActive ? "Stop" : "Play"}
           </Button>
 
-          <Button
-            color={isLoopRecording ? "red" : "blue"}
-            onClick={onRecord}
-          >
+          <Button color={isLoopRecording ? "red" : "blue"} onClick={onRecord}>
             {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
             {isLoopRecording ? "Stop Recording" : "Record"}
           </Button>

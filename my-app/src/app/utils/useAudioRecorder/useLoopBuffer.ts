@@ -636,52 +636,39 @@ const audioBufferToWav = (audioBuffer: AudioBuffer): Blob => {
   );
 
   // ========== PLAYBACK WITH POSITION TRACKING ==========
-
   // Play the loop with position tracking
-  const playLoopWithTracking = useCallback(async (startPosition = 0) => {
-    try {
-      if (!loopBuffer || !loopPlayerRef.current) {
-        console.error("No loop buffer available");
-        return false;
-      }
+const playLoopWithTracking = async (startPosition = 0) => {
+  if (!loopBuffer || !loopPlayerRef.current) {
+    console.log("Cannot play: No loop buffer or player");
+    return false;
+  }
 
-      // Ensure Tone.js is running
-      if (Tone.context.state !== "running") {
-        console.log("Tone context not running, starting it");
-        await Tone.start();
-      }
-
-      console.log(`Starting loop playback at position ${startPosition}s`);
-
-      // Set start position if supported
-      if (startPosition > 0) {
-        try {
-          loopPlayerRef.current.start(0, startPosition);
-        } catch (e) {
-          console.warn("Could not set start position, starting from beginning:", e);
-          loopPlayerRef.current.start();
-        }
-      } else {
-        loopPlayerRef.current.start();
-      }
-      
-      setIsLoopPlaybackActive(true);
-      setLoopPosition(startPosition);
-
-      // Set up animation frame for position tracking
-      if (positionAnimationRef.current) {
-        cancelAnimationFrame(positionAnimationRef.current);
-      }
-      positionAnimationRef.current = requestAnimationFrame(trackPosition);
-
-      return true;
-    } catch (error) {
-      console.error("Error playing loop with tracking:", error);
-      setLoopRecordingError(`Failed to play loop: ${error || "Unknown error"}`);
-      return false;
+  try {
+    // Ensure Tone.js context is running
+    if (Tone.context.state !== "running") {
+      await Tone.start();
     }
-  }, [loopBuffer, loopDuration, trackPosition]);
-
+    
+    console.log(`Playing from position: ${startPosition}s`);
+    
+    // Make sure player is stopped
+    if (loopPlayerRef.current.state === "started") {
+      loopPlayerRef.current.stop();
+    }
+    
+    // Start with the specified offset
+    loopPlayerRef.current.start(0, startPosition);
+    
+    // Update state
+    setIsLoopPlaybackActive(true);
+    setLoopPosition(startPosition);
+    
+    return true;
+  } catch (error) {
+    console.error("Error playing with position:", error);
+    return false;
+  }
+};
   // Stop loop playback and tracking
   const stopLoopPlayback = useCallback(() => {
     try {

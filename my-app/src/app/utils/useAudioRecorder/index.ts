@@ -109,7 +109,7 @@ export function useAudioRecorder() {
       }
       
       // The loop buffer will be initialized automatically via the useEffect
-      return true;
+      return audioSystemInitialized;
     } catch (err) {
       console.error("Error in unified initialization:", err);
       setError(`Initialization failed: ${err}`);
