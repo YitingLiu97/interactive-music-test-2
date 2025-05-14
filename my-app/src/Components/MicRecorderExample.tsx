@@ -39,11 +39,17 @@ interface WindowWithAudioContext extends Window {
 const MicRecorderExample = () => {
   // State for component
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
+    null
+  );
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
+  const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(
+    null
+  );
   const [isToneInitialized, setIsToneInitialized] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>("Initializing...");
+  const [statusMessage, setStatusMessage] = useState<string | null>(
+    "Initializing..."
+  );
   const [initializationAttempts, setInitializationAttempts] = useState(0);
 
   // Use the hooks - note we're using them directly
@@ -58,26 +64,28 @@ const MicRecorderExample = () => {
   } = micInput;
 
   // Use the recorder hook
-  const { 
-    startRecording, 
-    stopRecording, 
-    isRecording, 
-    isReady, 
-    recordedBlob, 
-    setupAudio, 
+  const {
+    startRecording,
+    stopRecording,
+    isRecording,
+    isReady,
+    recordedBlob,
+    setupAudio,
     checkDeviceStatus,
-    micInput: recorderMicInput // This is just for debugging
+    micInput: recorderMicInput, // This is just for debugging
   } = useMicRecorder();
 
   // Visualization state
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [analyzerNode, setAnalyzerNode] = useState<AnalyserNode | null>(null);
   const [animationFrame, setAnimationFrame] = useState<number | null>(null);
-  
+
   // CHECK if we're getting different micInput instances (debugging only)
   useEffect(() => {
     if (recorderMicInput !== micInput) {
-      console.warn("WARNING: Different instances of micInput detected between component and recorder!");
+      console.warn(
+        "WARNING: Different instances of micInput detected between component and recorder!"
+      );
       console.log("Component micInput:", micInput);
       console.log("Recorder micInput:", recorderMicInput);
     } else {
@@ -89,8 +97,8 @@ const MicRecorderExample = () => {
   async function initializeTone() {
     try {
       setStatusMessage("Initializing audio system...");
-      setInitializationAttempts(prev => prev + 1);
-      
+      setInitializationAttempts((prev) => prev + 1);
+
       console.log("Starting Tone.js initialization");
       if (Tone.context.state !== "running") {
         console.log("Tone context not running, starting it now");
@@ -99,13 +107,13 @@ const MicRecorderExample = () => {
       } else {
         console.log("Tone.js already running");
       }
-      
+
       setIsToneInitialized(true);
-      
+
       // After Tone is initialized, check device status and try setup
       const status = checkDeviceStatus();
       console.log("Device status after Tone init:", status);
-      
+
       if (status.hasDeviceId) {
         console.log("Device ID available, setting up audio");
         await setupAudio();
@@ -113,7 +121,7 @@ const MicRecorderExample = () => {
       } else {
         console.log("No device ID available yet, waiting...");
         setStatusMessage("Waiting for microphone device...");
-        
+
         // Try to force select a device if we have some available
         if (audioDevices.length > 0) {
           console.log("Devices available, selecting first one");
@@ -122,7 +130,9 @@ const MicRecorderExample = () => {
       }
     } catch (err) {
       console.error("Failed to initialize Tone.js:", err);
-      setStatusMessage(`Audio initialization failed: ${err || "Unknown error"}`);
+      setStatusMessage(
+        `Audio initialization failed: ${err || "Unknown error"}`
+      );
       setIsToneInitialized(false);
     }
   }
@@ -135,7 +145,7 @@ const MicRecorderExample = () => {
       if (audioDevices.length === 0) {
         console.log("No audio devices found yet, waiting for list to populate");
       }
-      
+
       // Auto-initialize tone on mount
       try {
         await initializeTone();
@@ -143,10 +153,10 @@ const MicRecorderExample = () => {
         console.error("Auto-initialization failed:", err);
       }
     };
-    
+
     initialize();
   }, []);
-  
+
   // When device ID or devices change, try to set up again
   useEffect(() => {
     // If we have a device ID and Tone is initialized, try to set up audio
@@ -172,12 +182,12 @@ const MicRecorderExample = () => {
       // Change the device
       await setDeviceIndex(newIndex);
       console.log(`Changed to device index ${newIndex}`);
-      
+
       // Check if the device ID is now available
       setTimeout(async () => {
         const status = checkDeviceStatus();
         console.log("Device status after change:", status);
-        
+
         if (status.hasDeviceId) {
           // We should have a device ID now, so set up the audio again
           await setupAudio();
@@ -188,7 +198,9 @@ const MicRecorderExample = () => {
       }, 500); // Small delay to let state update
     } catch (error) {
       console.error("Error changing device:", error);
-      setStatusMessage(`Failed to change microphone: ${error || "Unknown error"}`);
+      setStatusMessage(
+        `Failed to change microphone: ${error || "Unknown error"}`
+      );
     }
   };
 
@@ -299,16 +311,18 @@ const MicRecorderExample = () => {
         setStatusMessage("Initializing audio system for recording...");
         await initializeTone();
       }
-      
+
       // Get the current status
       const status = checkDeviceStatus();
       console.log("Status before recording:", status);
-      
+
       if (!status.hasDeviceId) {
-        setStatusMessage("No microphone device available. Please connect a microphone.");
+        setStatusMessage(
+          "No microphone device available. Please connect a microphone."
+        );
         return;
       }
-      
+
       if (!status.isReady) {
         setStatusMessage("Setting up microphone for recording...");
         const setupResult = await setupAudio();
@@ -317,11 +331,11 @@ const MicRecorderExample = () => {
           return;
         }
       }
-      
+
       // Finally try to start recording
       setStatusMessage("Starting recording...");
       const success = await startRecording();
-      
+
       if (success) {
         setStatusMessage(null); // Clear message on success
       } else {
@@ -338,7 +352,7 @@ const MicRecorderExample = () => {
     try {
       setStatusMessage("Stopping recording...");
       const result = await stopRecording();
-      
+
       if (result) {
         setStatusMessage(null); // Clear on success
       } else {
@@ -381,19 +395,19 @@ const MicRecorderExample = () => {
     if (!isPermissionGranted) {
       return <Badge color="red">Permission Denied</Badge>;
     }
-    
+
     if (isRecording) {
       return <Badge color="red">Recording</Badge>;
     }
-    
+
     if (isReady) {
       return <Badge color="green">Ready</Badge>;
     }
-    
+
     if (isToneInitialized) {
       return <Badge color="amber">Initializing...</Badge>;
     }
-    
+
     return <Badge color="amber">Not Initialized</Badge>;
   };
 
@@ -428,14 +442,15 @@ const MicRecorderExample = () => {
                 </Button>
               </Flex>
             )}
-            
+
             {/* Debug info - can be removed in production */}
             <Card className="p-3 bg-gray-100 text-xs">
               <Text size="1">
-                <strong>Debug Info:</strong> Tone: {Tone.context?.state || 'unknown'}, 
-                DeviceID: {micInput.deviceId ? 'Available' : 'Missing'},
-                Ready: {isReady ? 'Yes' : 'No'},
-                Init Attempts: {initializationAttempts}
+                <strong>Debug Info:</strong> Tone:{" "}
+                {Tone.context?.state || "unknown"}, DeviceID:{" "}
+                {micInput.deviceId ? "Available" : "Missing"}, Ready:{" "}
+                {isReady ? "Yes" : "No"}, Init Attempts:{" "}
+                {initializationAttempts}
               </Text>
             </Card>
 
@@ -459,6 +474,7 @@ const MicRecorderExample = () => {
 
             <Flex direction="column" gap="1">
               <Text size="2" weight="medium">
+                Analyzer Node Fftsize: {analyzerNode?.fftSize}
                 Audio Level:
               </Text>
               <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">

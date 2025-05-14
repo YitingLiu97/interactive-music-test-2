@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button, Flex, Text, Card } from '@radix-ui/themes';
-import { ReloadIcon, TimerIcon, PlayIcon, StopIcon } from '@radix-ui/react-icons';
+import { ReloadIcon, PlayIcon, StopIcon } from '@radix-ui/react-icons';
 import LoopVisualizer from './LoopVisualizer'; // Make sure this import is correct
 
 // Simple Record Button Icon Component
@@ -39,7 +39,7 @@ interface LoopControlsProps {
   stopLoopRecordingAndMerge: () => Promise<boolean>;
   onPositionChange?: (position: number) => void; // Optional callback
   loopRecordingError?: string | null;
-  waveformData?: number[] | Float32Array[]; // For visualization
+  waveformData?: number[] ; // For visualization | Float32Array[]
 }
 
 const LoopControls: React.FC<LoopControlsProps> = ({
@@ -60,8 +60,8 @@ const LoopControls: React.FC<LoopControlsProps> = ({
 }) => {
   // Local state for this component only
   const [loopDurationInput, setLoopDurationInput] = useState("4");
-  const [recordSegmentStart, setRecordSegmentStart] = useState(0);
-  const [recordSegmentDuration, setRecordSegmentDuration] = useState(1);
+  // const [recordSegmentStart, setRecordSegmentStart] = useState(0);
+  // const [recordSegmentDuration, setRecordSegmentDuration] = useState(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [recordingSegments, setRecordingSegments] = useState<{start: number; end: number | null}[]>([]);
   
@@ -88,7 +88,7 @@ const LoopControls: React.FC<LoopControlsProps> = ({
         return updated;
       });
     }
-  }, [isLoopRecording, loopPosition]);
+  }, [isLoopRecording, loopPosition, recordingSegments]);
   
   // Handle creating a new loop
   const handleCreateNewLoop = async () => {

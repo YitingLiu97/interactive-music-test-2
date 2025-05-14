@@ -43,7 +43,6 @@ export function useLoopBuffer({
   const micRef = useRef<Tone.UserMedia | null>(null);
   const loopStartTimeRef = useRef<number>(0);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const positionAnimationRef = useRef<number | null>(null);
   
   // Clean up previous blob URL when creating a new one

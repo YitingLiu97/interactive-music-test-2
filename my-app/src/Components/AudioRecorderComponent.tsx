@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Flex, Text, Card, Badge } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -56,7 +56,6 @@ const AudioRecorderComponent = () => {
     selectAudioDevice,
     startRecording,
     stopRecording,
-    setupRecorder,
 
     // Loop-related state
     loopPosition,
@@ -64,7 +63,7 @@ const AudioRecorderComponent = () => {
     loopDuration,
     isLoopPlaybackActive,
     isLoopRecording,
-    loopRecordingError,
+    // loopRecordingError,
 
     // Loop-related functions
     initializeLoopBuffer,
@@ -72,15 +71,10 @@ const AudioRecorderComponent = () => {
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
-    loopBlob,
     loopBlobUrl,
     exportLoopToBlob,
 
-    startRecordingAtCurrentPosition,
-
-    // Visualization data
     getWaveformData,
-    getLoopPositionRatio,
   } = useAudioRecorder();
 
   // Local component state
@@ -100,7 +94,7 @@ const AudioRecorderComponent = () => {
   const [isLoopPlaying, setIsLoopPlaying] = useState(false);
   const [loopDurationInput, setLoopDurationInput] = useState("5");
   const [loopMode, setLoopMode] = useState(false);
-  const [showLoopUI, setShowLoopUI] = useState(true);
+  // const [showLoopUI, setShowLoopUI] = useState(true);
   const [recordingSegments, setRecordingSegments] = useState<
     { start: number; end: number | null }[]
   >([]);
@@ -198,25 +192,25 @@ const AudioRecorderComponent = () => {
   };
 
   // Reinitialize recorder
-  const handleStartRecorder = async () => {
-    try {
-      if (!isRecorderReady) {
-        setStatusMessage("Recorder not ready. Please initialize first.");
-        return;
-      }
+  // const handleStartRecorder = async () => {
+  //   try {
+  //     if (!isRecorderReady) {
+  //       setStatusMessage("Recorder not ready. Please initialize first.");
+  //       return;
+  //     }
 
-      setStatusMessage("Setting up recorder...");
-      const success = await setupRecorder();
-      if (success) {
-        setStatusMessage(null);
-      } else {
-        setStatusMessage("Failed to setup recorder. Please try again.");
-      }
-    } catch (err) {
-      console.error("Setting up recorder error:", err);
-      setStatusMessage(`Setting up recorder error: ${err || "Unknown error"}`);
-    }
-  };
+  //     setStatusMessage("Setting up recorder...");
+  //     const success = await setupRecorder();
+  //     if (success) {
+  //       setStatusMessage(null);
+  //     } else {
+  //       setStatusMessage("Failed to setup recorder. Please try again.");
+  //     }
+  //   } catch (err) {
+  //     console.error("Setting up recorder error:", err);
+  //     setStatusMessage(`Setting up recorder error: ${err || "Unknown error"}`);
+  //   }
+  // };
 
   // Handle recording start
   const handleStartRecording = async () => {
@@ -510,7 +504,7 @@ const AudioRecorderComponent = () => {
         clearInterval(recordingTimer);
       }
     };
-  }, [isRecording]);
+  }, [isRecording, recordingTimer]);
 
   // Set up audio element for playback when recording is available
   useEffect(() => {
@@ -542,7 +536,7 @@ const AudioRecorderComponent = () => {
         audio.src = "";
       }
     };
-  }, [recordedBlob]);
+  }, [recordedBlob, audioElement]);
 
   // Update waveform data when loop buffer changes
   useEffect(() => {
@@ -762,7 +756,7 @@ const AudioRecorderComponent = () => {
                     {loopMode && (
                       <div className="mt-2">
                         {/* loopblob is nul still whys that  */}
-                        {loopBuffer && (
+                        {isDownloadingLoop && (
                           <>
                            <Text size="2" weight="medium">
                           Loop Preview:

@@ -67,7 +67,7 @@ const MicInputExample = () => {
       source.disconnect();
       audioContext.close();
     };
-  }, [mediaStream]);
+  }, [mediaStream, animationFrame]);
   
   // Handle device selection from dropdown
   const handleDeviceChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -111,6 +111,7 @@ const MicInputExample = () => {
           
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Analyzer Node Fftsize: {analyzerNode?.fftSize}
               Audio Level:
             </label>
             <div className="w-full bg-gray-200 rounded-full h-4">
