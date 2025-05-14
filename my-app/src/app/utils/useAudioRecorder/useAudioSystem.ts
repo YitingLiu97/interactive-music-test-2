@@ -11,8 +11,7 @@ export function useAudioSystem() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
 
   // ===== Permission States =====
-  const [isPermissionGranted, setIsPermissionGranted] =
-    useState<boolean>(false);
+  const [isPermissionGranted, setIsPermissionGranted] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // ===== Tone.js States =====
@@ -32,8 +31,115 @@ export function useAudioSystem() {
   const [isRecorderReady, setIsRecorderReady] = useState<boolean>(false);
   const [initAttempts, setInitAttempts] = useState<number>(0);
   const recordingStartTimeRef = useRef<number>(0);
+  
+  // Add a ref to track initialization status to avoid timing issues
+  const initializationRef = useRef({
+    hasInitializedTone: false,
+    currentDeviceId: null as string | null,
+    initInProgress: false
+  });
 
-  // ========== DEVICE HANDLING ==========
+  // ========== INITIALIZATION HELPERS ==========
+  
+  // Simple helper to initialize Tone.js - no state updates here
+  const initToneEngine = async () => {
+    if (initializationRef.current.hasInitializedTone) {
+      return true;
+    }
+    
+    try {
+      console.log("Initializing Tone.js engine");
+      
+      if (Tone.context.state !== "running") {
+        await Tone.start();
+        await Tone.context.resume();
+      }
+      
+      initializationRef.current.hasInitializedTone = true;
+      return true;
+    } catch (err) {
+      console.error("Error initializing Tone.js engine:", err);
+      return false;
+    }
+  };
+  
+  // Helper for setting up the recorder without relying on React state
+  const createRecorder = async (deviceIdToUse: string) => {
+    try {
+      console.log(`Creating recorder for device ID: ${deviceIdToUse}`);
+      
+      // Make sure Tone.js is initialized
+      await initToneEngine();
+      
+      // Clean up previous instances
+      if (micRef.current) {
+        try {
+          micRef.current.disconnect();
+          micRef.current.close();
+        } catch (e) {
+          console.warn("Error cleaning up previous mic:", e);
+        }
+        micRef.current = null;
+      }
+      
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch (e) {
+          console.warn("Error cleaning up previous recorder:", e);
+        }
+        recorderRef.current = null;
+      }
+      
+      // Create new instances
+      const mic = new Tone.UserMedia();
+      const recorder = new Tone.Recorder({ mimeType: "audio/webm" });
+      
+      // Open mic with device
+      console.log(`Opening mic with device ID: ${deviceIdToUse}`);
+      await mic.open(deviceIdToUse);
+      
+      // Connect mic to recorder
+      mic.connect(recorder);
+      
+      // Store references
+      micRef.current = mic;
+      recorderRef.current = recorder;
+      
+      // Update ref with current device ID
+      initializationRef.current.currentDeviceId = deviceIdToUse;
+      
+      return { success: true, mic, recorder };
+    } catch (err) {
+      console.error("Error creating recorder:", err);
+      return { success: false, error: err };
+    }
+  };
+
+  // ========== MAIN FUNCTIONS ==========
+
+  // Initialize Tone.js - public function with state updates
+  const initializeTone = useCallback(async () => {
+    try {
+      setInitState("tone");
+      console.log("Initializing Tone.js");
+      
+      const success = await initToneEngine();
+      
+      if (success) {
+        console.log("Tone.js initialized successfully, state:", Tone.context.state);
+        setIsToneInitialized(true);
+        return true;
+      } else {
+        throw new Error("Failed to initialize Tone.js");
+      }
+    } catch (error) {
+      console.error("Error in initializeTone:", error);
+      setError(`Failed to initialize audio system: ${error || "Unknown error"}`);
+      setInitState("failed");
+      return false;
+    }
+  }, []);
 
   // Get available audio devices
   const getAudioDevices = useCallback(async () => {
@@ -50,9 +156,6 @@ export function useAudioSystem() {
       setInitState("devices");
       console.log("Permission granted, enumerating devices");
 
-      // Add a small delay to ensure permissions are processed
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
       // Now enumerate all devices
       const devices = await navigator.mediaDevices.enumerateDevices();
       console.log(`Found ${devices.length} total devices`);
@@ -62,7 +165,6 @@ export function useAudioSystem() {
         (device) => device.kind === "audioinput"
       );
 
-      // Log each audio device for debugging
       audioInputs.forEach((device, index) => {
         console.log(
           `Audio device ${index}: ${device.label || "Unnamed device"} (ID: ${
@@ -71,10 +173,9 @@ export function useAudioSystem() {
         );
       });
 
-      // Set in state
       setAudioDevices(audioInputs);
 
-      // Stop the initial stream - we'll create a new one for the selected device
+      // Stop the initial stream
       initialStream.getTracks().forEach((track) => track.stop());
 
       return audioInputs;
@@ -87,28 +188,62 @@ export function useAudioSystem() {
     }
   }, []);
 
+  // Set up recorder with selected device
+  const setupRecorder = useCallback(async () => {
+    // Use either the device ID from state or from our ref
+    const deviceIdToUse = deviceId || initializationRef.current.currentDeviceId;
+    
+    try {
+      setInitState("recorder");
+      console.log("Setting up recorder");
+      
+      if (!deviceIdToUse) {
+        console.error("No device ID available for setup");
+        setError("No microphone selected");
+        setInitState("failed");
+        setIsRecorderReady(false);
+        return false;
+      }
+      
+      // Create recorder using our helper
+      const result = await createRecorder(deviceIdToUse);
+      
+      if (result.success) {
+        console.log("Recorder setup complete");
+        setInitState("ready");
+        setIsRecorderReady(true);
+        setError(null);
+        return true;
+      } else {
+        throw new Error(`Failed to create recorder: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("Error setting up recorder:", error);
+      setError(`Failed to set up recorder: ${error || "Unknown error"}`);
+      setInitState("failed");
+      setIsRecorderReady(false);
+      return false;
+    }
+  }, [deviceId]);
+
   // Select a specific audio device
   const selectAudioDevice = useCallback(
     async (index: number) => {
       try {
         console.log(`Selecting audio device at index ${index}`);
 
-        // Make sure we have devices available
+        // Make sure we have devices
         if (!audioDevices || audioDevices.length === 0) {
           console.log("No audio devices available, fetching devices");
           const devices = await getAudioDevices();
           if (!devices || devices.length === 0) {
-            throw new Error(
-              "No microphones found. Please connect a microphone and refresh."
-            );
+            throw new Error("No microphones found");
           }
+          return;
         }
 
-        // Ensure index is within bounds
-        const validIndex = Math.max(
-          0,
-          Math.min(index, audioDevices.length - 1)
-        );
+        // Validate index
+        const validIndex = Math.max(0, Math.min(index, audioDevices.length - 1));
         const selectedDevice = audioDevices[validIndex];
 
         if (!selectedDevice) {
@@ -116,35 +251,25 @@ export function useAudioSystem() {
         }
 
         const currentDeviceId = selectedDevice.deviceId;
-        console.log(
-          `Selected device: ${
-            selectedDevice.label || `Microphone ${validIndex + 1}`
-          } (ID: ${currentDeviceId})`
-        );
+        console.log(`Selected device: ${selectedDevice.label || `Mic ${validIndex + 1}`}`);
 
         if (!currentDeviceId) {
           throw new Error("Selected device has no ID");
         }
 
-        // Stop previous stream if it exists
+        // Stop previous stream
         if (mediaStream) {
-          console.log("Stopping previous media stream");
           mediaStream.getTracks().forEach((track) => track.stop());
         }
 
         // Create new stream with selected device
-        console.log(`Getting media stream for device ID: ${currentDeviceId}`);
         let stream;
-
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: { deviceId: { exact: currentDeviceId } },
           });
         } catch (err) {
-          console.warn(
-            "Failed with exact device ID constraint, trying without 'exact'",
-            err
-          );
+          console.warn("Failed with exact constraint, trying without 'exact'", err);
           stream = await navigator.mediaDevices.getUserMedia({
             audio: { deviceId: currentDeviceId },
           });
@@ -155,35 +280,22 @@ export function useAudioSystem() {
         }
 
         console.log("Successfully created media stream");
+        
+        // Update state
         setMediaStream(stream);
         setDeviceIndex(validIndex);
         setDeviceId(currentDeviceId);
-
-        // Clean up previous recorder before setting up a new one
-        if (recorderRef.current) {
-          try {
-            recorderRef.current.dispose();
-            recorderRef.current = null;
-          } catch (e) {
-            console.warn("Error disposing previous recorder:", e);
-          }
-        }
-
-        // Clean up previous mic before setting up a new one
-        if (micRef.current) {
-          try {
-            micRef.current.disconnect();
-            micRef.current.close();
-            micRef.current = null;
-          } catch (e) {
-            console.warn("Error closing previous mic:", e);
-          }
-        }
-
-        // We need to re-setup the recorder with the new device
-        const recorderSetupSuccess = await setupRecorder();
-
-        if (!recorderSetupSuccess) {
+        
+        // Store the device ID in our ref for immediate access
+        initializationRef.current.currentDeviceId = currentDeviceId;
+        
+        // Set up recorder with the new device (directly using the ID)
+        const recorderResult = await createRecorder(currentDeviceId);
+        
+        if (recorderResult.success) {
+          setIsRecorderReady(true);
+          setInitState("ready");
+        } else {
           console.error("Failed to set up recorder after device change");
         }
 
@@ -197,142 +309,29 @@ export function useAudioSystem() {
     [audioDevices, mediaStream, getAudioDevices]
   );
 
-  // ========== TONE.JS MANAGEMENT ==========
-
-  // Initialize Tone.js
-  const initializeTone = useCallback(async () => {
-    try {
-      setInitState("tone");
-      console.log("Initializing Tone.js");
-
-      if (Tone.context.state !== "running") {
-        console.log("Starting Tone.js context");
-        await Tone.start();
-
-        // Explicitly resume the context as well
-        await Tone.context.resume();
-      }
-
-      console.log("Tone.js initialized, state:", Tone.context.state);
-      setIsToneInitialized(true);
-      return true;
-    } catch (error) {
-      console.error("Error initializing Tone.js:", error);
-      setError(
-        `Failed to initialize audio system: ${error || "Unknown error"}`
-      );
-      setInitState("failed");
-      return false;
-    }
-  }, []);
-
-  // Set up Tone recorder with selected device
-  const setupRecorder = useCallback(async () => {
-    try {
-      setInitState("recorder");
-      console.log("Setting up audio recorder");
-
-      if (!deviceId) {
-        console.error("No device ID available");
-        throw new Error("No microphone selected");
-      }
-
-      if (!isToneInitialized) {
-        console.log("Tone.js not initialized, initializing now");
-        const success = await initializeTone();
-        if (!success) {
-          throw new Error("Failed to initialize Tone.js");
-        }
-      }
-
-      // Clean up previous instances
-      if (micRef.current) {
-        console.log("Closing previous mic instance");
-        try {
-          micRef.current.disconnect();
-          micRef.current.close();
-        } catch (e) {
-          console.warn("Error disconnecting previous mic:", e);
-        }
-        micRef.current = null;
-      }
-
-      if (recorderRef.current) {
-        console.log("Disposing previous recorder instance");
-        try {
-          recorderRef.current.dispose();
-        } catch (e) {
-          console.warn("Error disposing previous recorder:", e);
-        }
-        recorderRef.current = null;
-      }
-
-      // Create new instances with explicit format
-      console.log("Creating new Tone.UserMedia and Recorder instances");
-      const mic = new Tone.UserMedia();
-
-      // Create recorder with explicit format for better compatibility
-      const recorder = new Tone.Recorder({
-        mimeType: "audio/webm", // Most widely supported format
-      });
-
-      // Store references
-      micRef.current = mic;
-      recorderRef.current = recorder;
-
-      // Open mic first, then connect
-      console.log(`Opening mic with device ID: ${deviceId}`);
-      await mic.open(deviceId);
-
-      // Now connect mic to recorder
-      console.log("Connecting mic to recorder");
-      mic.connect(recorder);
-
-      // Test the connection
-      console.log(
-        "Testing connection:",
-        "Mic connected:",
-        mic.state === "started",
-        "Recorder ready:",
-        recorder !== null
-      );
-
-      console.log("Recorder setup complete");
-      setInitState("ready");
-      setIsRecorderReady(true);
-      setError(null);
-
-      return true;
-    } catch (error) {
-      console.error("Error setting up recorder:", error);
-      setError(`Failed to set up recorder: ${error || "Unknown error"}`);
-      setInitState("failed");
-      setIsRecorderReady(false);
-      return false;
-    }
-  }, [deviceId, isToneInitialized, initializeTone]);
-
-  // ========== RECORDING FUNCTIONS ==========
-
-  // Start recording
   // Start recording
   const startRecording = useCallback(async () => {
-    if (!isRecorderReady || !micRef.current) {
+    if (!isRecorderReady && !micRef.current) {
       console.error("Recorder not ready or mic missing");
       return false;
     }
 
-    // If there's a previous recording, revoke its URL
+    // Clear any previous recording
     if (recordedBlob?.url) {
       URL.revokeObjectURL(recordedBlob.url);
       setRecordedBlob(null);
     }
 
     try {
-      // We don't need to call setupRecorder() every time - that's overkill
-      // Instead, just create a new recorder instance with the existing mic
-
-      // 1) dispose any previous recorder if it exists
+      // Create a fresh recorder for this session
+      const currentDeviceId = deviceId || initializationRef.current.currentDeviceId;
+      
+      if (!currentDeviceId) {
+        console.error("No device ID available for recording");
+        return false;
+      }
+      
+      // Reset recorder for clean recording
       if (recorderRef.current) {
         try {
           recorderRef.current.dispose();
@@ -341,31 +340,31 @@ export function useAudioSystem() {
         }
       }
 
-      // 2) create a brand-new recorder
-      console.log("Creating fresh recorder for this recording session");
+      // Create fresh recorder
+      console.log("Creating fresh recorder for recording");
       const freshRecorder = new Tone.Recorder({ mimeType: "audio/webm" });
-
-      // 3) connect mic to the new recorder
-      if (micRef.current.state !== "started") {
-        console.log("Mic not started, reopening...");
-        if (deviceId) await micRef.current.open(deviceId);
+      
+      // Make sure mic is connected and open
+      if (!micRef.current || micRef.current.state !== "started") {
+        console.log("Mic not started, creating new one");
+        const mic = new Tone.UserMedia();
+        await mic.open(currentDeviceId);
+        micRef.current = mic;
       }
-
+      
+      // Connect and start
       micRef.current.connect(freshRecorder);
       recorderRef.current = freshRecorder;
-
-      // 4) ensure Tone.js context is running
+      
+      // Make sure Tone.js is running
       if (Tone.context.state !== "running") {
-        console.log("Starting Tone.js context");
         await Tone.start();
       }
-
-      // 5) start recording
-      console.log("Starting recording with fresh recorder");
+      
       freshRecorder.start();
       recordingStartTimeRef.current = Date.now();
       setIsRecording(true);
-
+      
       return true;
     } catch (error) {
       console.error("Error starting recording:", error);
@@ -374,7 +373,7 @@ export function useAudioSystem() {
     }
   }, [isRecorderReady, deviceId, recordedBlob]);
 
-  // Stop recording
+  // Stop recording (unchanged)
   const stopRecording = useCallback(async () => {
     if (!isRecording || !recorderRef.current) {
       console.error("Not recording or no recorder instance");
@@ -402,7 +401,7 @@ export function useAudioSystem() {
         rawBlob.size
       );
 
-      // Verify we got a valid recording
+      // Verify valid recording
       if (!rawBlob || rawBlob.size === 0) {
         console.error("Empty recording blob! Audio not captured.");
         setError("Recording failed - no audio captured. Try again.");
@@ -425,16 +424,23 @@ export function useAudioSystem() {
       return null;
     }
   }, [isRecording]);
-  // ========== INITIALIZATION SEQUENCE ==========
 
-  // Complete initialization sequence
+  // Complete initialization sequence with locking
   const initialize = useCallback(async () => {
+    // Prevent multiple simultaneous initialization attempts
+    if (initializationRef.current.initInProgress) {
+      console.log("Initialization already in progress, skipping");
+      return false;
+    }
+    
+    initializationRef.current.initInProgress = true;
+    
     try {
       setInitAttempts((prev) => prev + 1);
       setError(null);
       setInitState("idle");
 
-      // Step 1: Get devices and permission
+      // Get devices and permission
       console.log("Starting initialization sequence");
       setInitState("permission");
       const devices = await getAudioDevices();
@@ -443,17 +449,15 @@ export function useAudioSystem() {
         throw new Error("No microphones found");
       }
 
-      // Step 2: Initialize Tone.js
+      // Initialize Tone.js directly using our helper
       setInitState("tone");
-      const toneInitialized = await initializeTone();
-      if (!toneInitialized) {
+      const toneSuccess = await initToneEngine();
+      if (!toneSuccess) {
         throw new Error("Failed to initialize audio system");
       }
+      setIsToneInitialized(true);
 
-      // Wait for Tone.js to fully initialize
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Step 3: Select default device (first one)
+      // Select default device
       setInitState("devices");
       console.log("Selecting default device");
       const deviceResult = await selectAudioDevice(0);
@@ -462,50 +466,54 @@ export function useAudioSystem() {
         throw new Error("Failed to select microphone");
       }
 
-      // Wait for device to be ready
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Step 4: Set up recorder
-      setInitState("recorder");
-      console.log("Setting up recorder");
-      const recorderReady = await setupRecorder();
-
-      if (!recorderReady) {
-        throw new Error("Failed to set up recorder");
-      }
-
       setInitState("ready");
-      console.log("Initialization complete - recorder ready");
+      console.log("Initialization complete");
+      initializationRef.current.initInProgress = false;
       return true;
     } catch (error) {
       console.error("Initialization failed:", error);
       setError(`Initialization failed: ${error || "Unknown error"}`);
       setInitState("failed");
+      initializationRef.current.initInProgress = false;
       return false;
     }
-  }, [getAudioDevices, initializeTone, selectAudioDevice, setupRecorder]);
+  }, [getAudioDevices, selectAudioDevice]);
 
   // ========== EFFECTS ==========
 
-  // Effect to handle device changes
+  // Initialize Tone.js after component mounts
   useEffect(() => {
-    if (deviceId && isToneInitialized && !isRecorderReady) {
-      console.log("Device ID and Tone.js ready, setting up recorder");
-      setupRecorder();
+    // Initialize Tone.js silently on mount, if needed
+    if (!initializationRef.current.hasInitializedTone) {
+      initToneEngine()
+        .then(success => {
+          if (success) {
+            setIsToneInitialized(true);
+          }
+        })
+        .catch(err => console.warn("Silent Tone.js init failed:", err));
+    }
+  }, []);
+
+  // Set up recorder when device ID and Tone.js are ready
+  useEffect(() => {
+    if ((deviceId || initializationRef.current.currentDeviceId) && 
+        (isToneInitialized || initializationRef.current.hasInitializedTone) && 
+        !isRecorderReady) {
+      console.log("Device and Tone ready, setting up recorder");
+      setupRecorder().catch(err => console.error("Recorder setup error:", err));
     }
   }, [deviceId, isToneInitialized, isRecorderReady, setupRecorder]);
 
-  // Cleanup effect
+  // Cleanup effect (unchanged)
   useEffect(() => {
     return () => {
       console.log("Cleaning up audio system resources");
 
-      // Stop any active media stream
       if (mediaStream) {
         mediaStream.getTracks().forEach((track) => track.stop());
       }
 
-      // Clean up Tone.js resources
       if (micRef.current) {
         try {
           micRef.current.disconnect();
@@ -521,6 +529,10 @@ export function useAudioSystem() {
         } catch (e) {
           console.warn("Error cleaning up recorder:", e);
         }
+      }
+
+      if (recordedBlob?.url) {
+        URL.revokeObjectURL(recordedBlob.url);
       }
     };
   }, [mediaStream, recordedBlob]);
@@ -553,8 +565,9 @@ export function useAudioSystem() {
     audioSystemStatus: {
       initState,
       deviceCount: audioDevices.length,
-      toneState: Tone.context.state,
-      selectedDevice: deviceId || "none",
+      toneState: Tone.context ? Tone.context.state : 'unknown',
+      selectedDevice: deviceId || initializationRef.current.currentDeviceId || "none",
+      hasInitializedTone: initializationRef.current.hasInitializedTone
     },
   };
 }
