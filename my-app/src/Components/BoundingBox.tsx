@@ -322,7 +322,7 @@ export default function BoundingBox() {
     );
 
   const handleRecordingComplete = useCallback((newAudioInfo: AudioInfo) => {
-    console.log("📝 Parent received recording:", newAudioInfo);
+  console.log("🎉 BoundingBox: handleRecordingComplete called with:", newAudioInfo);
   setAudioInfos((prev) => {
       // Find if there's an existing recording slot
       const recordingIndex = prev.findIndex(
@@ -333,6 +333,8 @@ export default function BoundingBox() {
         // Replace the recording slot with actual recording
         const updated = [...prev];
         updated[recordingIndex] = newAudioInfo;
+    console.log("📝 BoundingBox: Updated audioInfos from", prev.length, "to", updated.length);
+    console.log("📝 BoundingBox: New audioInfos:", newAudioInfo);
 
         return updated;
       } else {
@@ -348,7 +350,8 @@ export default function BoundingBox() {
 
   // Handle recording start
   const handleRecordingStart = useCallback(() => {
-    setCurrentTrack("Recording in progress...");
+      console.log("🎬 BoundingBox: handleRecordingStart called");
+      setCurrentTrack("Recording in progress...");
   }, []);
 
   // Method to rebuild audio refs when audioInfos changes
@@ -627,6 +630,8 @@ export default function BoundingBox() {
     });
   }
 
+
+
   // Apply position-based muting for all audio circles
   useEffect(() => {
     if (audioRefsCreated) {
@@ -644,8 +649,13 @@ export default function BoundingBox() {
     }
   }, [audioRefsCreated]);
 
+  
+
+
+
   // Don't render anything on the server, only render on client
   if (!mounted) return null;
+
 
   return (
     <div className="flex flex-col h-screen w-screen">
@@ -727,7 +737,7 @@ export default function BoundingBox() {
 
             return (
               <AudioCircle
-                key={index}
+                key={info.id}
                 startPoint={{
                   x: position.x / 100, // Convert back to decimal for startPoint
                   y: position.y / 100,
@@ -835,6 +845,8 @@ export default function BoundingBox() {
           loopDurationFromStem={totalDuration}
           onRecordingComplete={handleRecordingComplete}
           onRecordingStart={handleRecordingStart}
+          recordingSlot={null}
+
         />
         {/* Audio interface outside the bounding box */}
         <AudioInterface

@@ -1,924 +1,351 @@
+// Debug version of RecorderForAudioCircle
 "use client";
-import React, { useState, useEffect } from "react";
-import { Button, Flex, Text, Card, Badge, Box } from "@radix-ui/themes";
-import {
-  PlayIcon,
-  PauseIcon,
-  StopIcon,
-  DotFilledIcon,
-  ReloadIcon,
-  LoopIcon,
-} from "@radix-ui/react-icons";
-import LoopVisualizer from "./LoopVisualizer"; // Import the LoopVisualizer component
-import { useAudioRecorder } from "../app/utils/useAudioRecorder";
-// Simple Record Button Icon Component
-const RecordButtonIcon = () => (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 15 15"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <circle
-      cx="7.5"
-      cy="7.5"
-      r="7"
-      fill="currentColor"
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Button, Flex, Text, Progress } from '@radix-ui/themes';
+import { PlayIcon, StopIcon } from '@radix-ui/react-icons';
+const MicrophoneIcon=()=> {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-6 h-6 text-white"
+      fill="none"
+      viewBox="0 0 24 24"
       stroke="currentColor"
-      strokeWidth="1"
-    />
-  </svg>
-);
-// TypeScript-friendly AudioContext
-interface WindowWithAudioContext extends Window {
-  webkitAudioContext?: typeof AudioContext;
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 1v10m0 0a4 4 0 004-4V5a4 4 0 00-8 0v2a4 4 0 004 4zm6 2a6 6 0 01-12 0M5 15v2a7 7 0 0014 0v-2"
+      />
+    </svg>
+  );
 }
 
-interface RecorderForAudioCircleComponentsProp {
+interface RecorderForAudioCircleProps {
   width: number;
   height: number;
   loopDurationFromStem: number;
-  onRecordingComplete?: (blobUrl: string) => void;
-  onRecordingStart?: () => void;
+  onRecordingComplete: (blobUrl: string) => void;
+  onRecordingStart: () => void;
   isVisible?: boolean;
 }
 
-const RecorderForAudioCircle: React.FC<
-  RecorderForAudioCircleComponentsProp
-> = ({
+export default function RecorderForAudioCircle({
   width,
   height,
   loopDurationFromStem,
   onRecordingComplete,
   onRecordingStart,
-  isVisible = true,
-}) => {
-  const {
-    // State
-    mediaStream,
-    audioDevices,
-    deviceIndex,
-    isPermissionGranted,
-    error,
-    isRecorderReady,
-    isRecording,
-    isToneInitialized,
-    recordedBlob,
-    initState,
-
-    // Functions
-    initialize,
-    selectAudioDevice,
-    startRecording,
-    stopRecording,
-
-    // Loop-related state
-    loopPosition,
-    loopBuffer,
-    loopDuration,
-    isLoopPlaybackActive,
-    isLoopRecording,
-    // loopRecordingError,
-
-    // Loop-related functions
-    initializeLoopBuffer,
-    startLoopRecordingAt,
-    stopLoopRecordingAndMerge,
-    playLoopWithTracking,
-    stopLoopPlayback,
-    loopBlobUrl,
-    // exportLoopToBlob,
-    getWaveformData,
-  } = useAudioRecorder();
-
-  // Local component state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
-    null
-  );
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(
-    null
-  );
-  const [statusMessage, setStatusMessage] = useState<string | null>(
-    "Please initialize audio system"
-  );
-  const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [visualizationActive, setVisualizationActive] = useState(false);
-  const [isLoopPlaying, setIsLoopPlaying] = useState(false);
-  const [loopDurationInput, setLoopDurationInput] = useState<number>(10);
-  const [loopMode, setLoopMode] = useState(true);
-  // const [showLoopUI, setShowLoopUI] = useState(true);
-  const [recordingSegments, setRecordingSegments] = useState<
-    { start: number; end: number | null }[]
-  >([]);
-  const [waveformData, setWaveformData] = useState<number[]>([]);
-// debug 
+  isVisible = true
+}: RecorderForAudioCircleProps) {
+  // Debug: Log when callbacks are received
   useEffect(() => {
-    if (loopBlobUrl && onRecordingComplete) {
-      console.log("on recording COMPLETE");
-      onRecordingComplete(loopBlobUrl);
-    }
-  }, [loopBlobUrl, onRecordingComplete]);
-
-
- useEffect(() => {
-    if (isRecording && onRecordingStart) {
-      console.log("on recording START");
-      onRecordingStart();
-    }
-  }, [isRecording, onRecordingStart]);
-
- useEffect(() => {
-    if (isVisible) {
-      console.log("audio panel is visible");
-    }
-  }, [isVisible]);
-
-  useEffect(() => {
-    const checkBrowserSupport = () => {
-      try {
-        const AudioContextClass =
-          window.AudioContext ||
-          (window as WindowWithAudioContext).webkitAudioContext;
-
-        const checks = {
-          audioContext: typeof AudioContextClass !== "undefined",
-          mediaDevices: !!navigator.mediaDevices,
-          getUserMedia: !!navigator.mediaDevices?.getUserMedia,
-          enumerateDevices: !!navigator.mediaDevices?.enumerateDevices,
-        };
-
-        console.log("Browser support checks:", checks);
-
-        if (!checks.audioContext) {
-          setStatusMessage(
-            "Warning: Your browser doesn't support AudioContext"
-          );
-        }
-
-        if (!checks.mediaDevices || !checks.getUserMedia) {
-          setStatusMessage(
-            "Warning: Your browser doesn't support media devices"
-          );
-        }
-      } catch (e) {
-        console.error("Error checking browser support:", e);
-        setStatusMessage("Warning: Error checking browser compatibility");
-      }
-    };
-
-    checkBrowserSupport();
-  }, []);
-
-  // Initialize on component mount
-  useEffect(() => {
-    console.log("Component mounted");
-  }, []);
-
-  // Handle initialization
-  const handleInitialize = async () => {
-    try {
-      setStatusMessage("Initializing audio system...");
-      const success = await initialize();
-
-      handlLoopDurationChangeFromSTEMAudio(loopDurationFromStem);
-      if (success) {
-        setStatusMessage(null);
-      } else {
-        setStatusMessage("Initialization failed. Please try again.");
-      }
-    } catch (err) {
-      console.error("Initialization error:", err);
-      setStatusMessage(`Failed to initialize: ${err || "Unknown error"}`);
-    }
-  };
-
-  // Handle device selection
-  const handleDeviceChange = async (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const newIndex = parseInt(e.target.value, 10);
-
-    try {
-      setStatusMessage(`Changing to microphone ${newIndex + 1}...`);
-      await selectAudioDevice(newIndex);
-      setStatusMessage(null);
-    } catch (err) {
-      console.error("Device change error:", err);
-      setStatusMessage(
-        `Failed to change microphone: ${err || "Unknown error"}`
-      );
-    }
-  };
-
-  // Handle position change from visualizer
-  const handlePositionChange = (newPosition: number) => {
-    // Only allow position changes when not recording
-    if (!isLoopRecording) {
-      // If playing, restart from new position
-      if (isLoopPlaybackActive) {
-        stopLoopPlayback();
-        setTimeout(() => {
-          playLoopWithTracking(newPosition);
-        }, 100);
-      }
-    }
-  };
-
-  // Reinitialize recorder
-  // const handleStartRecorder = async () => {
-  //   try {
-  //     if (!isRecorderReady) {
-  //       setStatusMessage("Recorder not ready. Please initialize first.");
-  //       return;
-  //     }
-
-  //     setStatusMessage("Setting up recorder...");
-  //     const success = await setupRecorder();
-  //     if (success) {
-  //       setStatusMessage(null);
-  //     } else {
-  //       setStatusMessage("Failed to setup recorder. Please try again.");
-  //     }
-  //   } catch (err) {
-  //     console.error("Setting up recorder error:", err);
-  //     setStatusMessage(`Setting up recorder error: ${err || "Unknown error"}`);
-  //   }
-  // };
-
-  // Handle recording start
-  const handleStartRecording = async () => {
-    try {
-      if (!isRecorderReady) {
-        setStatusMessage("Recorder not ready. Please initialize first.");
-        return;
-      }
-
-      setStatusMessage("Starting recording...");
-      const success = await startRecording();
-
-      if (success) {
-        setStatusMessage(null);
-      } else {
-        setStatusMessage("Failed to start recording. Please try again.");
-      }
-    } catch (err) {
-      console.error("Recording start error:", err);
-      setStatusMessage(`Recording error: ${err || "Unknown error"}`);
-    }
-  };
-
-  // Handle recording stop
-  const handleStopRecording = async () => {
-    try {
-      setStatusMessage("Stopping recording...");
-      const result = await stopRecording();
-
-      if (result) {
-        setStatusMessage(null);
-      } else {
-        setStatusMessage("Failed to stop recording.");
-      }
-    } catch (err) {
-      console.error("Recording stop error:", err);
-      setStatusMessage(`Error stopping recording: ${err || "Unknown error"}`);
-    }
-  };
-
-  const handlLoopDurationChangeFromSTEMAudio = (duration: number) => {
-    setLoopDurationInput(duration);
-    if (!isNaN(duration) && duration >= 1 && duration <= 60) {
-      initializeLoopBuffer(duration);
-    }
-  };
-
-  // Handle loop duration input
-  // this works when the loop duration input is string
-  //   const handleLoopDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //     // Only allow positive numbers
-  //     const value = e.target.value.replace(/[^0-9]/g, "");
-  //     setLoopDurationInput(value);
-
-  //     // Update the actual duration in the hook
-  //     const duration = parseInt(value, 10);
-  //     if (!isNaN(duration) && duration >= 1 && duration <= 60) {
-  //       initializeLoopBuffer(duration);
-  //     }
-  //   };
-
-  // Toggle loop mode
-  const handleToggleLoopMode = () => {
-    setLoopMode((prev) => !prev);
-  };
-
-  // Start loop recording
-  const handleStartLoopRecording = async () => {
-    try {
-      if (!isRecorderReady) {
-        setStatusMessage("Recorder not ready. Please initialize first.");
-        return;
-      }
-
-      setStatusMessage(`Starting ${loopDuration} second loop recording...`);
-
-      // Add a new recording segment that starts now
-      const newSegment = {
-        start: loopPosition,
-        end: null, // Will be set when recording stops
-      };
-      setRecordingSegments((prev) => [...prev, newSegment]);
-
-      // Use the actual current loop position for better synchronization
-      const currentPos = loopPosition;
-      const success = await startLoopRecordingAt(currentPos, loopDuration);
-
-      if (success) {
-        setStatusMessage(
-          `Recording ${loopDuration} second loop at position ${currentPos.toFixed(
-            3
-          )}s...`
-        );
-      } else {
-        // Remove the segment if recording failed to start
-        setRecordingSegments((prev) => prev.slice(0, -1));
-        setStatusMessage("Failed to start loop recording. Please try again.");
-      }
-    } catch (err) {
-      console.error("Loop recording start error:", err);
-      setStatusMessage(`Loop recording error: ${err || "Unknown error"}`);
-    }
-  };
-
-  // Stop loop recording or start recording at current position
-  const handleLoopRecordToggle = async () => {
-    try {
-      if (isLoopRecording) {
-        // If currently recording, stop it
-        setStatusMessage("Stopping loop recording...");
-        const result = await stopLoopRecordingAndMerge();
-
-        // Update the last recording segment with its end position
-        setRecordingSegments((prev) => {
-          if (prev.length === 0) return prev;
-          const updated = [...prev];
-          updated[updated.length - 1].end = loopPosition;
-          return updated;
-        });
-
-        if (result) {
-          setStatusMessage("Loop recording complete. Ready to play.");
-        } else {
-          setStatusMessage("Failed to create loop.");
-        }
-      } else {
-        setRecordingSegments([]);
-        // If not recording, start recording at current position
-        if (isLoopPlaybackActive) {
-          // If loop is playing, record at current position
-          await handleStartLoopRecording();
-        } else {
-          // If loop is not playing, start it and then record
-          setStatusMessage("Starting loop playback and recording...");
-          await playLoopWithTracking();
-          setTimeout(() => {
-            handleStartLoopRecording();
-          }, 300); // Small delay to ensure playback has started
-        }
-      }
-    } catch (err) {
-      console.error("Loop recording toggle error:", err);
-      setStatusMessage(`Error with loop recording: ${err || "Unknown error"}`);
-    }
-  };
-  // Handle Download Loop
-  // const handleDownloadLoop = async () => {
-  //   try {
-  //     setIsDownloadingLoop(true);
-  //     setStatusMessage("Preparing loop for download...");
-
-  //     // Check if we already have a blob URL
-  //     if (loopBlobUrl) {
-  //       triggerDownload(loopBlobUrl, "loop-recording.wav");
-  //       setStatusMessage("Loop download started!");
-  //       setIsDownloadingLoop(false);
-  //       return;
-  //     }
-
-  //     // Otherwise, export the loop buffer to a blob
-  //     const result = await exportLoopToBlob();
-
-  //     if (result && result.url) {
-  //       triggerDownload(result.url, "loop-recording.wav");
-  //       setStatusMessage("Loop download started!");
-  //     } else {
-  //       setStatusMessage(
-  //         "Failed to export loop for download. Please try again."
-  //       );
-  //     }
-
-  //     setIsDownloadingLoop(false);
-  //   } catch (err) {
-  //     console.error("Error downloading loop:", err);
-  //     setStatusMessage(`Error preparing download: ${err || "Unknown error"}`);
-  //     setIsDownloadingLoop(false);
-  //   }
-  // };
-
-  // Helper function to trigger a download from a blob URL
-  // const triggerDownload = (url: string, filename: string) => {
-  //   const anchor = document.createElement("a");
-  //   anchor.href = url;
-  //   anchor.download = filename;
-  //   document.body.appendChild(anchor);
-  //   anchor.click();
-  //   document.body.removeChild(anchor);
-  // };
-  // Stop all loop activity
-  const handleStopAll = () => {
-    if (isLoopRecording) {
-      stopLoopRecordingAndMerge();
-    }
-    if (isLoopPlaybackActive) {
-      stopLoopPlayback();
-      setIsLoopPlaying(false);
-    }
-    setStatusMessage("All loop operations stopped.");
-  };
-
-  // Toggle loop playback
-  const handleToggleLoopPlayback = async () => {
-    try {
-      if (isLoopPlaybackActive) {
-        await stopLoopPlayback();
-
-        setStatusMessage("Loop playback stopped.");
-      } else {
-        setStatusMessage("Starting loop playback...");
-        const success = await playLoopWithTracking();
-
-        if (success) {
-          setIsLoopPlaying(true);
-          setStatusMessage(null);
-        } else {
-          setStatusMessage("Failed to play loop.");
-        }
-      }
-    } catch (err) {
-      console.error("Loop playback error:", err);
-      setStatusMessage(`Loop playback error: ${err || "Unknown error"}`);
-    }
-  };
-
-  // Audio visualization
-  useEffect(() => {
-    if (!mediaStream) {
-      setVisualizationActive(false);
-      setAudioLevel(0); // Reset level when no stream
-      return;
-    }
-
-    setVisualizationActive(true);
-
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as WindowWithAudioContext).webkitAudioContext;
-
-    if (!AudioContextClass) {
-      console.error("AudioContext not supported in this browser");
-      return;
-    }
-
-    const audioContext = new AudioContextClass();
-    const analyzer = audioContext.createAnalyser();
-    analyzer.fftSize = 256;
-
-    const source = audioContext.createMediaStreamSource(mediaStream);
-    source.connect(analyzer);
-
-    const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-    console.log("Visualization active with mediaStream:", mediaStream.id);
-
-    let animationFrame: number;
-
-    const updateAudioLevel = () => {
-      analyzer.getByteFrequencyData(dataArray);
-
-      // Calculate average level
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
-      }
-      const avg = sum / dataArray.length;
-
-      // Normalize to 0-100 range
-      setAudioLevel(Math.min(100, Math.round((avg / 255) * 150)));
-
-      // Continue animation loop
-      animationFrame = requestAnimationFrame(updateAudioLevel);
-    };
-
-    updateAudioLevel();
-
-    // Cleanup
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      source.disconnect();
-      audioContext.close();
-      setVisualizationActive(false);
-
-      if (isLoopPlaying) {
-        stopLoopPlayback();
-      }
-    };
-  }, [mediaStream, isLoopPlaying, stopLoopPlayback]);
-
-  // Handle recording duration timer
-  useEffect(() => {
-    if (isRecording) {
-      setRecordingDuration(0);
-      const timer = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
-      }, 1000);
-      setRecordingTimer(timer);
-    } else if (recordingTimer) {
-      clearInterval(recordingTimer);
-      setRecordingTimer(null);
-    }
-
-    return () => {
-      if (recordingTimer) {
-        clearInterval(recordingTimer);
-      }
-    };
-  }, [isRecording, recordingTimer]);
-
-  // Set up audio element for playback when recording is available
-  useEffect(() => {
-    if (!recordedBlob?.url) return;
-
-    // Clean up previous audio element
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.src = "";
-    }
-
-    const audio = new Audio(recordedBlob.url);
-
-    audio.addEventListener("ended", () => {
-      setIsPlaying(false);
+    console.log("🔧 RecorderForAudioCircle received callbacks:", {
+      onRecordingComplete: typeof onRecordingComplete,
+      onRecordingStart: typeof onRecordingStart,
+      hasComplete: !!onRecordingComplete,
+      hasStart: !!onRecordingStart
     });
+  }, [onRecordingComplete, onRecordingStart]);
 
-    audio.addEventListener("error", (e) => {
-      console.error("Audio element error:", e);
-      setStatusMessage("Error with audio playback");
-      setIsPlaying(false);
-    });
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [hasRecording, setHasRecording] = useState(false);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    setAudioElement(audio);
-
-    return () => {
-      if (audio) {
-        audio.pause();
-        audio.src = "";
-      }
-    };
-  }, [recordedBlob, audioElement]);
-
-  // Update waveform data when loop buffer changes
-  useEffect(() => {
-    if (typeof getWaveformData === "function") {
-      const data = getWaveformData(200);
-      setWaveformData(data);
-    }
-  }, [loopBuffer, getWaveformData]);
-
-  // Toggle audio playback
-  const togglePlayback = () => {
-    if (!audioElement) return;
-
-    if (isPlaying) {
-      audioElement.pause();
-      setIsPlaying(false);
-    } else {
-      audioElement.currentTime = 0;
-      audioElement.play().catch((error) => {
-        console.error("Error playing audio:", error);
-        setStatusMessage("Failed to play recording");
+  const initializeRecorder = useCallback(async () => {
+    console.log("🚀 Initializing recorder...");
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
       });
-      setIsPlaying(true);
+      
+      console.log("✅ Got media stream:", stream);
+      streamRef.current = stream;
+      
+      // Check supported MIME types
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/wav'
+      ];
+      
+      const supportedType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+      console.log("🎵 Using MIME type:", supportedType);
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: supportedType || 'audio/webm'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      
+      // Debug: Log all MediaRecorder events
+      mediaRecorder.onstart = () => {
+        console.log("🎤 MediaRecorder started");
+      };
+      
+      mediaRecorder.ondataavailable = (event) => {
+        console.log("📦 Data available:", {
+          size: event.data.size,
+          type: event.data.type
+        });
+        
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+          console.log("📦 Added chunk, total chunks:", audioChunksRef.current.length);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        console.log("🛑 MediaRecorder stopped");
+        console.log("📦 Total chunks collected:", audioChunksRef.current.length);
+        
+        if (audioChunksRef.current.length === 0) {
+          console.error("❌ No audio chunks recorded!");
+          return;
+        }
+        
+        try {
+          const blob = new Blob(audioChunksRef.current, { 
+            type: mediaRecorder.mimeType || 'audio/webm' 
+          });
+          
+          console.log("✅ Created blob:", {
+            size: blob.size,
+            type: blob.type
+          });
+          
+          if (blob.size === 0) {
+            console.error("❌ Blob is empty!");
+            return;
+          }
+          
+          // Set state first
+          setRecordingBlob(blob);
+          setHasRecording(true);
+          
+          // Create blob URL
+          const blobUrl = URL.createObjectURL(blob);
+          console.log("✅ Created blob URL:", blobUrl);
+          
+          // Test the blob URL
+          const testAudio = new Audio(blobUrl);
+          
+          testAudio.onloadedmetadata = () => {
+            console.log("✅ Blob URL is valid, duration:", testAudio.duration);
+            
+            // Call the callback
+            console.log("📞 Calling onRecordingComplete with:", blobUrl);
+            if (onRecordingComplete && typeof onRecordingComplete === 'function') {
+              onRecordingComplete(blobUrl);
+              console.log("✅ onRecordingComplete called successfully");
+            } else {
+              console.error("❌ onRecordingComplete is not a function:", typeof onRecordingComplete);
+            }
+          };
+          
+          testAudio.onerror = (error) => {
+            console.error("❌ Blob URL test failed:", error);
+            // Still try to call the callback
+            if (onRecordingComplete && typeof onRecordingComplete === 'function') {
+              onRecordingComplete(blobUrl);
+            }
+          };
+          
+          // Load to trigger the test
+          testAudio.load();
+          
+          // Reset chunks for next recording
+          audioChunksRef.current = [];
+          
+        } catch (error) {
+          console.error("❌ Error processing recording:", error);
+        }
+      };
+      
+      mediaRecorder.onerror = (error) => {
+        console.error("❌ MediaRecorder error:", error);
+      };
+      
+      console.log("✅ MediaRecorder initialized successfully");
+      
+    } catch (error) {
+      console.error("❌ Error initializing recorder:", error);
     }
-  };
+  }, [onRecordingComplete]);
 
-  // Format seconds as mm:ss
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
+  // Initialize recorder on mount
+  useEffect(() => {
+    initializeRecorder();
+    
+    return () => {
+      console.log("🧹 Cleaning up recorder...");
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          console.log("🛑 Stopping track:", track.kind);
+          track.stop();
+        });
+      }
+    };
+  }, []); // Empty dependency array - initialize once
 
-  // Get status badge
-  const getStatusBadge = () => {
-    if (!isPermissionGranted) {
-      return <Badge color="red">Permission Denied</Badge>;
+  const startRecording = useCallback(() => {
+    console.log("🎬 Starting recording...");
+    
+    if (!mediaRecorderRef.current) {
+      console.error("❌ MediaRecorder not initialized!");
+      return;
     }
-
-    if (isRecording) {
-      return <Badge color="red">Recording</Badge>;
+    
+    if (mediaRecorderRef.current.state !== 'inactive') {
+      console.error("❌ MediaRecorder is not in inactive state:", mediaRecorderRef.current.state);
+      return;
     }
-
-    if (isLoopRecording) {
-      return <Badge color="red">Loop Recording</Badge>;
+    
+    try {
+      // Reset state
+      setRecordingTime(0);
+      setIsRecording(true);
+      setIsPaused(false);
+      setHasRecording(false);
+      audioChunksRef.current = [];
+      
+      // Call onRecordingStart
+      console.log("📞 Calling onRecordingStart");
+      if (onRecordingStart && typeof onRecordingStart === 'function') {
+        onRecordingStart();
+        console.log("✅ onRecordingStart called successfully");
+      } else {
+        console.error("❌ onRecordingStart is not a function:", typeof onRecordingStart);
+      }
+      
+      // Start recording
+      mediaRecorderRef.current.start(100);
+      console.log("✅ MediaRecorder.start() called");
+      
+      // Start timer
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          const newTime = prev + 0.1;
+          if (newTime >= loopDurationFromStem) {
+            console.log("⏰ Auto-stopping at loop duration");
+            stopRecording();
+            return loopDurationFromStem;
+          }
+          return newTime;
+        });
+      }, 100);
+      
+    } catch (error) {
+      console.error("❌ Error starting recording:", error);
+      setIsRecording(false);
     }
+  }, [onRecordingStart, loopDurationFromStem]);
 
-    if (isRecorderReady) {
-      return <Badge color="green">Ready</Badge>;
+  const stopRecording = useCallback(() => {
+    console.log("🛑 Stopping recording...");
+    
+    if (!mediaRecorderRef.current || !isRecording) {
+      console.log("⚠️ Not recording or MediaRecorder not available");
+      return;
     }
-
-    if (isToneInitialized) {
-      return <Badge color="amber">Initializing...</Badge>;
+    
+    try {
+      if (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused') {
+        mediaRecorderRef.current.stop();
+        console.log("✅ MediaRecorder.stop() called");
+      }
+      
+      setIsRecording(false);
+      setIsPaused(false);
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
+    } catch (error) {
+      console.error("❌ Error stopping recording:", error);
     }
+  }, [isRecording]);
 
-    if (initState === "failed") {
-      return <Badge color="red">Failed</Badge>;
-    }
-
-    return <Badge color="amber">Not Initialized</Badge>;
-  };
-
-  // debug position updates:
-  //   useEffect(() => {
-  //     console.log("AudioRecorder received position update:", {
-  //       loopPosition,
-  //       isLoopPlaybackActive,
-  //       isLoopRecording,
-  //       timestamp: Date.now(),
-  //     });
-  //   }, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
+  const progress = (recordingTime / loopDurationFromStem) * 100;
 
   return (
-    <Box maxWidth={`${width}px`} maxHeight={`${height}px`}>
-      <Card className="p-6 mx-auto bg-white rounded-xl shadow-lg">
-        <Flex direction="column" gap="4">
-          <Flex justify="between" align="center">
-            <Text size="5" weight="bold">
-              Audio Recorder
+    <div className="recorder-for-audio-circle border p-4" style={{ width, height }}>
+      <Flex direction="column" gap="4">
+        <Text size="4" weight="bold">
+          Audio Recorder (Debug Mode)
+        </Text>
+        
+        <div className="text-xs bg-gray-100 p-2 rounded">
+          <div>State: Recording={isRecording.toString()}, HasRecording={hasRecording.toString()}</div>
+          <div>Callbacks: Start={typeof onRecordingStart}, Complete={typeof onRecordingComplete}</div>
+          <div>MediaRecorder: {mediaRecorderRef.current ? mediaRecorderRef.current.state : 'null'}</div>
+        </div>
+        
+        {isVisible && (
+          <>
+            <Progress value={progress} max={100} />
+            
+            <Text size="2">
+              {recordingTime.toFixed(1)}s / {loopDurationFromStem}s
             </Text>
-            {getStatusBadge()}
-          </Flex>
-
-          {(error || statusMessage) && (
-            <Card className="p-3 bg-amber-100">
-              <Text size="2">{statusMessage || error}</Text>
-            </Card>
-          )}
-
-          {!isRecorderReady && (
-            <Flex justify="center" my="2">
-              <Button onClick={handleInitialize} color="green">
-                {initState === "failed" ? (
-                  <>
-                    <ReloadIcon /> Retry Initialization
-                  </>
-                ) : (
-                  "Initialize Audio System"
-                )}
-              </Button>
-            </Flex>
-          )}
-
-          {/* Debug info - remove in production */}
-          <Card className="p-3 bg-gray-100 text-xs">
-            <Text size="1">
-              <strong>Status:</strong> {initState} |<strong> Tone:</strong>{" "}
-              {isToneInitialized ? "Initialized" : "Not Initialized"} |
-              <strong> Ready:</strong> {isRecorderReady ? "Yes" : "No"} |
-              <strong> Devices:</strong> {audioDevices.length} |
-              <strong> LoopMode:</strong> {loopMode ? "On" : "Off"}
-            </Text>
-          </Card>
-
-          {isPermissionGranted && (
-            <>
-              <Flex direction="column" gap="2">
-                <Text size="2" weight="medium">
-                  Select Microphone:
-                </Text>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  value={deviceIndex}
-                  onChange={handleDeviceChange}
-                  disabled={isRecording || !isRecorderReady}
-                >
-                  {audioDevices.map((device, index) => (
-                    <option key={device.deviceId} value={index}>
-                      {device.label || `Microphone ${index + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </Flex>
-
-              {visualizationActive && (
-                <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">
-                    Audio Level:
-                  </Text>
-                  <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-100 ease-out ${
-                        isRecording || isLoopRecording
-                          ? "bg-red-500"
-                          : "bg-green-600"
-                      }`}
-                      style={{ width: `${audioLevel}%` }}
-                    ></div>
-                  </div>
-                </Flex>
-              )}
-
-              {loopMode ? (
-                /* Loop Recording Mode UI */
-                <Card className="p-4 bg-blue-50 rounded-lg">
-                  <Flex direction="column" gap="3">
-                    <Text size="3" weight="medium">
-                      Loop Recording Mode
-                    </Text>
-
-                    {/* Loop Duration Input */}
-                    <Flex gap="2" align="center">
-                      <Text size="2">Duration:</Text>{" "}
-                      {loopDurationInput.toFixed(2)}
-                      <Text size="2">seconds</Text>
-                      <Button
-                        variant="soft"
-                        size="1"
-                        onClick={() => initializeLoopBuffer(loopDurationInput)}
-                        disabled={isLoopRecording || isLoopPlaybackActive}
-                      >
-                        <ReloadIcon /> Current Audio Length
-                      </Button>
-                    </Flex>
-
-                    {/* Loop Visualizer */}
-                    {loopBuffer && (
-                      <div className="mt-2 mb-2">
-                        <LoopVisualizer
-                          loopBuffer={loopBuffer}
-                          loopDuration={loopDuration}
-                          loopPosition={loopPosition}
-                          isLoopPlaybackActive={isLoopPlaybackActive}
-                          isLoopRecording={isLoopRecording}
-                          recordingSegments={recordingSegments}
-                          onPlayPause={handleToggleLoopPlayback}
-                          onRecord={handleLoopRecordToggle}
-                          onStop={handleStopAll}
-                          onPositionChange={handlePositionChange}
-                          waveformData={waveformData}
-                        />
-                      </div>
-                    )}
-
-                    {/* Loop Transport Controls */}
-                    <Flex gap="2" justify="center">
-                      <Button
-                        color={isLoopPlaybackActive ? "amber" : "green"}
-                        onClick={handleToggleLoopPlayback}
-                      >
-                        {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
-                        {isLoopPlaybackActive ? "Stop Loop" : "Play Loop"}
-                      </Button>
-
-                      <Button
-                        color={isLoopRecording ? "red" : "blue"}
-                        onClick={handleLoopRecordToggle}
-                        disabled={!loopBuffer}
-                      >
-                        {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
-                        {isLoopRecording ? "Stop Recording" : "Record"}
-                      </Button>
-                    </Flex>
-                    {/* tentative, issue with download  */}
-                    {/* <Flex gap="2" justify="center">
-                    {loopMode && (
-                      <div className="mt-2">
-                        
-                          <>
-                            <Text size="2" weight="medium">
-                              Loop Preview:
-                            </Text>{" "}
-                            <Button onClick={handleDownloadLoop}>
-                              Download Loop
-                            </Button>
-                            <audio
-                              src={loopBlobUrl!}
-                              controls
-                              className="w-full mt-1"
-                            />
-                          </>
-                        
-                      </div>
-                    )}
-                  </Flex> */}
-                  </Flex>
-                </Card>
-              ) : (
-                /* Normal Recording Mode UI */
-                <>
-                  {isRecording && (
-                    <Flex align="center" gap="2">
-                      <DotFilledIcon className="text-red-500 animate-pulse" />
-                      <Text size="2" color="red">
-                        Recording: {formatDuration(recordingDuration)}
-                      </Text>
-                    </Flex>
-                  )}
-
-                  <Flex gap="2" justify="center">
-                    {isRecording ? (
-                      <Button color="red" onClick={handleStopRecording}>
-                        <StopIcon /> Stop Recording
-                      </Button>
-                    ) : (
-                      <Button
-                        color="red"
-                        onClick={handleStartRecording}
-                        disabled={!isRecorderReady}
-                      >
-                        <RecordButtonIcon /> Start Recording
-                      </Button>
-                    )}
-                  </Flex>
-
-                  {recordedBlob && (
-                    <Card className="p-3 bg-gray-50">
-                      <Flex direction="column" gap="2">
-                        <Text size="2" weight="medium">
-                          Recording:
-                        </Text>
-                        <Flex gap="2">
-                          <Button
-                            variant="soft"
-                            color={isPlaying ? "amber" : "green"}
-                            onClick={togglePlayback}
-                          >
-                            {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                            {isPlaying ? "Pause" : "Play"}
-                          </Button>
-                          <Button
-                            variant="soft"
-                            onClick={() => {
-                              const anchor = document.createElement("a");
-                              anchor.download = "recording.webm";
-                              anchor.href = recordedBlob.url;
-                              anchor.click();
-                            }}
-                          >
-                            Download
-                          </Button>
-                        </Flex>
-                        <audio
-                          src={recordedBlob.url}
-                          controls
-                          className="w-full mt-2"
-                        />
-                      </Flex>
-                    </Card>
-                  )}
-                </>
-              )}
-
-              <Flex justify="center" mt="2">
-                <Button
-                  variant="soft"
-                  color={loopMode ? "blue" : "gray"}
-                  onClick={handleToggleLoopMode}
-                  disabled={isRecording}
-                >
-                  <LoopIcon />{" "}
-                  {loopMode ? "Switch to Normal Mode" : "Switch to Loop Mode"}
+            
+            <Flex gap="2" justify="center">
+              {!isRecording ? (
+                <Button onClick={startRecording} color="red">
+                  <MicrophoneIcon />
+                  Start Recording
                 </Button>
+              ) : (
+                <Button onClick={stopRecording} color="gray">
+                  <StopIcon />
+                  Stop Recording
+                </Button>
+              )}
+              
+              {hasRecording && recordingBlob && (
+                <Button 
+                  onClick={() => {
+                    const url = URL.createObjectURL(recordingBlob);
+                    const audio = new Audio(url);
+                    audio.play();
+                  }} 
+                  color="green"
+                >
+                  <PlayIcon />
+                  Test Play
+                </Button>
+              )}
+            </Flex>
+            
+            {isRecording && (
+              <Flex align="center" justify="center" gap="2">
+                <div className="animate-pulse w-3 h-3 bg-red-500 rounded-full" />
+                <Text size="2" color="red">RECORDING</Text>
               </Flex>
-
-              <Text size="2" color="gray">
-                {mediaStream ? (
-                  <>
-                    Active microphone:{" "}
-                    {audioDevices[deviceIndex]?.label ||
-                      `Microphone ${deviceIndex + 1}`}
-                  </>
-                ) : (
-                  <>No active microphone</>
-                )}
-              </Text>
-            </>
-          )}
-        </Flex>
-      </Card>
-    </Box>
+            )}
+          </>
+        )}
+      </Flex>
+    </div>
   );
-};
-
-export default RecorderForAudioCircle;
+}

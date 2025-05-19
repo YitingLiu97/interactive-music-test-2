@@ -21,37 +21,44 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
   onRecordingStart,
   recordingSlot
 }) => {
+  console.log("🔧 AudioRecordingManager rendered with props:", {
+    onRecordingComplete: typeof onRecordingComplete,
+    onRecordingStart: typeof onRecordingStart,
+    hasComplete: !!onRecordingComplete,
+    hasStart: !!onRecordingStart
+  });
+
   const [isVisible, setIsVisible] = useState<boolean>(false);
 
-  // Simple toggle for visibility only
   const toggleVisibility = useCallback(() => {
+    console.log("👁️ Toggling visibility from", isVisible, "to", !isVisible);
     setIsVisible(prev => !prev);
-  }, []);
+  }, [isVisible]);
 
-  // Callback when recording produces a blob URL
+  // Wrap the callbacks with debugging
+  const handleRecordingStart = useCallback(() => {
+    console.log("🎬 AudioRecordingManager: handleRecordingStart called");
+    if (onRecordingStart && typeof onRecordingStart === 'function') {
+      onRecordingStart();
+      console.log("✅ AudioRecordingManager: onRecordingStart callback executed");
+    } else {
+      console.error("❌ AudioRecordingManager: onRecordingStart is not a function:", typeof onRecordingStart);
+    }
+  }, [onRecordingStart]);
+
   const handleRecordingReady = useCallback((blobUrl: string) => {
-  console.log("🎤 Recording ready with blob URL:", blobUrl);
-  
-  if (!blobUrl) {
-    console.error("❌ No blob URL provided!");
-    return;
-  }
+    console.log("🎤 AudioRecordingManager: handleRecordingReady called with:", blobUrl);
+    
+    if (!blobUrl) {
+      console.error("❌ AudioRecordingManager: No blob URL provided!");
+      return;
+    }
 
-   fetch(blobUrl)
-    .then(response => {
-      console.log("✅ Blob URL is accessible, size:", response.headers.get('content-length'));
-      return response.blob();
-    })
-    .then(blob => {
-      console.log("✅ Blob details:", {
-        size: blob.size,
-        type: blob.type
-      });
-    })
-    .catch(error => {
-      console.error("❌ Blob URL not accessible:", error);
-    });
-
+    // Validate the blob URL
+    if (!blobUrl.startsWith('blob:')) {
+      console.error("❌ AudioRecordingManager: Invalid blob URL format:", blobUrl);
+      return;
+    }
 
     const newAudioInfo: AudioInfo = {
       id: `vocal-recording-${Date.now()}`,
@@ -63,13 +70,23 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
       position: { x: 50, y: 50 },
       audioParams: { pan: 0, volume: 0 }
     };
-  console.log("🔄 Calling onRecordingComplete with:", newAudioInfo);
 
-    onRecordingComplete(newAudioInfo);
+    console.log("🔄 AudioRecordingManager: Calling parent onRecordingComplete with:", newAudioInfo);
+    
+    if (onRecordingComplete && typeof onRecordingComplete === 'function') {
+      onRecordingComplete(newAudioInfo);
+      console.log("✅ AudioRecordingManager: Parent onRecordingComplete executed");
+    } else {
+      console.error("❌ AudioRecordingManager: onRecordingComplete is not a function:", typeof onRecordingComplete);
+    }
   }, [onRecordingComplete, recordingSlot]);
 
   return (
-    <div className="audio-recording-manager">
+    <div className="audio-recording-manager border-2 border-blue-200 p-2">
+      <div className="text-xs bg-blue-100 p-2 mb-2 rounded">
+        AudioRecordingManager Debug - Visible: {isVisible.toString()}
+      </div>
+      
       <Button
         color={isVisible ? "red" : "blue"}
         onClick={toggleVisibility}
@@ -78,22 +95,26 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
         {isVisible ? 'Hide' : 'Show'} Audio Recorder
       </Button>
       
-      {/* Animated container for smooth transitions */}
-
+      <div 
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          isVisible 
+            ? 'max-h-96 opacity-100 transform translate-y-0' 
+            : 'max-h-0 opacity-0 transform -translate-y-2'
+        }`}
+      >
         <div className="pt-4">
-          {/* Keep component mounted but control visibility */}
           <div className={isVisible ? 'block' : 'hidden'}>
             <RecorderForAudioCircle
               width={width}
               height={height}
               loopDurationFromStem={loopDurationFromStem}
               onRecordingComplete={handleRecordingReady}
-              onRecordingStart={onRecordingStart}
-              isVisible={isVisible} // Pass visibility state to recorder
+              onRecordingStart={handleRecordingStart}
+              isVisible={isVisible}
             />
           </div>
         </div>
       </div>
-
+    </div>
   );
 };
