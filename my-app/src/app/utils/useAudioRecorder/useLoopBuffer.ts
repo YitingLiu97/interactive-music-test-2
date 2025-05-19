@@ -65,8 +65,6 @@ export function useLoopBuffer({
           return false;
         }
 
-        console.log(`Initializing empty loop buffer (${duration}s)`);
-
         // Create empty buffer with silence
         const sampleRate = Tone.context.sampleRate;
         const channels = 2; // Stereo
@@ -112,7 +110,6 @@ export function useLoopBuffer({
 
         // Clear any existing blob
         setLoopBlob(null);
-
         console.log("Empty loop buffer created successfully");
         return true;
       } catch (error) {
@@ -350,13 +347,13 @@ export function useLoopBuffer({
         loopPlayerRef.current.start(0, startPosition);
 
         // Update state IMMEDIATELY
-        console.log("Setting isLoopPlaybackActive to true");
+        // console.log("Setting isLoopPlaybackActive to true");
         setIsLoopPlaybackActive(true);
         setLoopPosition(startPosition);
 
         // Start position tracking with a small delay to ensure player has started
         setTimeout(() => {
-          console.log("Starting position tracking...");
+          // console.log("Starting position tracking...");
           startPositionTracking(startPosition);
         }, 100);
 
@@ -427,11 +424,11 @@ export function useLoopBuffer({
         const newRecordingBuffer = await Tone.context.decodeAudioData(
           arrayBuffer
         );
-        console.log(
-          `Decoded recording: ${newRecordingBuffer.duration.toFixed(2)}s, ${
-            newRecordingBuffer.numberOfChannels
-          } channels`
-        );
+        // console.log(
+        //   `Decoded recording: ${newRecordingBuffer.duration.toFixed(2)}s, ${
+        //     newRecordingBuffer.numberOfChannels
+        //   } channels`
+        // );
 
         // Create a new buffer for the merged result
         const mergedBuffer = Tone.context.createBuffer(
@@ -449,9 +446,9 @@ export function useLoopBuffer({
           loopBuffer.length
         );
 
-        console.log(
-          `Merging from sample ${startSample} to ${endSample} (out of ${loopBuffer.length} total samples)`
-        );
+        // console.log(
+        //   `Merging from sample ${startSample} to ${endSample} (out of ${loopBuffer.length} total samples)`
+        // );
 
         // For each channel, copy data appropriately
         for (
@@ -480,9 +477,9 @@ export function useLoopBuffer({
             endSample - startSample
           );
 
-          console.log(
-            `Overlaying ${recordingSampleCount} samples from recording at position ${startSample} for channel ${channel}`
-          );
+          // console.log(
+          //   `Overlaying ${recordingSampleCount} samples from recording at position ${startSample} for channel ${channel}`
+          // );
 
           // Replace specific segment with recording data
           // Smart mixing - fade in/out at boundaries for smoother transitions
@@ -562,7 +559,7 @@ export function useLoopBuffer({
           setLoopRecordingError("Failed to create player after recording");
         }
 
-        console.log("Successfully merged recording into loop");
+        // console.log("Successfully merged recording into loop");
         return true;
       } catch (error) {
         console.error("Error merging recording into loop:", error);
@@ -670,10 +667,6 @@ export function useLoopBuffer({
         if (actualDuration <= 0) {
           throw new Error(`Invalid recording duration: ${actualDuration}`);
         }
-
-        console.log(
-          `Starting loop recording at position ${startPosition}s for ${actualDuration}s`
-        );
 
         // Save the start and end positions for later use when merging
         setLoopRecordStartPosition(startPosition);
@@ -816,11 +809,11 @@ export function useLoopBuffer({
         // Ensure position is never negative
         if (currentPos < 0) currentPos += loopDuration;
 
-        console.log(
-          `Position tracking: elapsed=${elapsed.toFixed(
-            3
-          )}, position=${currentPos.toFixed(3)}`
-        );
+        // console.log(
+        //   `Position tracking: elapsed=${elapsed.toFixed(
+        //     3
+        //   )}, position=${currentPos.toFixed(3)}`
+        // );
         setLoopPosition(currentPos);
       }, 50); // Update every 50ms for smooth animation
     },
@@ -830,10 +823,8 @@ export function useLoopBuffer({
   // Add this useEffect to start tracking when playback becomes active:
   useEffect(() => {
     if (isLoopPlaybackActive && loopBuffer) {
-      console.log("Starting position tracking effect");
       trackPosition();
     } else {
-      console.log("Stopping position tracking effect");
       // Clear tracking when not active
       if (positionAnimationRef.current) {
         cancelAnimationFrame(positionAnimationRef.current);

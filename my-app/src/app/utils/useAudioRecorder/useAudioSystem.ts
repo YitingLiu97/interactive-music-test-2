@@ -166,13 +166,13 @@ export function useAudioSystem() {
         (device) => device.kind === "audioinput"
       );
 
-      audioInputs.forEach((device, index) => {
-        console.log(
-          `Audio device ${index}: ${device.label || "Unnamed device"} (ID: ${
-            device.deviceId || "No ID"
-          })`
-        );
-      });
+      // audioInputs.forEach((device, index) => {
+      //   console.log(
+      //     `Audio device ${index}: ${device.label || "Unnamed device"} (ID: ${
+      //       device.deviceId || "No ID"
+      //     })`
+      //   );
+      // });
 
       setAudioDevices(audioInputs);
 
