@@ -73,7 +73,6 @@ const AudioRecorderComponent = () => {
     stopLoopPlayback,
     loopBlobUrl,
     exportLoopToBlob,
-
     getWaveformData,
   } = useAudioRecorder();
 
@@ -93,7 +92,7 @@ const AudioRecorderComponent = () => {
   const [visualizationActive, setVisualizationActive] = useState(false);
   const [isLoopPlaying, setIsLoopPlaying] = useState(false);
   const [loopDurationInput, setLoopDurationInput] = useState("5");
-  const [loopMode, setLoopMode] = useState(false);
+  const [loopMode, setLoopMode] = useState(true);
   // const [showLoopUI, setShowLoopUI] = useState(true);
   const [recordingSegments, setRecordingSegments] = useState<
     { start: number; end: number | null }[]
