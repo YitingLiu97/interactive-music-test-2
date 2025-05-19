@@ -79,8 +79,8 @@ const AudioRecorderComponent: React.FC<AudioRecorderComponentProps> = ({
     stopLoopRecordingAndMerge,
     playLoopWithTracking,
     stopLoopPlayback,
-    loopBlobUrl,
-    exportLoopToBlob,
+    // loopBlobUrl,
+    // exportLoopToBlob,
     getWaveformData,
   } = useAudioRecorder();
 
@@ -107,7 +107,6 @@ const AudioRecorderComponent: React.FC<AudioRecorderComponentProps> = ({
   >([]);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isDownloadingLoop, setIsDownloadingLoop] = useState<boolean>();
-
 
   useEffect(() => {
     const checkBrowserSupport = () => {
@@ -391,14 +390,14 @@ const AudioRecorderComponent: React.FC<AudioRecorderComponentProps> = ({
   // };
 
   // Helper function to trigger a download from a blob URL
-  const triggerDownload = (url: string, filename: string) => {
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-  };
+  // const triggerDownload = (url: string, filename: string) => {
+  //   const anchor = document.createElement("a");
+  //   anchor.href = url;
+  //   anchor.download = filename;
+  //   document.body.appendChild(anchor);
+  //   anchor.click();
+  //   document.body.removeChild(anchor);
+  // };
   // Stop all loop activity
   const handleStopAll = () => {
     if (isLoopRecording) {
