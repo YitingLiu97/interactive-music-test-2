@@ -44,7 +44,7 @@ export function useLoopBuffer({
   const loopStartTimeRef = useRef<number>(0);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const positionAnimationRef = useRef<number | null>(null);
-
+const isMountedRef = useRef(true);
   // Clean up previous blob URL when creating a new one
   useEffect(() => {
     return () => {
@@ -309,13 +309,9 @@ export function useLoopBuffer({
 
   // ========== PLAYBACK WITH POSITION TRACKING ==========
   // Play the loop with position tracking
+  // In useLoopBuffer.ts, replace the playLoopWithTracking function:
   const playLoopWithTracking = useCallback(
     async (startPosition = 0) => {
-      console.log("=== playLoopWithTracking called ===");
-      console.log("loopBuffer exists:", !!loopBuffer);
-      console.log("loopPlayerRef.current exists:", !!loopPlayerRef.current);
-      console.log("startPosition:", startPosition);
-
       if (!loopBuffer || !loopPlayerRef.current) {
         console.log("Cannot play: No loop buffer or player");
         return false;
@@ -331,7 +327,7 @@ export function useLoopBuffer({
         console.log(`Playing from position: ${startPosition}s`);
 
         // Make sure player is stopped first
-        if (loopPlayerRef.current?.state === "started") {
+        if (loopPlayerRef.current.state === "started") {
           console.log("Stopping existing playback...");
           loopPlayerRef.current.stop();
           // Wait a bit for the stop to take effect
@@ -532,28 +528,42 @@ export function useLoopBuffer({
           channelData.push(mergedBuffer.getChannelData(channel));
         }
         setLoopChannelData(channelData);
+const wasPlaying = isLoopPlaybackActive;
+const currentPosition = loopPosition;
 
-        // Update player with new buffer
-        if (loopPlayerRef.current) {
-          // Need to stop player first if active8j
 
-          const wasPlaying = isLoopPlaybackActive || isLoopRecording;
-          if (wasPlaying) {
-            loopPlayerRef.current.stop();
-          }
+      if (loopPlayerRef.current) {
+  try {
+    if (wasPlaying) {
+      loopPlayerRef.current.stop();
+      setIsLoopPlaybackActive(false);
+    }
+    loopPlayerRef.current.dispose();
+  } catch (e) {
+    console.warn("Error disposing old player:", e);
+  }
+}
 
-          // Set new buffer
-          loopPlayerRef.current.buffer.set(mergedBuffer);
-
-          // Restart if it was playing
-          if (wasPlaying) {
-            setTimeout(() => {
-              if (loopPlayerRef.current) {
-                loopPlayerRef.current.start();
-              }
-            }, 100);
-          }
-        }
+// Create new player with merged buffer
+try {
+  const newPlayer = new Tone.Player(mergedBuffer).toDestination();
+  newPlayer.loop = true;
+  loopPlayerRef.current = newPlayer;
+  
+  // Restart playback if it was playing before
+  if (wasPlaying) {
+    // Small delay to ensure player is ready
+    setTimeout(() => {
+      if (loopPlayerRef.current && isMountedRef.current) {
+        console.log("Restarting playback after merge");
+        playLoopWithTracking(currentPosition);
+      }
+    }, 100);
+  }
+} catch (e) {
+  console.error("Error creating new player after merge:", e);
+  setLoopRecordingError("Failed to create player after recording");
+}
 
         console.log("Successfully merged recording into loop");
         return true;
@@ -840,6 +850,8 @@ export function useLoopBuffer({
 
     // Cleanup on unmount
     return () => {
+          isMountedRef.current = false;
+
       if (positionAnimationRef.current) {
         cancelAnimationFrame(positionAnimationRef.current);
       }

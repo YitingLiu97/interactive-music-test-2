@@ -239,7 +239,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
     // Draw ONLY the active recording segment with highlight if recording
     if (isLoopRecording && activeRecordingSegment) {
-      console.log("loop is recording");
       const startPosition = activeRecordingSegment.start;
       const startX = (startPosition / loopDuration) * canvas.width;
       const currentX = (loopPosition / loopDuration) * canvas.width;
@@ -305,7 +304,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
     // Draw playhead/needle with animation
     const needleX = (loopPosition / loopDuration) * canvas.width;
-    console.log("needle x position is "+needleX);
     // Shadow for needle
     ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx.shadowBlur = 5;
@@ -411,7 +409,7 @@ useEffect(() => {
         </div>
 
         {/* Control buttons */}
-        <Flex gap="2" justify="center">
+        {/* <Flex gap="2" justify="center">
           <Button
             color={isLoopPlaybackActive ? "red" : "green"}
             onClick={onPlayPause}
@@ -424,7 +422,7 @@ useEffect(() => {
             {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
             {isLoopRecording ? "Stop Recording" : "Record"}
           </Button>
-        </Flex>
+        </Flex> */}
       </Flex>
     </div>
   );

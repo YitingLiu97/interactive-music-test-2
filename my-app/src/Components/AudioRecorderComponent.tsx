@@ -407,11 +407,10 @@ const AudioRecorderComponent = () => {
   const handleToggleLoopPlayback = async () => {
     try {
       if (isLoopPlaybackActive) {
-        const success = await stopLoopPlayback();
-        if (success) {
-          setIsLoopPlaying(false);
+       await stopLoopPlayback();
+      
           setStatusMessage("Loop playback stopped.");
-        }
+       
       } else {
         setStatusMessage("Starting loop playback...");
         const success = await playLoopWithTracking();
@@ -749,13 +748,31 @@ const AudioRecorderComponent = () => {
                     </div>
                   )}
 
-                  {/* Loop Download Controls */}
+                  {/* Loop Transport Controls */}
+
                   <Flex gap="2" justify="center">
-                    {/* If you have the audio preview for the loop, you can add it here */}
+                    <Button
+                      color={isLoopPlaybackActive ? "amber" : "green"}
+                      onClick={handleToggleLoopPlayback}
+                    >
+                      {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
+                      {isLoopPlaybackActive ? "Stop Loop" : "Play Loop"}
+                    </Button>
+
+                    <Button
+                      color={isLoopRecording ? "red" : "blue"}
+                      onClick={handleLoopRecordToggle}
+                      disabled={!loopBuffer}
+                    >
+                      {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
+                      {isLoopRecording ? "Stop Recording" : "Record"}
+                    </Button>
+                  </Flex>
+                  {/* tentative, issue with download  */}
+                  {/* <Flex gap="2" justify="center">
                     {loopMode && (
                       <div className="mt-2">
-                        {/* loopblob is nul still whys that  */}
-                        {isLoopPlaybackActive && (
+                        
                           <>
                             <Text size="2" weight="medium">
                               Loop Preview:
@@ -769,10 +786,10 @@ const AudioRecorderComponent = () => {
                               className="w-full mt-1"
                             />
                           </>
-                        )}
+                        
                       </div>
                     )}
-                  </Flex>
+                  </Flex> */}
                 </Flex>
               </Card>
             ) : (
