@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Flex, Text, Card, Badge } from "@radix-ui/themes";
+import { Button, Flex, Text, Card, Badge, Box } from "@radix-ui/themes";
 import {
   PlayIcon,
   PauseIcon,
@@ -36,7 +36,15 @@ interface WindowWithAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-const AudioRecorderComponent = () => {
+interface AudioRecorderComponentProps
+{
+  width: number
+  height: number
+}
+
+const AudioRecorderComponent: React.FC<AudioRecorderComponentProps> = ({
+  width, height,
+}) => {
   // Use our unified audio recorder hook
   const {
     // State
@@ -99,7 +107,7 @@ const AudioRecorderComponent = () => {
   >([]);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isDownloadingLoop, setIsDownloadingLoop] = useState<boolean>();
-  // Check for browser support of key features
+
 
   useEffect(() => {
     const checkBrowserSupport = () => {
@@ -348,38 +356,39 @@ const AudioRecorderComponent = () => {
       setStatusMessage(`Error with loop recording: ${err || "Unknown error"}`);
     }
   };
-  const handleDownloadLoop = async () => {
-    try {
-      setIsDownloadingLoop(true);
-      setStatusMessage("Preparing loop for download...");
+  // Handle Download Loop 
+  // const handleDownloadLoop = async () => {
+  //   try {
+  //     setIsDownloadingLoop(true);
+  //     setStatusMessage("Preparing loop for download...");
 
-      // Check if we already have a blob URL
-      if (loopBlobUrl) {
-        triggerDownload(loopBlobUrl, "loop-recording.wav");
-        setStatusMessage("Loop download started!");
-        setIsDownloadingLoop(false);
-        return;
-      }
+  //     // Check if we already have a blob URL
+  //     if (loopBlobUrl) {
+  //       triggerDownload(loopBlobUrl, "loop-recording.wav");
+  //       setStatusMessage("Loop download started!");
+  //       setIsDownloadingLoop(false);
+  //       return;
+  //     }
 
-      // Otherwise, export the loop buffer to a blob
-      const result = await exportLoopToBlob();
+  //     // Otherwise, export the loop buffer to a blob
+  //     const result = await exportLoopToBlob();
 
-      if (result && result.url) {
-        triggerDownload(result.url, "loop-recording.wav");
-        setStatusMessage("Loop download started!");
-      } else {
-        setStatusMessage(
-          "Failed to export loop for download. Please try again."
-        );
-      }
+  //     if (result && result.url) {
+  //       triggerDownload(result.url, "loop-recording.wav");
+  //       setStatusMessage("Loop download started!");
+  //     } else {
+  //       setStatusMessage(
+  //         "Failed to export loop for download. Please try again."
+  //       );
+  //     }
 
-      setIsDownloadingLoop(false);
-    } catch (err) {
-      console.error("Error downloading loop:", err);
-      setStatusMessage(`Error preparing download: ${err || "Unknown error"}`);
-      setIsDownloadingLoop(false);
-    }
-  };
+  //     setIsDownloadingLoop(false);
+  //   } catch (err) {
+  //     console.error("Error downloading loop:", err);
+  //     setStatusMessage(`Error preparing download: ${err || "Unknown error"}`);
+  //     setIsDownloadingLoop(false);
+  //   }
+  // };
 
   // Helper function to trigger a download from a blob URL
   const triggerDownload = (url: string, filename: string) => {
@@ -616,7 +625,8 @@ const AudioRecorderComponent = () => {
   }, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
 
   return (
-    <Card className="p-6 max-w-lg mx-auto bg-white rounded-xl shadow-lg">
+    <Box maxWidth={`${width}px`} maxHeight={`${height}px`}>
+    <Card  className="p-6 mx-auto bg-white rounded-xl shadow-lg">
       <Flex direction="column" gap="4">
         <Flex justify="between" align="center">
           <Text size="5" weight="bold">
@@ -724,7 +734,7 @@ const AudioRecorderComponent = () => {
                       }
                       disabled={isLoopRecording || isLoopPlaybackActive}
                     >
-                      <ReloadIcon /> New Loop
+                    <ReloadIcon /> New Loop
                     </Button>
                   </Flex>
 
@@ -884,6 +894,7 @@ const AudioRecorderComponent = () => {
         )}
       </Flex>
     </Card>
+    </Box>
   );
 };
 

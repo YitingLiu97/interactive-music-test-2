@@ -126,7 +126,7 @@ export default function AudioInterface({
                         <Heading size="4" className="text-white">
                             {trackListName}
                         </Heading>
-                        <Text size="2" className="text-gray-400">
+                        <Text size="2" className="text-gray-800">
                             <InfoCircledIcon /> By {authorName}
                         </Text>
                         {currentTrack && (

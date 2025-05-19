@@ -8,6 +8,7 @@ import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Trapezoid } from "@/app/types/audioType";
+import AudioRecorderComponent from "./AudioRecorderComponent";
 
 interface AudioInfo {
   audioUrl: string;
