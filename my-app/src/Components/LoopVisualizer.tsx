@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useEffect, useState, useMemo } from "react";
+import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { Button, Flex, Text } from "@radix-ui/themes";
 import { PlayIcon, StopIcon } from "@radix-ui/react-icons";
 
@@ -147,7 +147,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   }, [canvasRef, loopDuration, onPositionChange, isLoopRecording]);
   
   // Efficient rendering function - only renders when something important changes
-  const renderCanvas = () => {
+  const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -169,8 +169,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     lastAudioLevelRef.current = audioLevel;
     needsRenderRef.current = false;// used to be false
     
-    console.log("loop position ref is "+ lastPositionRef.current);
-    console.log("loop position is "+ loopPosition);
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -199,7 +197,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
         const y = middle - amplitude * amplitudeScale;
 
         if (index === 0) {
-          console.log("index move to :" +x);
           ctx.moveTo(x, y);
         } else {
           ctx.lineTo(x, y);// this is printing but it is not displaying the visual
@@ -221,7 +218,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
     // Draw completed recording segments in their colors
     if (completedSegments && completedSegments.length > 0) {
-      console.log("completed segments are "+completedSegments.length);
       completedSegments.forEach((segment, index) => {
         if (segment.start !== undefined && segment.end !== null) {
           const startX = (segment.start / loopDuration) * canvas.width;
@@ -248,9 +244,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
       const startX = (startPosition / loopDuration) * canvas.width;
       const currentX = (loopPosition / loopDuration) * canvas.width;
       const width = currentX - startX;
-      console.log("loop start position is: "+startPosition);
-      console.log("loop position is: "+loopPosition);
-
+    
       if (width > 0) {
         // Highlight current recording with a vibrant red
         ctx.fillStyle = "rgba(239, 68, 68, 0.4)"; // Bright red with transparency
@@ -309,12 +303,8 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
       }
     } 
 
-    console.log("loop position is "+loopPosition);
-    console.log("loop duration is "+loopDuration);
-
     // Draw playhead/needle with animation
     const needleX = (loopPosition / loopDuration) * canvas.width;
-
     console.log("needle x position is "+needleX);
     // Shadow for needle
     ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
@@ -343,7 +333,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(`${loopPosition.toFixed(1)}s`, needleX, canvas.height - 5);
-  };
+  },[loopPosition,activeRecordingSegment,isLoopPlaybackActive,loopDuration,waveformData,completedSegments,isLoopRecording,audioLevel]);
 
   // Set up animation frame for continuous rendering
   useEffect(() => {
@@ -375,7 +365,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     recordingSegments,
     completedSegments,
     activeRecordingSegment,
-    needsRenderRef,
+    needsRenderRef, renderCanvas
   ]);
   
   // Format seconds as mm:ss
@@ -384,6 +374,12 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+useEffect(() => {
+  console.log("LoopVisualizer received position:", loopPosition);
+  console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
+}, [loopPosition, loopDuration]);
+
 
   return (
     <div className="loop-visualizer" ref={containerRef}>

@@ -101,6 +101,7 @@ const AudioRecorderComponent = () => {
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isDownloadingLoop, setIsDownloadingLoop] = useState<boolean>();
   // Check for browser support of key features
+
   useEffect(() => {
     const checkBrowserSupport = () => {
       try {
@@ -177,6 +178,7 @@ const AudioRecorderComponent = () => {
     }
   };
 
+  
   // Handle position change from visualizer
   const handlePositionChange = (newPosition: number) => {
     // Only allow position changes when not recording
@@ -601,6 +603,17 @@ const AudioRecorderComponent = () => {
     return <Badge color="amber">Not Initialized</Badge>;
   };
 
+  // Add this useEffect to debug position updates:
+useEffect(() => {
+  console.log('AudioRecorder received position update:', {
+    loopPosition,
+    isLoopPlaybackActive,
+    isLoopRecording,
+    timestamp: Date.now()
+  });
+}, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
+
+
   return (
     <Card className="p-6 max-w-lg mx-auto bg-white rounded-xl shadow-lg">
       <Flex direction="column" gap="4">
@@ -758,9 +771,10 @@ const AudioRecorderComponent = () => {
                         {/* loopblob is nul still whys that  */}
                         {isDownloadingLoop && (
                           <>
-                           <Text size="2" weight="medium">
-                          Loop Preview:
-                         </Text> <Button onClick={handleDownloadLoop}>
+                            <Text size="2" weight="medium">
+                              Loop Preview:
+                            </Text>{" "}
+                            <Button onClick={handleDownloadLoop}>
                               Download Loop
                             </Button>
                             <audio
