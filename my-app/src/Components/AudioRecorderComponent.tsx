@@ -178,7 +178,6 @@ const AudioRecorderComponent = () => {
     }
   };
 
-  
   // Handle position change from visualizer
   const handlePositionChange = (newPosition: number) => {
     // Only allow position changes when not recording
@@ -288,12 +287,14 @@ const AudioRecorderComponent = () => {
       };
       setRecordingSegments((prev) => [...prev, newSegment]);
 
-      const success = await startLoopRecordingAt(loopPosition, loopDuration); // Pass the full loop duration
+      // Use the actual current loop position for better synchronization
+      const currentPos = loopPosition;
+      const success = await startLoopRecordingAt(currentPos, loopDuration);
 
       if (success) {
         setStatusMessage(
-          `Recording ${loopDuration} second loop at position ${loopPosition.toFixed(
-            2
+          `Recording ${loopDuration} second loop at position ${currentPos.toFixed(
+            3
           )}s...`
         );
       } else {
@@ -329,6 +330,7 @@ const AudioRecorderComponent = () => {
           setStatusMessage("Failed to create loop.");
         }
       } else {
+        setRecordingSegments([]);
         // If not recording, start recording at current position
         if (isLoopPlaybackActive) {
           // If loop is playing, record at current position
@@ -405,9 +407,11 @@ const AudioRecorderComponent = () => {
   const handleToggleLoopPlayback = async () => {
     try {
       if (isLoopPlaybackActive) {
-        await stopLoopPlayback();
-        setIsLoopPlaying(false);
-        setStatusMessage("Loop playback stopped.");
+        const success = await stopLoopPlayback();
+        if (success) {
+          setIsLoopPlaying(false);
+          setStatusMessage("Loop playback stopped.");
+        }
       } else {
         setStatusMessage("Starting loop playback...");
         const success = await playLoopWithTracking();
@@ -604,15 +608,14 @@ const AudioRecorderComponent = () => {
   };
 
   // Add this useEffect to debug position updates:
-useEffect(() => {
-  console.log('AudioRecorder received position update:', {
-    loopPosition,
-    isLoopPlaybackActive,
-    isLoopRecording,
-    timestamp: Date.now()
-  });
-}, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
-
+  useEffect(() => {
+    console.log("AudioRecorder received position update:", {
+      loopPosition,
+      isLoopPlaybackActive,
+      isLoopRecording,
+      timestamp: Date.now(),
+    });
+  }, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
 
   return (
     <Card className="p-6 max-w-lg mx-auto bg-white rounded-xl shadow-lg">
@@ -746,30 +749,13 @@ useEffect(() => {
                     </div>
                   )}
 
-                  {/* Loop Transport Controls */}
-
+                  {/* Loop Download Controls */}
                   <Flex gap="2" justify="center">
-                    <Button
-                      color={isLoopPlaybackActive ? "amber" : "green"}
-                      onClick={handleToggleLoopPlayback}
-                    >
-                      {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
-                      {isLoopPlaybackActive ? "Stop Loop" : "Play Loop"}
-                    </Button>
-
-                    <Button
-                      color={isLoopRecording ? "red" : "blue"}
-                      onClick={handleLoopRecordToggle}
-                      disabled={!loopBuffer}
-                    >
-                      {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
-                      {isLoopRecording ? "Stop Recording" : "Record"}
-                    </Button>
                     {/* If you have the audio preview for the loop, you can add it here */}
                     {loopMode && (
                       <div className="mt-2">
                         {/* loopblob is nul still whys that  */}
-                        {isDownloadingLoop && (
+                        {isLoopPlaybackActive && (
                           <>
                             <Text size="2" weight="medium">
                               Loop Preview:
