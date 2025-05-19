@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import { Button, Flex, Text } from "@radix-ui/themes";
 import { PlayIcon, StopIcon } from "@radix-ui/react-icons";
 
@@ -45,7 +45,6 @@ const RecordButtonIcon: React.FC = () => (
 );
 
 const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
-  // loopBuffer,
   loopDuration,
   loopPosition,
   isLoopPlaybackActive,
@@ -62,27 +61,47 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   const [canvasWidth, setCanvasWidth] = useState<number>(0);
   const [canvasHeight, setCanvasHeight] = useState<number>(0);
   const [isUserDragging, setIsUserDragging] = useState<boolean>(false);
-
-  // Animation frame reference for smooth rendering
-  const animationFrameRef = useRef<number | null>(null);
-
-useEffect(() => {
-  const updateCanvasSize = (): void => {
-    if (containerRef.current && canvasRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setCanvasWidth(rect.width);
-      setCanvasHeight(100);
-      
-      // Important: also set the actual canvas dimensions
-      canvasRef.current.width = rect.width;
-      canvasRef.current.height = 100;
-    }
-  };
   
-  updateCanvasSize();
-  window.addEventListener("resize", updateCanvasSize);
-  return () => window.removeEventListener("resize", updateCanvasSize);
-}, []);
+  // Use refs for the values we don't need to trigger renders with
+  const lastPositionRef = useRef<number>(loopPosition);
+  const lastAudioLevelRef = useRef<number | undefined>(audioLevel);
+  const animationFrameRef = useRef<number | null>(null);
+  const needsRenderRef = useRef<boolean>(true);
+  
+  // Separate completed segments from active recording segment for efficiency
+  const completedSegments = useMemo(() => {
+    return recordingSegments.filter(segment => segment.end !== null);
+  }, [recordingSegments]);
+  
+  const activeRecordingSegment = useMemo(() => {
+    if (!isLoopRecording) return null;
+    // Get the segment that is still recording (end is null)
+    return recordingSegments.find(segment => segment.end === null) || null;
+  }, [isLoopRecording, recordingSegments]);
+
+  // Calculate canvas size on mount and resize
+  useEffect(() => {
+    const updateCanvasSize = (): void => {
+      if (containerRef.current && canvasRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        
+        // Only update if size actually changed
+        if (rect.width !== canvasWidth || 100 !== canvasHeight) {
+          setCanvasWidth(rect.width);
+          setCanvasHeight(100);
+          
+          // Important: also set the actual canvas dimensions
+          canvasRef.current.width = rect.width;
+          canvasRef.current.height = 100;
+          needsRenderRef.current = true;
+        }
+      }
+    };
+    
+    updateCanvasSize();
+    window.addEventListener("resize", updateCanvasSize);
+    return () => window.removeEventListener("resize", updateCanvasSize);
+  }, [canvasWidth, canvasHeight]);
 
   // Handle mouse interactions for scrubbing
   useEffect(() => {
@@ -90,18 +109,16 @@ useEffect(() => {
 
     const canvas = canvasRef.current;
 
-  const handleMouseDown = (e: MouseEvent): void => {
-    console.log("Mouse down on canvas");
-    if (isLoopRecording) return; // Don't allow scrubbing while recording
-    
-    setIsUserDragging(true);
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const newPosition = (x / rect.width) * loopDuration;
-    
-    console.log("Setting new position:", newPosition, "from x:", x, "width:", rect.width);
-    onPositionChange(Math.max(0, Math.min(newPosition, loopDuration)));
-  };
+    const handleMouseDown = (e: MouseEvent): void => {
+      if (isLoopRecording) return; // Don't allow scrubbing while recording
+      
+      setIsUserDragging(true);
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const newPosition = (x / rect.width) * loopDuration;
+      
+      onPositionChange(Math.max(0, Math.min(newPosition, loopDuration)));
+    };
 
     const handleMouseMove = (e: MouseEvent): void => {
       if (!isUserDragging) return;
@@ -119,256 +136,248 @@ useEffect(() => {
     canvas.addEventListener("mousedown", handleMouseDown as EventListener);
     canvas.addEventListener("mousemove", handleMouseMove as EventListener);
     canvas.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mouseup", handleMouseUp); // Catch mouse up outside canvas
 
     return () => {
       canvas.removeEventListener("mousedown", handleMouseDown as EventListener);
       canvas.removeEventListener("mousemove", handleMouseMove as EventListener);
       canvas.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mouseup", handleMouseUp);
     };
-}, [canvasRef, loopDuration, onPositionChange, isLoopRecording]);
+  }, [canvasRef, loopDuration, onPositionChange, isLoopRecording]);
   
-  // Draw the visualizer with animation frame for smooth rendering
-  useEffect(() => {
-    if (!canvasRef.current || !containerRef.current) return;
-
+  // Efficient rendering function - only renders when something important changes
+  const renderCanvas = () => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Check if we really need to render
+    const positionChanged = Math.abs(lastPositionRef.current - loopPosition) > 0.01;
+    const audioLevelChanged = audioLevel !== lastAudioLevelRef.current;
+    
+    if (!positionChanged && !audioLevelChanged && !needsRenderRef.current && 
+        !isLoopPlaybackActive && !isLoopRecording) {
+      // Skip rendering if nothing important changed
+      return;
+    }
+    
+    // Update refs to current values
+    lastPositionRef.current = loopPosition;
+    lastAudioLevelRef.current = audioLevel;
+    needsRenderRef.current = false;// used to be false
+    
+    console.log("loop position ref is "+ lastPositionRef.current);
+    console.log("loop position is "+ loopPosition);
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const draw = (): void => {
-      if (!ctx) return;
+    // Background
+    ctx.fillStyle = "#f1f5f9"; // Light gray background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw timeline markers (1 second intervals)
+    ctx.fillStyle = "#cbd5e1"; // Light gray markers
+    for (let i = 1; i < loopDuration; i++) {
+      const x = (i / loopDuration) * canvas.width;
+      ctx.fillRect(x - 1, 0, 1, canvas.height);
+    }
 
-      // Background
-      ctx.fillStyle = "#f1f5f9"; // Light gray background
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Draw waveform (if data available)
+    if (waveformData && waveformData.length > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = "#94a3b8"; // Slate gray for waveform
+      ctx.lineWidth = 1.5;
 
-      // Draw timeline markers (1 second intervals)
-      ctx.fillStyle = "#cbd5e1"; // Light gray markers
-      for (let i = 1; i < loopDuration; i++) {
-        const x = (i / loopDuration) * canvas.width;
-        ctx.fillRect(x - 1, 0, 1, canvas.height);
+      const middle = canvas.height / 2;
+      const amplitudeScale = canvas.height * 0.4; // Scale for visibility
+
+      waveformData.forEach((amplitude, index) => {
+        const x = (index / waveformData.length) * canvas.width;
+        const y = middle - amplitude * amplitudeScale;
+
+        if (index === 0) {
+          console.log("index move to :" +x);
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);// this is printing but it is not displaying the visual
+        }
+      });
+
+      // Mirror the waveform for the bottom half
+      for (let i = waveformData.length - 1; i >= 0; i--) {
+        const x = (i / waveformData.length) * canvas.width;
+        const y = middle + waveformData[i] * amplitudeScale;
+        ctx.lineTo(x, y);
       }
 
-       // Draw audio level meter if recording or playing
-  if ((isLoopPlaybackActive || isLoopRecording) && audioLevel) {
-    // Map the audio level (0-100) to canvas height
-    const levelHeight = (audioLevel / 100) * canvas.height;
-    
-    // Draw level meter in the right side of canvas
-    const meterWidth = 15;
-    const meterX = canvas.width - meterWidth - 10;
-    
-    // Background for meter
-    ctx.fillStyle = "#e2e8f0"; 
-    ctx.fillRect(meterX, 0, meterWidth, canvas.height);
-    
-    // Level fill - green to yellow to red based on level
-    const levelColor = audioLevel < 30 ? "green" : 
-                      audioLevel < 70 ? "orange" : 
-                      "red";
-    
-    ctx.fillStyle = levelColor;
-    ctx.fillRect(meterX, canvas.height - levelHeight, meterWidth, levelHeight);
-    
-    // Border
-    ctx.strokeStyle = "#64748b";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(meterX, 0, meterWidth, canvas.height);
-    
-    // Add dB markers
-    for (let i = 0; i <= 4; i++) {
-      const y = i * (canvas.height / 4);
-      ctx.fillStyle = "#64748b";
-      ctx.fillRect(meterX, y, meterWidth, 1);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(148, 163, 184, 0.3)"; // Semi-transparent fill
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Draw completed recording segments in their colors
+    if (completedSegments && completedSegments.length > 0) {
+      console.log("completed segments are "+completedSegments.length);
+      completedSegments.forEach((segment, index) => {
+        if (segment.start !== undefined && segment.end !== null) {
+          const startX = (segment.start / loopDuration) * canvas.width;
+          const endX = (segment.end / loopDuration) * canvas.width;
+          const width = endX - startX;
+
+          // Use different colors for different completed segments
+          const hue = (index * 30) % 360; // Cycle through different hues
+          ctx.fillStyle = `hsla(${hue}, 90%, 60%, 0.3)`;
+          ctx.fillRect(startX, 0, width, canvas.height);
+
+          // Add border
+          ctx.strokeStyle = `hsla(${hue}, 90%, 50%, 0.8)`;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(startX, 0, width, canvas.height);
+        }
+      });
+    }
+
+    // Draw ONLY the active recording segment with highlight if recording
+    if (isLoopRecording && activeRecordingSegment) {
+      console.log("loop is recording");
+      const startPosition = activeRecordingSegment.start;
+      const startX = (startPosition / loopDuration) * canvas.width;
+      const currentX = (loopPosition / loopDuration) * canvas.width;
+      const width = currentX - startX;
+      console.log("loop start position is: "+startPosition);
+      console.log("loop position is: "+loopPosition);
+
+      if (width > 0) {
+        // Highlight current recording with a vibrant red
+        ctx.fillStyle = "rgba(239, 68, 68, 0.4)"; // Bright red with transparency
+        ctx.fillRect(startX, 0, width, canvas.height);
+
+        // Animated border for recording section
+        const animPhase = (Date.now() % 1000) / 1000; // 0-1 pulsing animation
+        const pulseOpacity = 0.5 + 0.5 * Math.sin(animPhase * Math.PI * 2);
+
+        ctx.strokeStyle = `rgba(239, 68, 68, ${pulseOpacity})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(startX, 0, width, canvas.height);
+
+        // Label for "RECORDING"
+        ctx.fillStyle = "rgba(239, 68, 68, 0.9)";
+        ctx.font = "bold 14px sans-serif";
+        ctx.textAlign = "center";
+        const labelX = startX + width / 2;
+        const labelY = canvas.height / 2;
+        ctx.fillText("RECORDING", labelX, labelY);
+      }
+    }
+
+    // Draw audio level meter if recording or playing - optimized to only show when needed
+    if ((isLoopPlaybackActive || isLoopRecording) && audioLevel !== undefined) {
+      // Only draw the level meter on the right side
+      console.log("draw audio meter");
+      const meterWidth = 15;
+      const meterX = canvas.width - meterWidth - 10;
       
-      // Add level labels
-      if (i > 0) { // Skip 0 label
+      // Background for meter
+      ctx.fillStyle = "#e2e8f0"; 
+      ctx.fillRect(meterX, 0, meterWidth, canvas.height);
+      
+      // Level fill - green to yellow to red based on level
+      const level = Math.max(0, Math.min(100, audioLevel));
+      const levelHeight = (level / 100) * canvas.height;
+      const levelColor = level < 30 ? "green" : 
+                       level < 70 ? "orange" : 
+                       "red";
+      
+      ctx.fillStyle = levelColor;
+      ctx.fillRect(meterX, canvas.height - levelHeight, meterWidth, levelHeight);
+      
+      // Border
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(meterX, 0, meterWidth, canvas.height);
+      
+      // Only add level labels when actually recording/playing
+      if (isLoopRecording || isLoopPlaybackActive) {
         ctx.fillStyle = "#334155";
         ctx.font = "9px sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText(`${(100 - i * 25)}%`, meterX - 2, y + 3);
+        ctx.fillText(`${level.toFixed(0)}%`, meterX - 2, canvas.height - 5);
       }
-    }
-  }
+    } 
 
-      // Draw waveform (if data available)
-      if (waveformData && waveformData.length > 0) {
-        ctx.beginPath();
-        ctx.strokeStyle = "#94a3b8"; // Slate gray for waveform
-        ctx.lineWidth = 1.5;
+    console.log("loop position is "+loopPosition);
+    console.log("loop duration is "+loopDuration);
 
-        const middle = canvas.height / 2;
-        const amplitudeScale = canvas.height * 0.4; // Scale for visibility
+    // Draw playhead/needle with animation
+    const needleX = (loopPosition / loopDuration) * canvas.width;
 
-        waveformData.forEach((amplitude, index) => {
-          const x = (index / waveformData.length) * canvas.width;
-          const y = middle - amplitude * amplitudeScale;
+    console.log("needle x position is "+needleX);
+    // Shadow for needle
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 5;
 
-          if (index === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        });
+    // Draw needle line with glow effect - red for both recording and playback
+    ctx.beginPath();
+    ctx.strokeStyle = isLoopRecording || isLoopPlaybackActive ? "#ef4444" : "#3b82f6"; 
+    ctx.lineWidth = 3;
+    ctx.moveTo(needleX, 0);
+    ctx.lineTo(needleX, canvas.height);
+    ctx.stroke();
 
-        // Mirror the waveform for the bottom half
-        for (let i = waveformData.length - 1; i >= 0; i--) {
-          const x = (i / waveformData.length) * canvas.width;
-          const y = middle + waveformData[i] * amplitudeScale;
-          ctx.lineTo(x, y);
-        }
+    // Reset shadow
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
 
-        ctx.closePath();
-        ctx.fillStyle = "rgba(148, 163, 184, 0.3)"; // Semi-transparent fill
-        ctx.fill();
-        ctx.stroke();
-      }
+    // Draw needle handle/grip at the top
+    ctx.fillStyle = isLoopRecording || isLoopPlaybackActive ? "#ef4444" : "#3b82f6";
+    ctx.beginPath();
+    ctx.arc(needleX, 10, 8, 0, Math.PI * 2);
+    ctx.fill();
 
-      // Draw recording segments with visual distinction
-      if (recordingSegments && recordingSegments.length > 0) {
-        recordingSegments.forEach((segment, index) => {
-          if (
-            segment.start !== undefined &&
-            segment.end !== undefined &&
-            segment.end !== null
-          ) {
-            const startX = (segment.start / loopDuration) * canvas.width;
-            const endX = (segment.end / loopDuration) * canvas.width;
-            const width = endX - startX;
-
-            // Use different colors for different segments
-            const hue = (index * 30) % 360; // Cycle through different hues
-            ctx.fillStyle = `hsla(${hue}, 90%, 60%, 0.3)`;
-            ctx.fillRect(startX, 0, width, canvas.height);
-
-            // Add border
-            ctx.strokeStyle = `hsla(${hue}, 90%, 50%, 0.8)`;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(startX, 0, width, canvas.height);
-          }
-        });
-      }
-
-      // Draw current recording segment if actively recording
-      if (isLoopRecording) {
-        const startPosition =
-          recordingSegments.length > 0
-            ? recordingSegments[recordingSegments.length - 1].start
-            : 0;
-
-        if (startPosition !== undefined) {
-          const startX = (startPosition / loopDuration) * canvas.width;
-          const currentX = (loopPosition / loopDuration) * canvas.width;
-          const width = currentX - startX;
-
-          // Highlight current recording with a vibrant red
-          ctx.fillStyle = "rgba(239, 68, 68, 0.4)"; // Bright red with transparency
-          ctx.fillRect(startX, 0, width, canvas.height);
-
-          // Animated border for recording section
-          const animPhase = (Date.now() % 1000) / 1000; // 0-1 pulsing animation
-          const pulseOpacity = 0.5 + 0.5 * Math.sin(animPhase * Math.PI * 2);
-
-          ctx.strokeStyle = `rgba(239, 68, 68, ${pulseOpacity})`;
-          ctx.lineWidth = 3;
-          ctx.strokeRect(startX, 0, width, canvas.height);
-
-          // Label for "RECORDING"
-          ctx.fillStyle = "rgba(239, 68, 68, 0.9)";
-          ctx.font = "bold 14px sans-serif";
-          ctx.textAlign = "center";
-          const labelX = startX + width / 2;
-          const labelY = canvas.height / 2;
-          ctx.fillText("RECORDING", labelX, labelY);
-        }
-
-         if (audioLevel) {
-    // Draw a level meter
-    const levelHeight = canvas.height * (audioLevel / 100); // Scale to appropriate range
-    ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
-    ctx.fillRect(canvas.width - 20, canvas.height - levelHeight, 15, levelHeight);
-    
-    // Add level text
-    ctx.fillStyle = "#000";
-    ctx.font = "10px sans-serif";
+    // Display current position text
+    ctx.fillStyle = "#1e293b";
+    ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`${audioLevel.toFixed(0)}`, canvas.width - 12, canvas.height - 5);
-  }
-
-      }
-
-      // Draw playhead/needle with animation
-      const needleX = (loopPosition / loopDuration) * canvas.width;
-
-      // Shadow for needle
-      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-      ctx.shadowBlur = 5;
-
-      // Draw needle line with glow effect
-      ctx.beginPath();
-      ctx.strokeStyle = isLoopRecording ? "#ef4444" : "#3b82f6"; // Red when recording, blue otherwise
-      ctx.lineWidth = 3;
-      ctx.moveTo(needleX, 0);
-      ctx.lineTo(needleX, canvas.height);
-      ctx.stroke();
-
-      // Reset shadow
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
-
-      // Draw needle handle/grip at the top
-      ctx.fillStyle = isLoopRecording ? "#ef4444" : "#3b82f6";
-      ctx.beginPath();
-      ctx.arc(needleX, 10, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Display current position text
-      ctx.fillStyle = "#1e293b";
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "center";
-      const formattedPosition = loopPosition.toFixed(1);
-      if (audioLevel) {
-        const audioLevelInfo = "audio level " + audioLevel?.toFixed(1);
-        ctx.fillText(`${audioLevelInfo}s`, needleX, canvas.height - 10);
-      }
-      ctx.fillText(`${formattedPosition}s`, needleX, canvas.height - 5);
-
-      // Request next frame if active
-      if (isLoopPlaybackActive || isLoopRecording) {
-        animationFrameRef.current = requestAnimationFrame(draw);
-      }
-    };
-
-    // Initial draw
-    draw();
-
-     if (canvasRef.current && ctx) {
-    draw(); // Force a redraw when any audio prop changes
+    ctx.fillText(`${loopPosition.toFixed(1)}s`, needleX, canvas.height - 5);
   };
-  
-    // Continuous redraw if playing or recording
-    if (isLoopPlaybackActive || isLoopRecording) {
-      animationFrameRef.current = requestAnimationFrame(draw);
-    }
 
-    // Cleanup animation frame on unmount
+  // Set up animation frame for continuous rendering
+  useEffect(() => {
+    // Update the needsRender flag when important props change
+    needsRenderRef.current = true;
+    
+    // Animation function that uses requestAnimationFrame
+    const animate = () => {
+      renderCanvas();
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    // Start animation
+    animationFrameRef.current = requestAnimationFrame(animate);
+    
+    // Cleanup on unmount
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [canvasWidth,
-    canvasHeight,
-    waveformData,
-    loopPosition,
-    loopDuration,
-    isLoopPlaybackActive,
+  }, [
+    loopDuration, 
+    waveformData, 
+    isLoopPlaybackActive, 
     isLoopRecording,
-    recordingSegments,audioLevel
+    canvasWidth, 
+    canvasHeight, 
+    recordingSegments,
+    completedSegments,
+    activeRecordingSegment,
+    needsRenderRef,
   ]);
-
+  
   // Format seconds as mm:ss
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -408,7 +417,7 @@ useEffect(() => {
         {/* Control buttons */}
         <Flex gap="2" justify="center">
           <Button
-            color={isLoopPlaybackActive ? "amber" : "green"}
+            color={isLoopPlaybackActive ? "red" : "green"}
             onClick={onPlayPause}
           >
             {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}

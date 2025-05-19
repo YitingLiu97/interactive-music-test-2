@@ -457,11 +457,15 @@ const audioBufferToWav = (audioBuffer: AudioBuffer): Blob => {
   
   // Enhanced position tracking for smooth visualization
   const trackPosition = useCallback(() => {
-    if (!isLoopPlaybackActive || !loopBuffer) return;
-
+  if (!isLoopPlaybackActive || !loopBuffer || !loopPlayerRef.current) {
+    return;
+  }
     // Use precise timing with Tone.js transport
-    const elapsed = Tone.Transport.seconds % loopDuration;
-    setLoopPosition(elapsed);
+    const now = Tone.now();
+  const elapsed = now - (loopPlayerRef.current as any)._startTime || 0;
+  const currentPos = elapsed % loopDuration;
+ 
+  setLoopPosition(currentPos);
 
     // Request animation frame for smooth updates
     positionAnimationRef.current = requestAnimationFrame(trackPosition);
@@ -598,7 +602,8 @@ const audioBufferToWav = (audioBuffer: AudioBuffer): Blob => {
 
         // Update player with new buffer
         if (loopPlayerRef.current) {
-          // Need to stop player first if active
+          // Need to stop player first if active8j
+          
           const wasPlaying = isLoopPlaybackActive;
           if (wasPlaying) {
             loopPlayerRef.current.stop();
@@ -637,38 +642,41 @@ const audioBufferToWav = (audioBuffer: AudioBuffer): Blob => {
 
   // ========== PLAYBACK WITH POSITION TRACKING ==========
   // Play the loop with position tracking
-const playLoopWithTracking = async (startPosition = 0) => {
-  if (!loopBuffer || !loopPlayerRef.current) {
-    console.log("Cannot play: No loop buffer or player");
-    return false;
-  }
+const playLoopWithTracking = useCallback(async (startPosition = 0) => {
+    if (!loopBuffer || !loopPlayerRef.current) {
+      console.log("Cannot play: No loop buffer or player");
+      return false;
+    }
 
-  try {
-    // Ensure Tone.js context is running
-    if (Tone.context.state !== "running") {
-      await Tone.start();
+    try {
+      // Ensure Tone.js context is running
+      if (Tone.context.state !== "running") {
+        await Tone.start();
+      }
+      
+      console.log(`Playing from position: ${startPosition}s`);
+      
+      // Make sure player is stopped
+      if (loopPlayerRef.current.state === "started") {
+        loopPlayerRef.current.stop();
+      }
+      
+      // Start with the specified offset
+      loopPlayerRef.current.start(0, startPosition);
+      
+      // Update state
+      setIsLoopPlaybackActive(true);
+      setLoopPosition(startPosition);
+      
+      trackPosition();
+
+
+      return true;
+    } catch (error) {
+      console.error("Error playing with position:", error);
+      return false;
     }
-    
-    console.log(`Playing from position: ${startPosition}s`);
-    
-    // Make sure player is stopped
-    if (loopPlayerRef.current.state === "started") {
-      loopPlayerRef.current.stop();
-    }
-    
-    // Start with the specified offset
-    loopPlayerRef.current.start(0, startPosition);
-    
-    // Update state
-    setIsLoopPlaybackActive(true);
-    setLoopPosition(startPosition);
-    
-    return true;
-  } catch (error) {
-    console.error("Error playing with position:", error);
-    return false;
-  }
-};
+  }, [loopBuffer]);
   // Stop loop playback and tracking
   const stopLoopPlayback = useCallback(() => {
     try {
@@ -679,7 +687,10 @@ const playLoopWithTracking = async (startPosition = 0) => {
 
       console.log("Stopping loop playback and tracking");
       loopPlayerRef.current.stop();
+       console.log("Stopping loop playback and tracking");
+      loopPlayerRef.current.stop();
       setIsLoopPlaybackActive(false);
+      setLoopPosition(0); // Reset position
 
       // Clear animation frame for position tracking
       if (positionAnimationRef.current) {

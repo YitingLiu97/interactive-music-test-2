@@ -1,9 +1,8 @@
-// Complete updated LoopControls component with fixed LoopVisualizer usage
-
-import React, { useState, useEffect } from "react";
+// Fixed LoopControls component with improved position tracking and debugging
+import React, { useState, useEffect, useRef } from "react";
 import { Button, Flex, Text, Card } from "@radix-ui/themes";
 import { ReloadIcon, PlayIcon, StopIcon } from "@radix-ui/react-icons";
-import LoopVisualizer from "./LoopVisualizer"; // Make sure this import is correct
+import LoopVisualizer from "./LoopVisualizer"; 
 
 // Simple Record Button Icon Component
 const RecordButtonIcon = () => (
@@ -30,8 +29,8 @@ interface LoopControlsProps {
   loopPosition: number;
   isLoopPlaybackActive: boolean;
   isLoopRecording: boolean;
-  loopBuffer: AudioBuffer | null; // Added for the visualizer
-  audioLevel?: number; // Optional audio level for visualization
+  loopBuffer: AudioBuffer | null;
+  audioLevel?: number;
   initializeLoopBuffer: (duration: number) => Promise<boolean>;
   startLoopRecordingAt: (
     startPosition: number,
@@ -40,12 +39,17 @@ interface LoopControlsProps {
   playLoopWithTracking: (startPosition?: number) => Promise<boolean>;
   stopLoopPlayback: () => boolean;
   stopLoopRecordingAndMerge: () => Promise<boolean>;
-  onPositionChange?: (position: number) => void; // Optional callback
+  onPositionChange?: (position: number) => void;
   loopBlobUrl: string | null;
   isExportingLoop: boolean;
   exportLoopToBlob: () => Promise<{ blob: Blob; url: string } | null>;
   loopRecordingError?: string | null;
-  waveformData?: number[]; // For visualization | Float32Array[]
+  waveformData?: number[];
+}
+
+interface RecordingSegment {
+  start: number;
+  end: number | null;
 }
 
 const LoopControls: React.FC<LoopControlsProps> = ({
@@ -68,29 +72,169 @@ const LoopControls: React.FC<LoopControlsProps> = ({
 }) => {
   // Local state for this component only
   const [loopDurationInput, setLoopDurationInput] = useState("4");
-  // const [recordSegmentStart, setRecordSegmentStart] = useState(0);
-  // const [recordSegmentDuration, setRecordSegmentDuration] = useState(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [recordingSegments, setRecordingSegments] = useState<
-    { start: number; end: number | null }[]
-  >([]);
+  const [recordingSegments, setRecordingSegments] = useState<RecordingSegment[]>([]);
   const [canDownload, setCanDownload] = useState(false);
+  
+  // Internal position tracking - this is our source of truth during recording
+  const [internalPosition, setInternalPosition] = useState(0);
+  
+  // Refs for tracking state
+  const previousPositionRef = useRef<number>(0);
+  const recordingStartedRef = useRef<boolean>(false);
+  const recordingStartTimeRef = useRef<number>(0);
+  const recordingStartPositionRef = useRef<number>(0);
+  const positionUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Effect to update recording segments when recording state changes
-useEffect(()=>{
-  if (!isLoopRecording && recordingSegments.length > 0 && 
-       recordingSegments[recordingSegments.length - 1].end !== null) {
-    // Recording stopped
-    setRecordingSegments(prev => {
-      const updated = [...prev];
-      updated[updated.length - 1].end = loopPosition;
-      return updated;
-    });
-    
-    // Enable download
-    setCanDownload(true);
-  }
-}, [isLoopRecording, loopPosition, recordingSegments]);
+  // Debug: Log the values we're receiving
+  console.log('LoopControls received:', {
+    loopPosition,
+    isLoopRecording,
+    isLoopPlaybackActive,
+    loopDuration,
+    internalPosition
+  });
+
+  // Use internal position if recording, otherwise sync with parent position
+  const currentDisplayPosition = isLoopRecording ? internalPosition : loopPosition;
+
+  // Sync internal position with parent when not recording
+  useEffect(() => {
+    if (!isLoopRecording) {
+      setInternalPosition(loopPosition);
+    }
+  }, [loopPosition, isLoopRecording]);
+
+  // Effect to handle position updates during recording
+  useEffect(() => {
+    if (isLoopRecording && !recordingStartedRef.current) {
+      // Recording just started
+      console.log('Starting recording position tracking from:', loopPosition);
+      
+      recordingStartedRef.current = true;
+      recordingStartTimeRef.current = Date.now();
+      recordingStartPositionRef.current = loopPosition;
+      setInternalPosition(loopPosition);
+      
+      // Start a new recording segment
+      setRecordingSegments(prev => [...prev, { start: loopPosition, end: null }]);
+      
+      // Start position update interval
+      positionUpdateIntervalRef.current = setInterval(() => {
+        const elapsed = (Date.now() - recordingStartTimeRef.current) / 1000;
+        const newPosition = recordingStartPositionRef.current + elapsed;
+        
+        console.log('Recording position update:', {
+          elapsed,
+          startPosition: recordingStartPositionRef.current,
+          newPosition,
+          loopDuration
+        });
+        
+        // Handle loop wraparound
+        if (newPosition >= loopDuration) {
+          const wrappedPosition = newPosition % loopDuration;
+          setInternalPosition(wrappedPosition);
+          
+          console.log('Loop wrapped to:', wrappedPosition);
+          
+          // Notify parent if callback exists
+          if (onPositionChange) {
+            try {
+              onPositionChange(wrappedPosition);
+            } catch (error) {
+              console.error('Error calling onPositionChange:', error);
+            }
+          }
+          
+          // Update recording segment and start a new one if still recording
+          setRecordingSegments(prev => {
+            if (prev.length === 0) return prev;
+            
+            const updated = [...prev];
+            const lastIndex = updated.length - 1;
+            
+            // Close the current segment at loop end
+            if (updated[lastIndex].end === null) {
+              updated[lastIndex] = {
+                ...updated[lastIndex],
+                end: loopDuration
+              };
+              
+              // Start a new segment at the beginning if still recording
+              updated.push({ start: 0, end: null });
+            }
+            
+            return updated;
+          });
+          
+          // Reset timing for the new loop cycle
+          recordingStartTimeRef.current = Date.now();
+          recordingStartPositionRef.current = 0;
+        } else {
+          setInternalPosition(newPosition);
+          
+          // Notify parent if callback exists
+          if (onPositionChange) {
+            try {
+              onPositionChange(newPosition);
+            } catch (error) {
+              console.error('Error calling onPositionChange:', error);
+            }
+          }
+        }
+      }, 50); // Update every 50ms for smooth movement
+      
+    } else if (!isLoopRecording && recordingStartedRef.current) {
+      // Recording just stopped
+      console.log('Stopping recording position tracking at:', internalPosition);
+      
+      recordingStartedRef.current = false;
+      
+      // Clear the position update interval
+      if (positionUpdateIntervalRef.current) {
+        clearInterval(positionUpdateIntervalRef.current);
+        positionUpdateIntervalRef.current = null;
+      }
+      
+      // Update the last recording segment
+      setRecordingSegments(prev => {
+        if (prev.length === 0) return prev;
+        
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        
+        // Only update if the last segment is still active
+        if (updated[lastIndex].end === null) {
+          updated[lastIndex] = {
+            ...updated[lastIndex],
+            end: internalPosition
+          };
+        }
+        
+        return updated;
+      });
+      
+      setCanDownload(true);
+    }
+  }, [isLoopRecording, loopPosition, loopDuration, onPositionChange, internalPosition]);
+
+  // Track position for resuming playback (when not recording)
+  useEffect(() => {
+    if (!isLoopRecording && !isLoopPlaybackActive) {
+      previousPositionRef.current = currentDisplayPosition;
+    }
+  }, [currentDisplayPosition, isLoopRecording, isLoopPlaybackActive]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (positionUpdateIntervalRef.current) {
+        clearInterval(positionUpdateIntervalRef.current);
+        positionUpdateIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // Add download handler
   const handleDownloadLoop = async () => {
@@ -116,7 +260,6 @@ useEffect(()=>{
       setStatusMessage(`Export error: ${err}`);
     }
   };
-  
 
   // Handle creating a new loop
   const handleCreateNewLoop = async () => {
@@ -124,12 +267,24 @@ useEffect(()=>{
       const duration = parseInt(loopDurationInput, 10) || 4;
       setStatusMessage(`Creating new ${duration}s loop...`);
 
-      // Reset recording segments
+      // Clear any existing intervals
+      if (positionUpdateIntervalRef.current) {
+        clearInterval(positionUpdateIntervalRef.current);
+        positionUpdateIntervalRef.current = null;
+      }
+
+      // Reset recording segments and position
       setRecordingSegments([]);
+      setInternalPosition(0);
+      if (onPositionChange) {
+        onPositionChange(0);
+      }
+      previousPositionRef.current = 0;
 
       const success = await initializeLoopBuffer(duration);
       if (success) {
         setStatusMessage("New loop created");
+        setCanDownload(false);
       } else {
         setStatusMessage("Failed to create new loop");
       }
@@ -147,7 +302,12 @@ useEffect(()=>{
         setStatusMessage("Playback stopped");
       } else {
         setStatusMessage("Starting playback...");
-        const success = await playLoopWithTracking();
+        
+        // Resume from previous position or start from beginning
+        const startPosition = previousPositionRef.current;
+        console.log('Starting playback from position:', startPosition);
+        
+        const success = await playLoopWithTracking(startPosition);
 
         if (success) {
           setStatusMessage(null);
@@ -175,11 +335,22 @@ useEffect(()=>{
           setStatusMessage("Failed to complete recording");
         }
       } else {
-        // Start recording
+        // Start recording at the current position
         setStatusMessage("Starting recording...");
+        const startPosition = previousPositionRef.current; 
+        
+        console.log('Starting recording from position:', startPosition);
+        
+        // Calculate remaining duration based on loop length
+        const remainingDuration = loopDuration - startPosition;
+        
+        // Make sure we don't try to record negative duration
+        if (remainingDuration <= 0) {
+          setStatusMessage("Cannot record - at end of loop");
+          return;
+        }
 
-        // Make sure to pass the full loop duration to ensure it records for the entire time
-        const success = await startLoopRecordingAt(loopPosition, loopDuration);
+        const success = await startLoopRecordingAt(startPosition, remainingDuration);
 
         if (success) {
           setStatusMessage("Recording in progress...");
@@ -195,6 +366,12 @@ useEffect(()=>{
 
   // Handle stop all
   const handleStop = () => {
+    // Clear any position update intervals
+    if (positionUpdateIntervalRef.current) {
+      clearInterval(positionUpdateIntervalRef.current);
+      positionUpdateIntervalRef.current = null;
+    }
+    
     if (isLoopRecording) {
       stopLoopRecordingAndMerge();
     }
@@ -204,26 +381,48 @@ useEffect(()=>{
     setStatusMessage("All operations stopped");
   };
 
+  // Handle position change from visualizer (scrubbing)
   const handlePositionChange = async (newPosition: number) => {
-  console.log("Position change requested:", newPosition);
-  
-  // This assumes you have access to setLoopPosition from props or context
-  if (typeof onPositionChange === 'function') {
-    onPositionChange(newPosition);
-  }
-  
-  // If playing, restart at the new position
-  if (isLoopPlaybackActive) {
-    // Stop first
-    stopLoopPlayback();
+    console.log('Position change requested:', newPosition);
     
-    // Brief delay to ensure playback stops
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // Update the previous position ref for next playback/recording
+    previousPositionRef.current = newPosition;
     
-    // Start at new position
-    playLoopWithTracking(newPosition);
-  }
-};
+    // Update the internal position immediately
+    setInternalPosition(newPosition);
+    
+    // Update the actual position via callback
+    if (typeof onPositionChange === 'function') {
+      try {
+        onPositionChange(newPosition);
+      } catch (error) {
+        console.error('Error calling onPositionChange:', error);
+      }
+    }
+    
+    // If recording, update the timing references
+    if (isLoopRecording) {
+      recordingStartTimeRef.current = Date.now();
+      recordingStartPositionRef.current = newPosition;
+      console.log('Updated recording timing for scrub:', {
+        newPosition,
+        timestamp: recordingStartTimeRef.current
+      });
+    }
+    
+    // If playing, restart at the new position
+    if (isLoopPlaybackActive) {
+      // Stop first
+      stopLoopPlayback();
+      
+      // Brief delay to ensure playback stops
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Start at new position
+      playLoopWithTracking(newPosition);
+    }
+  };
+
   return (
     <Card className="p-4 mt-4">
       {statusMessage && (
@@ -238,28 +437,37 @@ useEffect(()=>{
         </Text>
       )}
 
+      {/* Debug Information */}
+      <Text size="1" className="text-gray-400 mb-2">
+        Debug: Parent Position: {loopPosition.toFixed(3)}, 
+        Internal Position: {internalPosition.toFixed(3)}, 
+        Display Position: {currentDisplayPosition.toFixed(3)}
+      </Text>
+
       {/* Loop Visualizer */}
       <Text size="2" weight="medium" mb="2">
         Loop Visualizer
       </Text>
       <LoopVisualizer
-        loopBuffer={loopBuffer} // Add this prop
+        loopBuffer={loopBuffer}
         waveformData={waveformData}
         loopDuration={loopDuration}
-        loopPosition={loopPosition}
+        loopPosition={currentDisplayPosition} // Use our calculated position
         isLoopRecording={isLoopRecording}
         isLoopPlaybackActive={isLoopPlaybackActive}
-        recordingSegments={recordingSegments || []}
-        onPlayPause={handleToggleLoopPlayback} // Add these handler functions
+        recordingSegments={recordingSegments}
+        onPlayPause={handleToggleLoopPlayback}
         onRecord={handleToggleRecording}
         onStop={handleStop}
         onPositionChange={handlePositionChange}
-        audioLevel={audioLevel} // Optional - add if you have audio level data
+        audioLevel={audioLevel}
       />
-<Text size="2" color="red">
-  Current Position: {loopPosition.toFixed(2)}s
-  {isLoopPlaybackActive ? " (Playing)" : " (Stopped)"}
-</Text>
+
+      <Text size="2" color="blue">
+        Current Position: {currentDisplayPosition.toFixed(2)}s
+        {isLoopPlaybackActive ? " (Playing)" : isLoopRecording ? " (Recording)" : " (Stopped)"}
+      </Text>
+
       {/* Loop Configuration */}
       <Flex direction="column" gap="3" className="mt-4">
         <Flex justify="between" align="center">
@@ -290,8 +498,8 @@ useEffect(()=>{
         </Flex>
       </Flex>
 
-        <Button>Can download is {canDownload}</Button>
-     {canDownload && (
+      {/* Download section */}
+      {canDownload && (
         <Flex direction="column" gap="3" className="mt-4">
           <Text size="2" weight="medium">Export Loop</Text>
           <Button
@@ -304,18 +512,19 @@ useEffect(()=>{
           </Button>
         </Flex>
       )}
-      {/* Recording Position */}
+
+      {/* Recording Controls */}
       <Flex direction="column" gap="3" className="mt-4">
         <Text size="2" weight="medium">
-          Recording Position
+          Loop Controls
         </Text>
         <Text size="2">
-          Current: {loopPosition.toFixed(2)}s / {loopDuration}s
+          Current: {currentDisplayPosition.toFixed(2)}s / {loopDuration}s
         </Text>
         <Flex gap="3">
           <Button
             size="2"
-            color={isLoopPlaybackActive ? "amber" : "blue"}
+            color={isLoopPlaybackActive ? "red" : "blue"}
             onClick={handleToggleLoopPlayback}
             disabled={isLoopRecording}
           >
@@ -331,6 +540,16 @@ useEffect(()=>{
           >
             {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
             {isLoopRecording ? "Stop Recording" : "Record"}
+          </Button>
+
+          <Button
+            size="2"
+            variant="soft"
+            color="gray"
+            onClick={handleStop}
+            disabled={!isLoopPlaybackActive && !isLoopRecording}
+          >
+            <StopIcon /> Stop All
           </Button>
         </Flex>
       </Flex>
