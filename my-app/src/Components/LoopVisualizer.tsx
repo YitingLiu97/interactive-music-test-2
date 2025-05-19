@@ -374,8 +374,8 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   };
 
 useEffect(() => {
-  console.log("LoopVisualizer received position:", loopPosition);
-  console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
+  // console.log("LoopVisualizer received position:", loopPosition);
+  // console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
 }, [loopPosition, loopDuration]);
 
 

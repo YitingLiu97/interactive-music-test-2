@@ -8,10 +8,7 @@ import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Trapezoid } from "@/app/types/audioType";
-import { Card, Box, Flex } from "@radix-ui/themes";
-import RecorderForAudioCircle from "./RecorderForAudioCircle";
 import { AudioInfo, HandState } from "@/app/types/audioType";
-import AudioRecorderComponent from "./AudioRecorderComponent";
 import { AudioRecordingManager } from "./AudioRecordingManager";
 export default function BoundingBox() {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -325,7 +322,8 @@ export default function BoundingBox() {
     );
 
   const handleRecordingComplete = useCallback((newAudioInfo: AudioInfo) => {
-    setAudioInfos((prev) => {
+    console.log("📝 Parent received recording:", newAudioInfo);
+  setAudioInfos((prev) => {
       // Find if there's an existing recording slot
       const recordingIndex = prev.findIndex(
         (info) => info.isRecording && !info.audioUrl
@@ -335,9 +333,11 @@ export default function BoundingBox() {
         // Replace the recording slot with actual recording
         const updated = [...prev];
         updated[recordingIndex] = newAudioInfo;
+
         return updated;
       } else {
         // Add as new audio circle
+        
         return [...prev, newAudioInfo];
       }
     });
@@ -353,12 +353,14 @@ export default function BoundingBox() {
 
   // Method to rebuild audio refs when audioInfos changes
   const rebuildAudioRefs = useCallback(() => {
+    console.log("📝 rebuildAudioRefs");
+
     audioRefs.current = audioInfos.map(() =>
       React.createRef<AudioControlRef>()
     );
     setAudioRefsCreated(false);
     setTimeout(() => setAudioRefsCreated(true), 100);
-  }, [audioInfos.length]);
+  }, [ audioInfos]);
 
   // Effect to handle audio infos changes
   useEffect(() => {

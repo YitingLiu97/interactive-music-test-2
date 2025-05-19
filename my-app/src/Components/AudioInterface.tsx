@@ -35,6 +35,7 @@ type Props = {
     // New props
     sections?: AudioSection[];
     onSeekTo?: (timeInSeconds: number) => void;
+    setting: {width: number, height:number}
 };
 
 export default function AudioInterface({ 
@@ -57,6 +58,7 @@ export default function AudioInterface({
         { id: '6', name: 'Outro', startTime: 135, endTime: 180 }
     ],
     onSeekTo = () => {},
+    setting = {width: 100, height:150}
 }: Props) {
     // Progress based on currentTime prop (percentage)
     const progress = (currentTime / totalDuration) * 100;
@@ -118,7 +120,8 @@ export default function AudioInterface({
     };
 
     return (
-        <Card className="w-full h-[150px] bg-black text-white rounded-none">
+        <Card className="w-full bg-black text-white rounded-none"
+        style={{height: `h-[${setting.height}px]`, width:`${setting.width}px`}}>
             <Flex direction="row" gap="4" align="center" className="h-full">
                 {/* Track info section */}
                 <Box className="w-1/2 p1-4">

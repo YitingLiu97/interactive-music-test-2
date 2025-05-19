@@ -30,7 +30,28 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
 
   // Callback when recording produces a blob URL
   const handleRecordingReady = useCallback((blobUrl: string) => {
-    if (!blobUrl) return;
+  console.log("🎤 Recording ready with blob URL:", blobUrl);
+  
+  if (!blobUrl) {
+    console.error("❌ No blob URL provided!");
+    return;
+  }
+
+   fetch(blobUrl)
+    .then(response => {
+      console.log("✅ Blob URL is accessible, size:", response.headers.get('content-length'));
+      return response.blob();
+    })
+    .then(blob => {
+      console.log("✅ Blob details:", {
+        size: blob.size,
+        type: blob.type
+      });
+    })
+    .catch(error => {
+      console.error("❌ Blob URL not accessible:", error);
+    });
+
 
     const newAudioInfo: AudioInfo = {
       id: `vocal-recording-${Date.now()}`,
@@ -42,6 +63,7 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
       position: { x: 50, y: 50 },
       audioParams: { pan: 0, volume: 0 }
     };
+  console.log("🔄 Calling onRecordingComplete with:", newAudioInfo);
 
     onRecordingComplete(newAudioInfo);
   }, [onRecordingComplete, recordingSlot]);

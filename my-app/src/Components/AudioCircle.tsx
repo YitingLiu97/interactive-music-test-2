@@ -71,6 +71,28 @@ export default function AudioCircle({
     const throttleTimerRef = useRef<number | null>(null);
     const pendingParamUpdateRef = useRef<{pan: number, volume: number} | null>(null);
 
+
+    useEffect(() => {
+    console.log("🔄 useAudioCircle received new audioUrl:", audioUrl);
+    
+    // Check if it's a blob URL
+    if (audioUrl?.startsWith("blob")) {
+      console.log("🎵 Loading blob URL for recorded audio");
+      
+      // Test if blob URL is still valid
+      fetch(audioUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Blob URL not accessible: ${response.status}`);
+          }
+          console.log("✅ Blob URL is valid and accessible");
+        })
+        .catch(error => {
+          console.error("❌ Blob URL validation failed:", error);
+        });
+    }
+  }, [audioUrl]);
+
     // Respond to parent play/pause state changes
     useEffect(() => {
         if (loaded && masterIsPlaying !== lastPlayingState.current) {

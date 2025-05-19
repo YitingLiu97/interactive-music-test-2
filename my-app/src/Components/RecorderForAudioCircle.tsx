@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Flex, Text, Card, Badge, Box } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -35,19 +35,24 @@ interface WindowWithAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-interface RecorderForAudioCircleComponentsProp
-{
-  width: number
-  height: number
-  loopDurationFromStem: number
-  onRecordingComplete?: (blobUrl: string) => void
-  onRecordingStart?: () => void
-    isVisible?: boolean
+interface RecorderForAudioCircleComponentsProp {
+  width: number;
+  height: number;
+  loopDurationFromStem: number;
+  onRecordingComplete?: (blobUrl: string) => void;
+  onRecordingStart?: () => void;
+  isVisible?: boolean;
 }
 
-const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = ({
-  width, height, loopDurationFromStem, onRecordingComplete, onRecordingStart,   isVisible = true
-
+const RecorderForAudioCircle: React.FC<
+  RecorderForAudioCircleComponentsProp
+> = ({
+  width,
+  height,
+  loopDurationFromStem,
+  onRecordingComplete,
+  onRecordingStart,
+  isVisible = true,
 }) => {
   const {
     // State
@@ -109,14 +114,27 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
     { start: number; end: number | null }[]
   >([]);
   const [waveformData, setWaveformData] = useState<number[]>([]);
-  const [isToggle, SetIsToggle] = useState<boolean>(false);
-
+// debug 
   useEffect(() => {
-  if (loopBlobUrl && onRecordingComplete) {
-    console.log("on recording complete");
-    onRecordingComplete(loopBlobUrl);
-  }
-}, [loopBlobUrl, onRecordingComplete]);
+    if (loopBlobUrl && onRecordingComplete) {
+      console.log("on recording COMPLETE");
+      onRecordingComplete(loopBlobUrl);
+    }
+  }, [loopBlobUrl, onRecordingComplete]);
+
+
+ useEffect(() => {
+    if (isRecording && onRecordingStart) {
+      console.log("on recording START");
+      onRecordingStart();
+    }
+  }, [isRecording, onRecordingStart]);
+
+ useEffect(() => {
+    if (isVisible) {
+      console.log("audio panel is visible");
+    }
+  }, [isVisible]);
 
   useEffect(() => {
     const checkBrowserSupport = () => {
@@ -269,7 +287,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
     }
   };
 
-  const handlLoopDurationChangeFromSTEMAudio = (duration: number)=>{ 
+  const handlLoopDurationChangeFromSTEMAudio = (duration: number) => {
     setLoopDurationInput(duration);
     if (!isNaN(duration) && duration >= 1 && duration <= 60) {
       initializeLoopBuffer(duration);
@@ -277,18 +295,18 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
   };
 
   // Handle loop duration input
-  // this works when the loop duration input is string 
-//   const handleLoopDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     // Only allow positive numbers
-//     const value = e.target.value.replace(/[^0-9]/g, "");
-//     setLoopDurationInput(value);
+  // this works when the loop duration input is string
+  //   const handleLoopDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //     // Only allow positive numbers
+  //     const value = e.target.value.replace(/[^0-9]/g, "");
+  //     setLoopDurationInput(value);
 
-//     // Update the actual duration in the hook
-//     const duration = parseInt(value, 10);
-//     if (!isNaN(duration) && duration >= 1 && duration <= 60) {
-//       initializeLoopBuffer(duration);
-//     }
-//   };
+  //     // Update the actual duration in the hook
+  //     const duration = parseInt(value, 10);
+  //     if (!isNaN(duration) && duration >= 1 && duration <= 60) {
+  //       initializeLoopBuffer(duration);
+  //     }
+  //   };
 
   // Toggle loop mode
   const handleToggleLoopMode = () => {
@@ -374,7 +392,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
       setStatusMessage(`Error with loop recording: ${err || "Unknown error"}`);
     }
   };
-  // Handle Download Loop 
+  // Handle Download Loop
   // const handleDownloadLoop = async () => {
   //   try {
   //     setIsDownloadingLoop(true);
@@ -433,10 +451,9 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
   const handleToggleLoopPlayback = async () => {
     try {
       if (isLoopPlaybackActive) {
-       await stopLoopPlayback();
-      
-          setStatusMessage("Loop playback stopped.");
-       
+        await stopLoopPlayback();
+
+        setStatusMessage("Loop playback stopped.");
       } else {
         setStatusMessage("Starting loop playback...");
         const success = await playLoopWithTracking();
@@ -632,161 +649,159 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
     return <Badge color="amber">Not Initialized</Badge>;
   };
 
-  // Add this useEffect to debug position updates:
-  useEffect(() => {
-    console.log("AudioRecorder received position update:", {
-      loopPosition,
-      isLoopPlaybackActive,
-      isLoopRecording,
-      timestamp: Date.now(),
-    });
-  }, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
+  // debug position updates:
+  //   useEffect(() => {
+  //     console.log("AudioRecorder received position update:", {
+  //       loopPosition,
+  //       isLoopPlaybackActive,
+  //       isLoopRecording,
+  //       timestamp: Date.now(),
+  //     });
+  //   }, [loopPosition, isLoopPlaybackActive, isLoopRecording]);
 
   return (
     <Box maxWidth={`${width}px`} maxHeight={`${height}px`}>
-    <Card  className="p-6 mx-auto bg-white rounded-xl shadow-lg">
-      <Flex direction="column" gap="4">
-        <Flex justify="between" align="center">
-          <Text size="5" weight="bold">
-            Audio Recorder
-          </Text>
-          {getStatusBadge()}
-        </Flex>
-
-        {(error || statusMessage) && (
-          <Card className="p-3 bg-amber-100">
-            <Text size="2">{statusMessage || error}</Text>
-          </Card>
-        )}
-
-        {!isRecorderReady && (
-          <Flex justify="center" my="2">
-            <Button onClick={handleInitialize} color="green">
-              {initState === "failed" ? (
-                <>
-                  <ReloadIcon /> Retry Initialization
-                </>
-              ) : (
-                "Initialize Audio System"
-              )}
-            </Button>
+      <Card className="p-6 mx-auto bg-white rounded-xl shadow-lg">
+        <Flex direction="column" gap="4">
+          <Flex justify="between" align="center">
+            <Text size="5" weight="bold">
+              Audio Recorder
+            </Text>
+            {getStatusBadge()}
           </Flex>
-        )}
 
-        {/* Debug info - remove in production */}
-        <Card className="p-3 bg-gray-100 text-xs">
-          <Text size="1">
-            <strong>Status:</strong> {initState} |<strong> Tone:</strong>{" "}
-            {isToneInitialized ? "Initialized" : "Not Initialized"} |
-            <strong> Ready:</strong> {isRecorderReady ? "Yes" : "No"} |
-            <strong> Devices:</strong> {audioDevices.length} |
-            <strong> LoopMode:</strong> {loopMode ? "On" : "Off"}
-          </Text>
-        </Card>
+          {(error || statusMessage) && (
+            <Card className="p-3 bg-amber-100">
+              <Text size="2">{statusMessage || error}</Text>
+            </Card>
+          )}
 
-        {isPermissionGranted && (
-          <>
-            <Flex direction="column" gap="2">
-              <Text size="2" weight="medium">
-                Select Microphone:
-              </Text>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                value={deviceIndex}
-                onChange={handleDeviceChange}
-                disabled={isRecording || !isRecorderReady}
-              >
-                {audioDevices.map((device, index) => (
-                  <option key={device.deviceId} value={index}>
-                    {device.label || `Microphone ${index + 1}`}
-                  </option>
-                ))}
-              </select>
+          {!isRecorderReady && (
+            <Flex justify="center" my="2">
+              <Button onClick={handleInitialize} color="green">
+                {initState === "failed" ? (
+                  <>
+                    <ReloadIcon /> Retry Initialization
+                  </>
+                ) : (
+                  "Initialize Audio System"
+                )}
+              </Button>
             </Flex>
+          )}
 
-            {visualizationActive && (
-              <Flex direction="column" gap="1">
+          {/* Debug info - remove in production */}
+          <Card className="p-3 bg-gray-100 text-xs">
+            <Text size="1">
+              <strong>Status:</strong> {initState} |<strong> Tone:</strong>{" "}
+              {isToneInitialized ? "Initialized" : "Not Initialized"} |
+              <strong> Ready:</strong> {isRecorderReady ? "Yes" : "No"} |
+              <strong> Devices:</strong> {audioDevices.length} |
+              <strong> LoopMode:</strong> {loopMode ? "On" : "Off"}
+            </Text>
+          </Card>
+
+          {isPermissionGranted && (
+            <>
+              <Flex direction="column" gap="2">
                 <Text size="2" weight="medium">
-                  Audio Level:
+                  Select Microphone:
                 </Text>
-                <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-100 ease-out ${
-                      isRecording || isLoopRecording
-                        ? "bg-red-500"
-                        : "bg-green-600"
-                    }`}
-                    style={{ width: `${audioLevel}%` }}
-                  ></div>
-                </div>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  value={deviceIndex}
+                  onChange={handleDeviceChange}
+                  disabled={isRecording || !isRecorderReady}
+                >
+                  {audioDevices.map((device, index) => (
+                    <option key={device.deviceId} value={index}>
+                      {device.label || `Microphone ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
               </Flex>
-            )}
 
-            {loopMode ? (
-              /* Loop Recording Mode UI */
-              <Card className="p-4 bg-blue-50 rounded-lg">
-                <Flex direction="column" gap="3">
-                  <Text size="3" weight="medium">
-                    Loop Recording Mode
+              {visualizationActive && (
+                <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">
+                    Audio Level:
                   </Text>
+                  <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-100 ease-out ${
+                        isRecording || isLoopRecording
+                          ? "bg-red-500"
+                          : "bg-green-600"
+                      }`}
+                      style={{ width: `${audioLevel}%` }}
+                    ></div>
+                  </div>
+                </Flex>
+              )}
 
-                  {/* Loop Duration Input */}
-                  <Flex gap="2" align="center">
-                    <Text size="2">Duration:</Text> {loopDurationInput}
-                    <Text size="2">seconds</Text>
-                    <Button
-                      variant="soft"
-                      size="1"
-                      onClick={() =>
-                        initializeLoopBuffer(loopDurationInput)
-                      }
-                      disabled={isLoopRecording || isLoopPlaybackActive}
-                    >
-                    <ReloadIcon /> Current Audio Length
-                    </Button>
-                  </Flex>
+              {loopMode ? (
+                /* Loop Recording Mode UI */
+                <Card className="p-4 bg-blue-50 rounded-lg">
+                  <Flex direction="column" gap="3">
+                    <Text size="3" weight="medium">
+                      Loop Recording Mode
+                    </Text>
 
-                  {/* Loop Visualizer */}
-                  {loopBuffer && (
-                    <div className="mt-2 mb-2">
-                      <LoopVisualizer
-                        loopBuffer={loopBuffer}
-                        loopDuration={loopDuration}
-                        loopPosition={loopPosition}
-                        isLoopPlaybackActive={isLoopPlaybackActive}
-                        isLoopRecording={isLoopRecording}
-                        recordingSegments={recordingSegments}
-                        onPlayPause={handleToggleLoopPlayback}
-                        onRecord={handleLoopRecordToggle}
-                        onStop={handleStopAll}
-                        onPositionChange={handlePositionChange}
-                        waveformData={waveformData}
-                      />
-                    </div>
-                  )}
+                    {/* Loop Duration Input */}
+                    <Flex gap="2" align="center">
+                      <Text size="2">Duration:</Text>{" "}
+                      {loopDurationInput.toFixed(2)}
+                      <Text size="2">seconds</Text>
+                      <Button
+                        variant="soft"
+                        size="1"
+                        onClick={() => initializeLoopBuffer(loopDurationInput)}
+                        disabled={isLoopRecording || isLoopPlaybackActive}
+                      >
+                        <ReloadIcon /> Current Audio Length
+                      </Button>
+                    </Flex>
 
+                    {/* Loop Visualizer */}
+                    {loopBuffer && (
+                      <div className="mt-2 mb-2">
+                        <LoopVisualizer
+                          loopBuffer={loopBuffer}
+                          loopDuration={loopDuration}
+                          loopPosition={loopPosition}
+                          isLoopPlaybackActive={isLoopPlaybackActive}
+                          isLoopRecording={isLoopRecording}
+                          recordingSegments={recordingSegments}
+                          onPlayPause={handleToggleLoopPlayback}
+                          onRecord={handleLoopRecordToggle}
+                          onStop={handleStopAll}
+                          onPositionChange={handlePositionChange}
+                          waveformData={waveformData}
+                        />
+                      </div>
+                    )}
 
-                  {/* Loop Transport Controls */}
-                  <Flex gap="2" justify="center">
-                    <Button
-                      color={isLoopPlaybackActive ? "amber" : "green"}
-                      onClick={handleToggleLoopPlayback}
-                    >
-                      {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
-                      {isLoopPlaybackActive ? "Stop Loop" : "Play Loop"}
-                    </Button>
+                    {/* Loop Transport Controls */}
+                    <Flex gap="2" justify="center">
+                      <Button
+                        color={isLoopPlaybackActive ? "amber" : "green"}
+                        onClick={handleToggleLoopPlayback}
+                      >
+                        {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
+                        {isLoopPlaybackActive ? "Stop Loop" : "Play Loop"}
+                      </Button>
 
-                    <Button
-                      color={isLoopRecording ? "red" : "blue"}
-                      onClick={handleLoopRecordToggle}
-                      disabled={!loopBuffer}
-                    >
-                      {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
-                      {isLoopRecording ? "Stop Recording" : "Record"}
-                    </Button>
-                  </Flex>
-                  {/* tentative, issue with download  */}
-                  {/* <Flex gap="2" justify="center">
+                      <Button
+                        color={isLoopRecording ? "red" : "blue"}
+                        onClick={handleLoopRecordToggle}
+                        disabled={!loopBuffer}
+                      >
+                        {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
+                        {isLoopRecording ? "Stop Recording" : "Record"}
+                      </Button>
+                    </Flex>
+                    {/* tentative, issue with download  */}
+                    {/* <Flex gap="2" justify="center">
                     {loopMode && (
                       <div className="mt-2">
                         
@@ -807,101 +822,101 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
                       </div>
                     )}
                   </Flex> */}
-                </Flex>
-              </Card>
-            ) : (
-              /* Normal Recording Mode UI */
-              <>
-                {isRecording && (
-                  <Flex align="center" gap="2">
-                    <DotFilledIcon className="text-red-500 animate-pulse" />
-                    <Text size="2" color="red">
-                      Recording: {formatDuration(recordingDuration)}
-                    </Text>
                   </Flex>
-                )}
- 
-                <Flex gap="2" justify="center">
-                  {isRecording ? (
-                    <Button color="red" onClick={handleStopRecording}>
-                      <StopIcon /> Stop Recording
-                    </Button>
-                  ) : (
-                    <Button
-                      color="red"
-                      onClick={handleStartRecording}
-                      disabled={!isRecorderReady}
-                    >
-                      <RecordButtonIcon /> Start Recording
-                    </Button>
-                  )}
-                </Flex>
-
-                    {recordedBlob && (
-                  <Card className="p-3 bg-gray-50">
-                    <Flex direction="column" gap="2">
-                      <Text size="2" weight="medium">
-                        Recording:
-                      </Text>
-                      <Flex gap="2">
-                        <Button
-                          variant="soft"
-                          color={isPlaying ? "amber" : "green"}
-                          onClick={togglePlayback}
-                        >
-                          {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                          {isPlaying ? "Pause" : "Play"}
-                        </Button>
-                        <Button
-                          variant="soft"
-                          onClick={() => {
-                            const anchor = document.createElement("a");
-                            anchor.download = "recording.webm";
-                            anchor.href = recordedBlob.url;
-                            anchor.click();
-                          }}
-                        >
-                          Download
-                        </Button>
-                      </Flex>
-                      <audio
-                        src={recordedBlob.url}
-                        controls
-                        className="w-full mt-2"
-                      />
-                    </Flex>
-                  </Card>
-                )}
-              </>
-            )}
-
-            <Flex justify="center" mt="2">
-              <Button
-                variant="soft"
-                color={loopMode ? "blue" : "gray"}
-                onClick={handleToggleLoopMode}
-                disabled={isRecording}
-              >
-                <LoopIcon />{" "}
-                {loopMode ? "Switch to Normal Mode" : "Switch to Loop Mode"}
-              </Button>
-            </Flex>
-
-            <Text size="2" color="gray">
-              {mediaStream ? (
-                <>
-                  Active microphone:{" "}
-                  {audioDevices[deviceIndex]?.label ||
-                    `Microphone ${deviceIndex + 1}`}
-                </>
+                </Card>
               ) : (
-                <>No active microphone</>
+                /* Normal Recording Mode UI */
+                <>
+                  {isRecording && (
+                    <Flex align="center" gap="2">
+                      <DotFilledIcon className="text-red-500 animate-pulse" />
+                      <Text size="2" color="red">
+                        Recording: {formatDuration(recordingDuration)}
+                      </Text>
+                    </Flex>
+                  )}
+
+                  <Flex gap="2" justify="center">
+                    {isRecording ? (
+                      <Button color="red" onClick={handleStopRecording}>
+                        <StopIcon /> Stop Recording
+                      </Button>
+                    ) : (
+                      <Button
+                        color="red"
+                        onClick={handleStartRecording}
+                        disabled={!isRecorderReady}
+                      >
+                        <RecordButtonIcon /> Start Recording
+                      </Button>
+                    )}
+                  </Flex>
+
+                  {recordedBlob && (
+                    <Card className="p-3 bg-gray-50">
+                      <Flex direction="column" gap="2">
+                        <Text size="2" weight="medium">
+                          Recording:
+                        </Text>
+                        <Flex gap="2">
+                          <Button
+                            variant="soft"
+                            color={isPlaying ? "amber" : "green"}
+                            onClick={togglePlayback}
+                          >
+                            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                            {isPlaying ? "Pause" : "Play"}
+                          </Button>
+                          <Button
+                            variant="soft"
+                            onClick={() => {
+                              const anchor = document.createElement("a");
+                              anchor.download = "recording.webm";
+                              anchor.href = recordedBlob.url;
+                              anchor.click();
+                            }}
+                          >
+                            Download
+                          </Button>
+                        </Flex>
+                        <audio
+                          src={recordedBlob.url}
+                          controls
+                          className="w-full mt-2"
+                        />
+                      </Flex>
+                    </Card>
+                  )}
+                </>
               )}
-            </Text>
-          </>
-        )}
-      </Flex>
-    </Card>
+
+              <Flex justify="center" mt="2">
+                <Button
+                  variant="soft"
+                  color={loopMode ? "blue" : "gray"}
+                  onClick={handleToggleLoopMode}
+                  disabled={isRecording}
+                >
+                  <LoopIcon />{" "}
+                  {loopMode ? "Switch to Normal Mode" : "Switch to Loop Mode"}
+                </Button>
+              </Flex>
+
+              <Text size="2" color="gray">
+                {mediaStream ? (
+                  <>
+                    Active microphone:{" "}
+                    {audioDevices[deviceIndex]?.label ||
+                      `Microphone ${deviceIndex + 1}`}
+                  </>
+                ) : (
+                  <>No active microphone</>
+                )}
+              </Text>
+            </>
+          )}
+        </Flex>
+      </Card>
     </Box>
   );
 };
