@@ -33,7 +33,7 @@ export interface AudioInfo {
   instrumentName: string;
   circleColor: string;
   audioSource: "recording" | "file";
-  isRecording: boolean;
+  isRecording?: boolean;
   position?: { x: number; y: number };
   audioParams?: { pan: number; volume: number };
 }
