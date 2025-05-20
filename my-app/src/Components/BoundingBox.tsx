@@ -358,6 +358,15 @@ export default function BoundingBox() {
     [recordingAudioInfo]
   );
 
+// only remove the circle when the audio is null
+// when the recording is cancelled 
+  const cancelRecording=useCallback(()=>{
+
+   setAudioInfos(prev=>prev.filter(info=>info.id!=='vocal-recording'));
+   setRecordingAudioInfo(null);
+   setIsRecorderVisible(false);
+  },[]);
+
   // Handle recording start
   const handleRecordingStart = useCallback(() => {
     console.log("🎬 BoundingBox: handleRecordingStart called");
@@ -908,8 +917,7 @@ export default function BoundingBox() {
           <div className="absolute top-4 left-4 z-20">
             <Button
               onClick={() => {
-                setIsRecorderVisible(false);
-                setRecordingSlotIndex(null);
+               cancelRecording();
               }}
               variant="outline"
               className="mt-2"
