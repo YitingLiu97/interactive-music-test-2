@@ -7,7 +7,7 @@ import {
   StopIcon,
   DotFilledIcon,
   ReloadIcon,
-  LoopIcon,
+  // LoopIcon,
 } from "@radix-ui/react-icons";
 import LoopVisualizer from "./LoopVisualizer";
 import { useAudioRecorder } from "../app/utils/useAudioRecorder";
@@ -101,7 +101,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
   const [visualizationActive, setVisualizationActive] = useState(false);
   const [isLoopPlaying, setIsLoopPlaying] = useState(false);
   const [loopDurationInput, setLoopDurationInput] = useState<number>(10);
-  const [loopMode, setLoopMode] = useState(true);
+  // const [loopMode, setLoopMode] = useState(true);
   const [recordingSegments, setRecordingSegments] = useState<{ start: number; end: number | null }[]>([]);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   
@@ -367,9 +367,9 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
   };
 
   // Toggle loop mode
-  const handleToggleLoopMode = () => {
-    setLoopMode((prev) => !prev);
-  };
+  // const handleToggleLoopMode = () => {
+  //   setLoopMode((prev) => !prev);
+  // };
 
   // Start loop recording
   const handleStartLoopRecording = async () => {
@@ -713,7 +713,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
               {isToneInitialized ? "Initialized" : "Not Initialized"} |
               <strong> Ready:</strong> {isRecorderReady ? "Yes" : "No"} |
               <strong> Devices:</strong> {audioDevices.length} |
-              <strong> LoopMode:</strong> {loopMode ? "On" : "Off"} |
+              {/* <strong> LoopMode:</strong> {loopMode ? "On" : "Off"} | */}
               <strong> BlobURL:</strong> {currentBlobUrl ? "Available" : "None"} |
               <strong> Completed:</strong> {hasCompletedRecording ? "Yes" : "No"} |
               <strong> FirstRec:</strong> {isFirstRecording ? "Yes" : "No"} |
@@ -772,7 +772,8 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
                 </Flex>
               )}
 
-              {loopMode ? (
+{/* used to be loopmode */}
+              {true ? (
                 /* Loop Recording Mode UI */
                 <Card className="p-4 bg-blue-50 rounded-lg">
                   <Flex direction="column" gap="3">
@@ -909,14 +910,14 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
                             onClick={() => {
                               const anchor = document.createElement("a");
                               anchor.download = "recording.webm";
-                              anchor.href = recordedBlob.url;
+                              anchor.href = recordedBlob!.url;
                               anchor.click();
                             }}
                           >
                             Download
                           </Button>
                         </Flex>
-                        <audio src={recordedBlob.url} controls className="w-full mt-2" />
+                        <audio src={recordedBlob!.url} controls className="w-full mt-2" />
                       </Flex>
                     </Card>
                   )}
