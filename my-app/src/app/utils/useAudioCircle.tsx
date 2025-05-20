@@ -320,44 +320,53 @@ export function useAudioCircle(audioUrl: string) {
   };
 
   // Fixed seek function
-  const seekTo = (timeInSeconds: number) => {
-    if (!playerRef.current || !isMountedRef.current) return false;
-    
-    try {
-      // Always stop first
-      if (playerRef.current.state === "started") {
-        playerRef.current.stop();
-      }
-      
-      // Use setTimeout to avoid React render conflicts
-      setTimeout(() => {
-        if (!playerRef.current || !isMountedRef.current) return;
-        
-        try {
-          const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? timeInSeconds : 0;
-          playerRef.current.start(undefined, validTime);
-          
-          // Update state
-          isPlayingRef.current = true;
-          
-          if (isMountedRef.current) {
-            setIsPlaying(true);
-            
-            // Reset analysis flag and restart analysis
-            isAnalyzingRef.current = false;
-            analyzeAudio();
-          }
-        } catch (e) {
-          console.error("Error restarting at time position:", e);
-        }
-      }, 20);
-      
-      return true;
-    } catch (error) {
-      console.error("Error seeking:", error);
-      return false;
+const seekTo = (timeInSeconds: number) => {
+  if (!playerRef.current || !isMountedRef.current) return false;
+
+  try {
+    // Always stop first
+    if (playerRef.current.state === "started") {
+      playerRef.current.stop();
     }
-  };
+
+    // Use setTimeout to avoid React render conflicts
+    setTimeout(() => {
+      if (!playerRef.current || !isMountedRef.current) return;
+
+      try {
+        const validTime = isFinite(timeInSeconds) && timeInSeconds >= 0 ? timeInSeconds : 0;
+        
+        // Key fix: Use a future start time to avoid Tone.js timing conflicts
+        const startTime = Tone.now() + 0.05; // 50ms in the future
+        playerRef.current.start(startTime, validTime);
+
+        // Update state
+        isPlayingRef.current = true;
+
+        if (isMountedRef.current) {
+          setIsPlaying(true);
+
+          // Reset analysis flag and restart analysis
+          isAnalyzingRef.current = false;
+          analyzeAudio();
+        }
+      } catch (e) {
+        console.error("Error restarting at time position:", e);
+        
+        // Reset playing state on error
+        isPlayingRef.current = false;
+        if (isMountedRef.current) {
+          setIsPlaying(false);
+        }
+      }
+    }, 20);
+
+    return true;
+  } catch (error) {
+    console.error("Error seeking:", error);
+    return false;
+  }
+};
 
 // Set pan function with smoother transitions
 const setPan = (value: number) => {

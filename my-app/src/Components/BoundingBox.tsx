@@ -843,7 +843,7 @@ export default function BoundingBox() {
         />
         {/* Audio interface outside the bounding box */}
         <AudioInterface
-          setting={{ width: 1000, height: 150 }}
+          setting={{ width: window.innerWidth, height: 150 }}
           trackListName="Chinese Instrumental"
           authorName="Justin Scholar 玉刻"
           onPlayAll={playAll}
