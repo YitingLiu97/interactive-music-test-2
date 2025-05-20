@@ -23,7 +23,6 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
   onRecordingComplete,
   onRecordingStart,
   recordingSlot, 
-  toggleVisbiilty,
   isVisible
 }) => {
 console.log("🔧 AudioRecordingManager rendered with props:", {

@@ -106,7 +106,7 @@ const AudioRecorderComponent: React.FC<AudioRecorderComponentProps> = ({
     { start: number; end: number | null }[]
   >([]);
   const [waveformData, setWaveformData] = useState<number[]>([]);
-  const [isDownloadingLoop, setIsDownloadingLoop] = useState<boolean>();
+  // const [isDownloadingLoop, setIsDownloadingLoop] = useState<boolean>();
 
   useEffect(() => {
     const checkBrowserSupport = () => {

@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
 import { InitState } from "./types";
-import LoopControls from "@/Components/LoopControls";
 
 export function useAudioSystem() {
   // ===== Device/Media States =====

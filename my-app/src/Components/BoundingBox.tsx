@@ -959,7 +959,7 @@ export default function BoundingBox() {
             variant={isRecorderVisible ? "outline" : "solid"}
             disabled={isRecorderVisible}
           >
-            🎤 {isRecorderVisible ? "Recording..." : "Start Recording"}
+            🎤 WIP {isRecorderVisible ? "Recording..." : "Start Recording"}
           </Button>
         </div>
 
