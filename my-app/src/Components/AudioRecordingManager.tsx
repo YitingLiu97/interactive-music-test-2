@@ -116,12 +116,9 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
   }, [onRecordingComplete, recordingSlot]);
 
   return (
-    <div className="audio-recording-manager border-2 border-blue-200 p-2">
-      <div className="text-xs bg-blue-100 p-2 mb-2 rounded">
-        AudioRecordingManager Debug - Visible: 
-      </div>
-        <div className="pt-4">
-          <div className={isVisible ? 'block' : 'hidden'}>
+    <div className={isVisible ? 'audio-recording-manager  border-2 border-blue-200 p-2' : 'audio-recording-manager p-2'}>
+         <div className='bg-red-400 overflow-y-scroll '>
+          <div className={isVisible ? 'block' : 'hidden'} >
             <RecorderForAudioCircle
               width={width}
               height={height}
@@ -131,7 +128,7 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
               onRecordingStart={handleRecordingStart}
               />
           </div>
-      </div>
+          </div>
     </div>
   );
 };
