@@ -241,7 +241,7 @@ export default function CircleUI({
                 top: 0,
                 transform: `translate(${xPos - circleSize/2}px, ${yPos - circleSize/2}px)`,                cursor: isDragging ? "grabbing" : "grab",
                 transition: isDragging ? "none" : "all 0.1s ease",
-                opacity: opacity,
+                opacity: isNaN(opacity) ? 1 : opacity,
                 zIndex: isDragging ? 10 : 1,
                 boxShadow: isDragging 
                     ? `0 0 ${glowIntensity}px rgba(255, 255, 255, 0.6)` 

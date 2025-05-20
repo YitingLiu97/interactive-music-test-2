@@ -359,14 +359,21 @@ export function useAudioCircle(audioUrl: string) {
     }
   };
 
-  // Set pan function with smoother transitions
-  const setPan = (value: number) => {
-    if (!pannerRef.current || !isMountedRef.current) return;
-    
-    const clampedValue = Math.max(-1, Math.min(value, 1));
-    
-    try {
-      // Apply smooth ramping to prevent audio artifacts
+// Set pan function with smoother transitions
+const setPan = (value: number) => {
+  if (!pannerRef.current || !isMountedRef.current) return;
+  
+  // First check if the value is valid
+  if (typeof value !== 'number' || isNaN(value)) {
+    console.warn('Invalid pan value:', value);
+    return;
+  }
+  
+  const clampedValue = Math.max(-1, Math.min(value, 1));
+  
+  try {
+    // Check if the pan parameter exists and is properly initialized
+    if (pannerRef.current.pan && pannerRef.current.pan.value !== undefined) {
       const now = Tone.now();
       const currentValue = pannerRef.current.pan.value;
       
@@ -383,65 +390,83 @@ export function useAudioCircle(audioUrl: string) {
       if (isMountedRef.current) {
         setCurrentPan(clampedValue);
       }
-    } catch (error) {
-      console.error("Error setting pan:", error);
-      
-      // Fallback to direct setting if ramping fails
-      try {
+    } else {
+      console.warn('Pan parameter not properly initialized');
+    }
+  } catch (error) {
+    console.error("Error setting pan:", error);
+    
+    // Fallback to direct setting if ramping fails
+    try {
+      if (pannerRef.current.pan && pannerRef.current.pan.value !== undefined) {
         pannerRef.current.pan.value = clampedValue;
         if (isMountedRef.current) {
           setCurrentPan(clampedValue);
         }
-      } catch (e) {
-        console.error("Fallback pan setting failed:", e);
       }
+    } catch (e) {
+      console.error("Fallback pan setting failed:", e);
     }
-  };
+  }
+};
 
-  // Set volume function with smoother transitions
-  const setVolume = (value: number) => {
-    if (!volumeRef.current || !isMountedRef.current) return;
+// Set volume function with smoother transitions
+const setVolume = (value: number) => {
+  if (!volumeRef.current || !isMountedRef.current) return;
+  
+  // First check if the value is valid
+  if (typeof value !== 'number' || isNaN(value)) {
+    console.warn('Invalid volume value:', value);
+    return;
+  }
+  
+  const clampedValue = Math.max(-60, Math.min(value, 0));
+  
+  try {
+    // Check if the volume parameter exists and is properly initialized
+    if (!volumeRef.current.volume || volumeRef.current.volume.value === undefined) {
+      console.warn('Volume parameter not properly initialized');
+      return;
+    }
     
-    const clampedValue = Math.max(-60, Math.min(value, 0));
+    const shouldBeMuted = clampedValue <= volumeThreshold;
     
-    try {
-      const shouldBeMuted = clampedValue <= volumeThreshold;
+    if (shouldBeMuted) {
+      volumeRef.current.mute = true;
+      if (isMountedRef.current) {
+        setIsMuted(true);
+      }
+    } else {
+      volumeRef.current.mute = false;
       
-      if (shouldBeMuted) {
-        volumeRef.current.mute = true;
-        if (isMountedRef.current) {
-          setIsMuted(true);
-        }
+      // Apply smooth ramping to prevent audio artifacts
+      const now = Tone.now();
+      const currentValue = volumeRef.current.volume.value;
+      
+      // Only ramp if the change is significant enough
+      if (Math.abs(currentValue - clampedValue) > 0.5) {
+        volumeRef.current.volume.cancelScheduledValues(now);
+        volumeRef.current.volume.setValueAtTime(currentValue, now);
+        volumeRef.current.volume.linearRampToValueAtTime(clampedValue, now + 0.05);
       } else {
-        volumeRef.current.mute = false;
-        
-        // Apply smooth ramping to prevent audio artifacts
-        const now = Tone.now();
-        const currentValue = volumeRef.current.volume.value;
-        
-        // Only ramp if the change is significant enough
-        if (Math.abs(currentValue - clampedValue) > 0.5) {
-          volumeRef.current.volume.cancelScheduledValues(now);
-          volumeRef.current.volume.setValueAtTime(currentValue, now);
-          volumeRef.current.volume.linearRampToValueAtTime(clampedValue, now + 0.05);
-        } else {
-          // For very small changes, just set directly
-          volumeRef.current.volume.value = clampedValue;
-        }
-        
-        if (isMountedRef.current) {
-          setIsMuted(false);
-        }
+        // For very small changes, just set directly
+        volumeRef.current.volume.value = clampedValue;
       }
       
       if (isMountedRef.current) {
-        setCurrentVolume(clampedValue);
+        setIsMuted(false);
       }
-    } catch (error) {
-      console.error("Error setting volume:", error);
-      
-      // Fallback to direct setting if ramping fails
-      try {
+    }
+    
+    if (isMountedRef.current) {
+      setCurrentVolume(clampedValue);
+    }
+  } catch (error) {
+    console.error("Error setting volume:", error);
+    
+    // Fallback to direct setting if ramping fails
+    try {
+      if (volumeRef.current.volume && volumeRef.current.volume.value !== undefined) {
         const shouldBeMuted = clampedValue <= volumeThreshold;
         volumeRef.current.mute = shouldBeMuted;
         
@@ -453,12 +478,12 @@ export function useAudioCircle(audioUrl: string) {
           setIsMuted(shouldBeMuted);
           setCurrentVolume(clampedValue);
         }
-      } catch (e) {
-        console.error("Fallback volume setting failed:", e);
       }
+    } catch (e) {
+      console.error("Fallback volume setting failed:", e);
     }
-  };
-
+  }
+};
   // Toggle loop function
   const toggleLoop = () => {
     if (!playerRef.current || !isMountedRef.current) return;

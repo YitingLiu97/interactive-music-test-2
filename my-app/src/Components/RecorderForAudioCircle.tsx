@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button, Flex, Text, Card, Badge, Box } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -54,6 +54,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
   onRecordingComplete, // Creates audio circle (first time)
   onRecordingUpdated, // Updates audio circle (subsequent times)
   onRecordingStart,
+  isVisible = true,
 }) => {
   const {
     // State
@@ -173,15 +174,19 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
           if (isFirstRecording) {
             // First recording - create the audio circle
             if (onRecordingComplete) {
-              console.log("🆕 First recording - calling onRecordingComplete to CREATE audio circle");
+              console.log("🆕 FIRST RECORDING - calling onRecordingComplete to CREATE audio circle");
               onRecordingComplete(blobUrlToUse);
               setIsFirstRecording(false); // Mark that we've created the circle
+            } else {
+              console.error("❌ No onRecordingComplete callback for first recording!");
             }
           } else {
             // Subsequent recordings - update the existing audio circle
             if (onRecordingUpdated) {
-              console.log("🔄 Subsequent recording - calling onRecordingUpdated to UPDATE audio circle");
+              console.log("🔄 SUBSEQUENT RECORDING - calling onRecordingUpdated to UPDATE same audio circle");
               onRecordingUpdated(blobUrlToUse);
+            } else {
+              console.error("❌ No onRecordingUpdated callback for subsequent recording!");
             }
           }
         }

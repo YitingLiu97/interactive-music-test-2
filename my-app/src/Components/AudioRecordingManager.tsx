@@ -49,8 +49,6 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
     }
   }, [onRecordingStart]);
 
-
-
   const handleRecordingUpdate = useCallback((blobUrl: string) => {
     console.log("🎤 AudioRecordingManager: handleRecordingUpdate called with:", blobUrl);
     
@@ -109,6 +107,7 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
       audioParams: { pan: 0, volume: 0 }
     };
 
+  
     console.log("🔄 AudioRecordingManager: Calling parent onRecordingComplete with:", newAudioInfo);
     
     if (onRecordingComplete && typeof onRecordingComplete === 'function') {

@@ -837,9 +837,9 @@ export default function BoundingBox() {
           height={2000}
           loopDurationFromStem={totalDuration}
           onRecordingComplete={handleRecordingComplete}
+          onRecordingUpdate={handleRecordingComplete}
           onRecordingStart={handleRecordingStart}
           recordingSlot={null}
-
         />
         {/* Audio interface outside the bounding box */}
         <AudioInterface

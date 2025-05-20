@@ -270,7 +270,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     // Draw audio level meter if recording or playing - optimized to only show when needed
     if ((isLoopPlaybackActive || isLoopRecording) && audioLevel !== undefined) {
       // Only draw the level meter on the right side
-      console.log("draw audio meter");
       const meterWidth = 15;
       const meterX = canvas.width - meterWidth - 10;
       
@@ -373,10 +372,10 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-useEffect(() => {
-  console.log("LoopVisualizer received position:", loopPosition);
-  console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
-}, [loopPosition, loopDuration]);
+// useEffect(() => {
+//   console.log("LoopVisualizer received position:", loopPosition);
+//   console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
+// }, [loopPosition, loopDuration]);
 
 
   return (
