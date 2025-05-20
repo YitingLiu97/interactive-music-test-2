@@ -46,6 +46,13 @@ export default function BoundingBox() {
   const releaseDebounceRef = useRef<Record<number, number>>({});
   const RELEASE_DEBOUNCE_TIME = 300; // ms to delay release to prevent accidental drops
   const raf = useRef<number | null>(null);
+  const [isRecorderVisible, setIsRecorderVisible] = useState(false);
+  const [isRecorderPanelVisible, setIsRecorderPanelVisible] = useState(true);
+  const [recordingSlotIndex, setRecordingSlotIndex] = useState<number | null>(
+    null
+  );
+  const [recordingAudioInfo, setRecordingAudioInfo] =
+    useState<AudioInfo | null>(null);
 
   const [audioInfos, setAudioInfos] = useState<AudioInfo[]>([
     {
@@ -89,7 +96,7 @@ export default function BoundingBox() {
       circleColor: "blue",
       instrumentName: "Zheng",
       audioSource: "file",
-    }
+    },
   ]);
 
   // Initialize the refs array with the correct length first
@@ -313,37 +320,99 @@ export default function BoundingBox() {
       handleHandLost
     );
 
-  const handleRecordingComplete = useCallback((newAudioInfo: AudioInfo) => {
-  console.log("🎉 BoundingBox: handleRecordingComplete called with:", newAudioInfo);
-  setAudioInfos((prev) => {
-      // Find if there's an existing recording slot
-      const recordingIndex = prev.findIndex(
-        (info) => info.isRecording && !info.audioUrl
+  // Modified handleRecordingComplete to properly integrate with audioInfos
+  const handleRecordingComplete = useCallback(
+    (newAudioInfo: AudioInfo) => {
+      console.log(
+        "🎉 BoundingBox: handleRecordingComplete called with:",
+        newAudioInfo
       );
 
-      if (recordingIndex >= 0) {
-        // Replace the recording slot with actual recording
-        const updated = [...prev];
-        updated[recordingIndex] = newAudioInfo;
-        console.log("📝 BoundingBox: Updated audioInfos from", prev.length, "to", updated.length);
-        console.log("📝 BoundingBox: New audioInfos:", newAudioInfo);
+      // Update the recording audio info
+      const updatedRecording = {
+        ...newAudioInfo,
+        id: "vocal-recording", // Ensure consistent ID
+        position: recordingAudioInfo?.position || { x: 50, y: 70 },
+      };
 
-        return updated;
-      } else {
-        // Add as new audio circle
-        
-        return [...prev, newAudioInfo];
-      }
-    });
+      setRecordingAudioInfo(updatedRecording);
 
-    // Rebuild audio refs array
-    rebuildAudioRefs();
-  }, []);
+      // Update in audioInfos array
+      setAudioInfos((prev) => {
+        const index = prev.findIndex((info) => info.id === "vocal-recording");
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = updatedRecording;
+          console.log("📝 BoundingBox: Updated existing recording circle");
+          return updated;
+        } else {
+          // This shouldn't happen, but fallback to add
+          console.log("📝 BoundingBox: Added new recording circle");
+          return [...prev, updatedRecording];
+        }
+      });
+
+      // Keep recorder visible so user can see the result and record again
+      setRecordingSlotIndex(null);
+    },
+    [recordingAudioInfo]
+  );
 
   // Handle recording start
   const handleRecordingStart = useCallback(() => {
-      console.log("🎬 BoundingBox: handleRecordingStart called");
-      setCurrentTrack("Recording in progress...");
+    console.log("🎬 BoundingBox: handleRecordingStart called");
+    setCurrentTrack("Recording in progress...");
+  }, []);
+
+  // Modified handleRecordingUpdate - same logic as complete for single circle
+  const handleRecordingUpdate = useCallback(
+    (updatedAudioInfo: AudioInfo) => {
+      console.log(
+        "🔄 BoundingBox: handleRecordingUpdate called with:",
+        updatedAudioInfo
+      );
+      handleRecordingComplete(updatedAudioInfo); // Same logic for single circle
+    },
+    [handleRecordingComplete]
+  );
+
+  const createRecordingSlot = useCallback(() => {
+    const newPosition = {
+      x: 50, // Center horizontally
+      y: 70, // Place below other circles
+    };
+
+    const recordingSlot: AudioInfo = {
+      id: `vocal-recording`, // Fixed ID for single recording
+      audioUrl: "", // Empty until recording completes
+      instrumentName: "Recording...",
+      circleColor: "red",
+      audioSource: "recording",
+      isRecording: true,
+      position: newPosition,
+      audioParams: { pan: 0, volume: 0.7 },
+    };
+
+    // Set the recording audio info
+    setRecordingAudioInfo(recordingSlot);
+
+    // Add to audioInfos if not already there
+    setAudioInfos((prev) => {
+      const existingIndex = prev.findIndex(
+        (info) => info.id === "vocal-recording"
+      );
+      if (existingIndex >= 0) {
+        // Replace existing recording
+        const updated = [...prev];
+        updated[existingIndex] = recordingSlot;
+        return updated;
+      } else {
+        // Add new recording
+        return [...prev, recordingSlot];
+      }
+    });
+
+    setIsRecorderVisible(true);
   }, []);
 
   // Method to rebuild audio refs when audioInfos changes
@@ -355,7 +424,17 @@ export default function BoundingBox() {
     );
     setAudioRefsCreated(false);
     setTimeout(() => setAudioRefsCreated(true), 100);
-  }, [ audioInfos]);
+  }, [audioInfos]);
+
+  const toggleVisibility = useCallback(() => {
+    console.log(
+      "👁️ Toggling visibility from",
+      isRecorderPanelVisible,
+      "to",
+      !isRecorderPanelVisible
+    );
+    setIsRecorderPanelVisible((prev) => !prev);
+  }, [isRecorderPanelVisible]);
 
   // Effect to handle audio infos changes
   useEffect(() => {
@@ -622,8 +701,6 @@ export default function BoundingBox() {
     });
   }
 
-
-
   // Apply position-based muting for all audio circles
   useEffect(() => {
     if (audioRefsCreated) {
@@ -641,13 +718,8 @@ export default function BoundingBox() {
     }
   }, [audioRefsCreated]);
 
-  
-
-
-
   // Don't render anything on the server, only render on client
   if (!mounted) return null;
-
 
   return (
     <div className="flex flex-col h-screen w-screen">
@@ -830,17 +902,59 @@ export default function BoundingBox() {
           </>
         )}
       </div>
-      
-      <div className="flex flex-col left-0 top-0">
-        <AudioRecordingManager
-          width={300}
-          height={2000}
-          loopDurationFromStem={totalDuration}
-          onRecordingComplete={handleRecordingComplete}
-          onRecordingUpdate={handleRecordingComplete}
-          onRecordingStart={handleRecordingStart}
-          recordingSlot={null}
-        />
+
+      <div className="flex flex-1 overflow-y-auto left-0 top-0 overflow-hidden">
+        {isRecorderVisible && (
+          <div className="absolute top-4 left-4 z-20">
+            <Button
+              onClick={() => {
+                setIsRecorderVisible(false);
+                setRecordingSlotIndex(null);
+              }}
+              variant="outline"
+              className="mt-2"
+            >
+              Cancel Recording
+            </Button>
+            <Button
+              onClick={() => {
+                toggleVisibility();
+              }}
+              variant="outline"
+              className="mt-2"
+            >
+              {isRecorderPanelVisible ? "Hide " : "Show "} Audio Recorder
+            </Button>
+
+            <AudioRecordingManager
+              width={300}
+              height={500}
+              loopDurationFromStem={totalDuration}
+              onRecordingComplete={handleRecordingComplete}
+              onRecordingUpdate={handleRecordingUpdate}
+              onRecordingStart={handleRecordingStart}
+              recordingSlot={
+                recordingSlotIndex !== null
+                  ? audioInfos[recordingSlotIndex]
+                  : null
+              }
+              toggleVisbiilty={toggleVisibility}
+              isVisible={isRecorderPanelVisible}
+            />
+          </div>
+        )}
+
+        <div className="absolute top-4 left-4 z-10">
+          <Button
+            onClick={createRecordingSlot}
+            color="red"
+            variant={isRecorderVisible ? "outline" : "solid"}
+            disabled={isRecorderVisible}
+          >
+            🎤 {isRecorderVisible ? "Recording..." : "Start Recording"}
+          </Button>
+        </div>
+
         {/* Audio interface outside the bounding box */}
         <AudioInterface
           setting={{ width: window.innerWidth, height: 150 }}

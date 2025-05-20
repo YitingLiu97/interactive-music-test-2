@@ -1,8 +1,7 @@
 "use client";
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import RecorderForAudioCircle from './RecorderForAudioCircle';
 import { AudioInfo } from '@/app/types/audioType';
-import { Button } from '@radix-ui/themes';
 
 interface AudioRecordingManagerProps {
   width: number;
@@ -12,6 +11,8 @@ interface AudioRecordingManagerProps {
   onRecordingUpdate: (audioInfo: AudioInfo) => void;
   onRecordingStart: () => void;
   recordingSlot?: AudioInfo | null;
+  toggleVisbiilty?: ()=>void ;
+  isVisible: boolean;
 }
 
 export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
@@ -21,7 +22,9 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
   onRecordingUpdate,
   onRecordingComplete,
   onRecordingStart,
-  recordingSlot
+  recordingSlot, 
+  toggleVisbiilty,
+  isVisible
 }) => {
 console.log("🔧 AudioRecordingManager rendered with props:", {
     onRecordingComplete: typeof onRecordingComplete,
@@ -30,13 +33,7 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
     hasStart: !!onRecordingStart,
     recordingSlot: recordingSlot?.id
   });
-  const [isVisible, setIsVisible] = useState<boolean>(false);
   const createdAudioInfoRef = useRef<AudioInfo| null>(null);
-
-  const toggleVisibility = useCallback(() => {
-    console.log("👁️ Toggling visibility from", isVisible, "to", !isVisible);
-    setIsVisible(prev => !prev);
-  }, [isVisible]);
 
   // Wrap the callbacks with debugging
   const handleRecordingStart = useCallback(() => {
@@ -121,24 +118,8 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
   return (
     <div className="audio-recording-manager border-2 border-blue-200 p-2">
       <div className="text-xs bg-blue-100 p-2 mb-2 rounded">
-        AudioRecordingManager Debug - Visible: {isVisible.toString()}
+        AudioRecordingManager Debug - Visible: 
       </div>
-      
-      <Button
-        color={isVisible ? "red" : "blue"}
-        onClick={toggleVisibility}
-        variant={isVisible ? "solid" : "outline"}
-      >
-        {isVisible ? 'Hide' : 'Show'} Audio Recorder
-      </Button>
-      
-      <div 
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          isVisible 
-            ? 'opacity-100 transform translate-y-0' 
-            : 'opacity-0 transform -translate-y-2'
-        }`}
-      >
         <div className="pt-4">
           <div className={isVisible ? 'block' : 'hidden'}>
             <RecorderForAudioCircle
@@ -148,10 +129,8 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
               onRecordingComplete={handleRecordingReady}
               onRecordingUpdated={handleRecordingUpdate}
               onRecordingStart={handleRecordingStart}
-              isVisible={isVisible}
-            />
+              />
           </div>
-        </div>
       </div>
     </div>
   );

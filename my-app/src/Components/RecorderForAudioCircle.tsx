@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Flex, Text, Card, Badge, Box } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -44,7 +44,6 @@ interface RecorderForAudioCircleComponentsProp {
   onRecordingComplete?: (blobUrl: string) => void; // Creates the audio circle (first time only)
   onRecordingUpdated?: (blobUrl: string) => void; // Updates existing audio circle 
   onRecordingStart?: () => void;
-  isVisible?: boolean;
 }
 
 const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = ({
@@ -54,7 +53,6 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
   onRecordingComplete, // Creates audio circle (first time)
   onRecordingUpdated, // Updates audio circle (subsequent times)
   onRecordingStart,
-  isVisible = true,
 }) => {
   const {
     // State
@@ -175,17 +173,10 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
             // First recording - create the audio circle
             if (onRecordingComplete) {
               console.log("🆕 FIRST RECORDING - calling onRecordingComplete to CREATE audio circle");
-              console.log("🔧 isFirstRecording:", isFirstRecording, "onRecordingComplete exists:", !!onRecordingComplete);
               onRecordingComplete(blobUrlToUse);
               setIsFirstRecording(false); // Mark that we've created the circle
             } else {
               console.error("❌ No onRecordingComplete callback for first recording!");
-              // Fallback: If no complete callback, try update callback
-              if (onRecordingUpdated) {
-                console.log("🔄 FALLBACK - using onRecordingUpdated for first recording");
-                onRecordingUpdated(blobUrlToUse);
-                setIsFirstRecording(false);
-              }
             }
           } else {
             // Subsequent recordings - update the existing audio circle
@@ -194,11 +185,6 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
               onRecordingUpdated(blobUrlToUse);
             } else {
               console.error("❌ No onRecordingUpdated callback for subsequent recording!");
-              // Fallback: If no update callback, try complete callback
-              if (onRecordingComplete) {
-                console.log("🔄 FALLBACK - using onRecordingComplete for subsequent recording");
-                onRecordingComplete(blobUrlToUse);
-              }
             }
           }
         }
