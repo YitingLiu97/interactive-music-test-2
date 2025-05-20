@@ -923,7 +923,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
                 </>
               )}
 
-              <Flex justify="center" mt="2">
+              {/* <Flex justify="center" mt="2">
                 <Button
                   variant="soft"
                   color={loopMode ? "blue" : "gray"}
@@ -933,7 +933,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
                   <LoopIcon />{" "}
                   {loopMode ? "Switch to Normal Mode" : "Switch to Loop Mode"}
                 </Button>
-              </Flex>
+              </Flex> */}
 
               <Text size="2" color="gray">
                 {mediaStream ? (
