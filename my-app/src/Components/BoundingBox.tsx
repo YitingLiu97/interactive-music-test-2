@@ -89,15 +89,7 @@ export default function BoundingBox() {
       circleColor: "blue",
       instrumentName: "Zheng",
       audioSource: "file",
-    },
-    {
-      id: "vocal-recording",
-      audioUrl: null,
-      circleColor: "pink",
-      instrumentName: "Vocal Recording",
-      isRecording: true,
-      audioSource: "recording",
-    },
+    }
   ]);
 
   // Initialize the refs array with the correct length first
@@ -333,8 +325,8 @@ export default function BoundingBox() {
         // Replace the recording slot with actual recording
         const updated = [...prev];
         updated[recordingIndex] = newAudioInfo;
-    console.log("📝 BoundingBox: Updated audioInfos from", prev.length, "to", updated.length);
-    console.log("📝 BoundingBox: New audioInfos:", newAudioInfo);
+        console.log("📝 BoundingBox: Updated audioInfos from", prev.length, "to", updated.length);
+        console.log("📝 BoundingBox: New audioInfos:", newAudioInfo);
 
         return updated;
       } else {
@@ -737,10 +729,10 @@ export default function BoundingBox() {
 
             return (
               <AudioCircle
-                key={info.id}
+                key={index}
                 startPoint={{
-                  x: position.x / 100, // Convert back to decimal for startPoint
-                  y: position.y / 100,
+                  x: position?.x / 100, // Convert back to decimal for startPoint
+                  y: position?.y / 100,
                 }}
                 boundingBox={size}
                 trapezoid={trapezoid}
@@ -838,10 +830,11 @@ export default function BoundingBox() {
           </>
         )}
       </div>
-      <div className="flex flex-col w-full">
+      
+      <div className="flex flex-col left-0 top-0">
         <AudioRecordingManager
           width={300}
-          height={1000}
+          height={2000}
           loopDurationFromStem={totalDuration}
           onRecordingComplete={handleRecordingComplete}
           onRecordingStart={handleRecordingStart}

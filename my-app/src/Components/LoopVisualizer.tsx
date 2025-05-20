@@ -1,7 +1,6 @@
 "use client";
 import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
-import { Button, Flex, Text } from "@radix-ui/themes";
-import { PlayIcon, StopIcon } from "@radix-ui/react-icons";
+import { Flex, Text } from "@radix-ui/themes";
 
 // Define TypeScript interfaces
 interface RecordingSegment {
@@ -25,24 +24,24 @@ interface LoopVisualizerProps {
 }
 
 // Simple Record Button Icon Component
-const RecordButtonIcon: React.FC = () => (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 15 15"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <circle
-      cx="7.5"
-      cy="7.5"
-      r="7"
-      fill="currentColor"
-      stroke="currentColor"
-      strokeWidth="1"
-    />
-  </svg>
-);
+// const RecordButtonIcon: React.FC = () => (
+//   <svg
+//     width="15"
+//     height="15"
+//     viewBox="0 0 15 15"
+//     fill="none"
+//     xmlns="http://www.w3.org/2000/svg"
+//   >
+//     <circle
+//       cx="7.5"
+//       cy="7.5"
+//       r="7"
+//       fill="currentColor"
+//       stroke="currentColor"
+//       strokeWidth="1"
+//     />
+//   </svg>
+// );
 
 const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   loopDuration,
@@ -50,8 +49,8 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   isLoopPlaybackActive,
   isLoopRecording,
   recordingSegments,
-  onPlayPause,
-  onRecord,
+  // onPlayPause,
+  // onRecord,
   onPositionChange,
   waveformData = [],
   audioLevel,
@@ -239,6 +238,7 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
 
     // Draw ONLY the active recording segment with highlight if recording
     if (isLoopRecording && activeRecordingSegment) {
+      console.log("loop is recording");
       const startPosition = activeRecordingSegment.start;
       const startX = (startPosition / loopDuration) * canvas.width;
       const currentX = (loopPosition / loopDuration) * canvas.width;
@@ -374,8 +374,8 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
   };
 
 useEffect(() => {
-  // console.log("LoopVisualizer received position:", loopPosition);
-  // console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
+  console.log("LoopVisualizer received position:", loopPosition);
+  console.log("LoopVisualizer position ratio:", loopPosition / loopDuration);
 }, [loopPosition, loopDuration]);
 
 

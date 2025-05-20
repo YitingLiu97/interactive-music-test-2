@@ -912,7 +912,7 @@ export function useLoopBuffer({
       }
 
       // Stop and dispose player
-      if (loopPlayerRef.current) {
+      if (loopPlayerRef.current && loopPlayerRef.current.state==='started') {
         try {
           loopPlayerRef.current.stop();
           loopPlayerRef.current.dispose();

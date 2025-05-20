@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import RecorderForAudioCircle from './RecorderForAudioCircle';
 import { AudioInfo } from '@/app/types/audioType';
 import { Button } from '@radix-ui/themes';
@@ -9,6 +9,7 @@ interface AudioRecordingManagerProps {
   height: number;
   loopDurationFromStem: number;
   onRecordingComplete: (audioInfo: AudioInfo) => void;
+  onRecordingUpdate: (audioInfo: AudioInfo) => void;
   onRecordingStart: () => void;
   recordingSlot?: AudioInfo | null;
 }
@@ -17,18 +18,20 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
   width,
   height,
   loopDurationFromStem,
+  onRecordingUpdate,
   onRecordingComplete,
   onRecordingStart,
   recordingSlot
 }) => {
-  console.log("🔧 AudioRecordingManager rendered with props:", {
+console.log("🔧 AudioRecordingManager rendered with props:", {
     onRecordingComplete: typeof onRecordingComplete,
     onRecordingStart: typeof onRecordingStart,
     hasComplete: !!onRecordingComplete,
-    hasStart: !!onRecordingStart
+    hasStart: !!onRecordingStart,
+    recordingSlot: recordingSlot?.id
   });
-
   const [isVisible, setIsVisible] = useState<boolean>(false);
+  const createdAudioInfoRef = useRef<AudioInfo| null>(null);
 
   const toggleVisibility = useCallback(() => {
     console.log("👁️ Toggling visibility from", isVisible, "to", !isVisible);
@@ -46,6 +49,41 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
     }
   }, [onRecordingStart]);
 
+
+
+  const handleRecordingUpdate = useCallback((blobUrl: string) => {
+    console.log("🎤 AudioRecordingManager: handleRecordingUpdate called with:", blobUrl);
+    
+    if (!blobUrl) {
+      console.error("❌ AudioRecordingManager: No blob URL provided!");
+      return;
+    }
+    if (!blobUrl.startsWith('blob:')) {
+      console.error("❌ AudioRecordingManager: Invalid blob URL format:", blobUrl);
+      return;
+    }
+
+    if (!createdAudioInfoRef.current) {
+      console.error("❌ AudioRecordingManager: No audio info stored to update!");
+      return;
+    }
+
+    const updatedAudioInfo: AudioInfo = {
+      ...createdAudioInfoRef.current,
+      audioUrl: blobUrl
+    }
+
+    console.log("🔄 AudioRecordingManager: Calling parent onRecordingUpdate with:", updatedAudioInfo);
+
+    if (onRecordingUpdate && typeof onRecordingUpdate === 'function') {
+      onRecordingUpdate(updatedAudioInfo);
+      console.log("✅ AudioRecordingManager: Parent onRecordingUpdate executed");
+    } else {
+      console.error("❌ AudioRecordingManager: onRecordingUpdate is not a function:", typeof onRecordingComplete);
+    }
+  }, [onRecordingUpdate]);
+
+
   const handleRecordingReady = useCallback((blobUrl: string) => {
     console.log("🎤 AudioRecordingManager: handleRecordingReady called with:", blobUrl);
     
@@ -61,13 +99,13 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
     }
 
     const newAudioInfo: AudioInfo = {
-      id: `vocal-recording-${Date.now()}`,
+      id: recordingSlot?.id || "vocal-recording", // Use existing ID if updating existing slot
       audioUrl: blobUrl,
       instrumentName: "Vocal Recording",
       circleColor: recordingSlot?.circleColor || "yellow",
       audioSource: 'recording',
       isRecording: false,
-      position: { x: 50, y: 50 },
+      position: { x: 200, y: 200 },
       audioParams: { pan: 0, volume: 0 }
     };
 
@@ -98,8 +136,8 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
       <div 
         className={`overflow-hidden transition-all duration-300 ease-in-out ${
           isVisible 
-            ? 'max-h-96 opacity-100 transform translate-y-0' 
-            : 'max-h-0 opacity-0 transform -translate-y-2'
+            ? 'opacity-100 transform translate-y-0' 
+            : 'opacity-0 transform -translate-y-2'
         }`}
       >
         <div className="pt-4">
@@ -109,6 +147,7 @@ export const AudioRecordingManager: React.FC<AudioRecordingManagerProps> = ({
               height={height}
               loopDurationFromStem={loopDurationFromStem}
               onRecordingComplete={handleRecordingReady}
+              onRecordingUpdated={handleRecordingUpdate}
               onRecordingStart={handleRecordingStart}
               isVisible={isVisible}
             />
