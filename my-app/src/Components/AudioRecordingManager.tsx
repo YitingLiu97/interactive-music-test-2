@@ -37,13 +37,29 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
   // Wrap the callbacks with debugging
   const handleRecordingStart = useCallback(() => {
     console.log("🎬 AudioRecordingManager: handleRecordingStart called");
+    // CREATE AND STORE the audio info when recording starts
+    const newAudioInfo: AudioInfo = {
+      id: recordingSlot?.id || "vocal-recording",
+      audioUrl: "", // Will be updated when blob is ready
+      instrumentName: "Recording...",
+      circleColor: recordingSlot?.circleColor || "yellow",
+      audioSource: 'recording',
+      isRecording: true,
+      position: { x: 200, y: 200 },
+      audioParams: { pan: 0, volume: 0 }
+    };
+    
+    // Store it in the ref so handleRecordingUpdate can use it
+    createdAudioInfoRef.current = newAudioInfo;
+    
+    
     if (onRecordingStart && typeof onRecordingStart === 'function') {
       onRecordingStart();
       console.log("✅ AudioRecordingManager: onRecordingStart callback executed");
     } else {
       console.error("❌ AudioRecordingManager: onRecordingStart is not a function:", typeof onRecordingStart);
     }
-  }, [onRecordingStart]);
+  }, [onRecordingStart, recordingSlot]);
 
   const handleRecordingUpdate = useCallback((blobUrl: string) => {
     console.log("🎤 AudioRecordingManager: handleRecordingUpdate called with:", blobUrl);
@@ -67,6 +83,8 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
       audioUrl: blobUrl
     }
 
+     createdAudioInfoRef.current = updatedAudioInfo;
+
     console.log("🔄 AudioRecordingManager: Calling parent onRecordingUpdate with:", updatedAudioInfo);
 
     if (onRecordingUpdate && typeof onRecordingUpdate === 'function') {
@@ -80,20 +98,13 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
 
   const handleRecordingReady = useCallback((blobUrl: string) => {
     console.log("🎤 AudioRecordingManager: handleRecordingReady called with:", blobUrl);
-    
-    if (!blobUrl) {
-      console.error("❌ AudioRecordingManager: No blob URL provided!");
-      return;
-    }
-
-    // Validate the blob URL
-    if (!blobUrl.startsWith('blob:')) {
-      console.error("❌ AudioRecordingManager: Invalid blob URL format:", blobUrl);
-      return;
-    }
-
-    const newAudioInfo: AudioInfo = {
-      id: recordingSlot?.id || "vocal-recording", // Use existing ID if updating existing slot
+   // Use the stored audio info if available, otherwise create new
+    const finalAudioInfo: AudioInfo = createdAudioInfoRef.current ? {
+      ...createdAudioInfoRef.current,
+      audioUrl: blobUrl,
+      isRecording: false
+    } : {
+      id: recordingSlot?.id || "vocal-recording",
       audioUrl: blobUrl,
       instrumentName: "Vocal Recording",
       circleColor: recordingSlot?.circleColor || "yellow",
@@ -103,16 +114,13 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
       audioParams: { pan: 0, volume: 0 }
     };
 
-  
-    console.log("🔄 AudioRecordingManager: Calling parent onRecordingComplete with:", newAudioInfo);
+    console.log("🔄 AudioRecordingManager: Calling parent onRecordingComplete with:", finalAudioInfo);
     
     if (onRecordingComplete && typeof onRecordingComplete === 'function') {
-      onRecordingComplete(newAudioInfo);
-      console.log("✅ AudioRecordingManager: Parent onRecordingComplete executed");
-    } else {
-      console.error("❌ AudioRecordingManager: onRecordingComplete is not a function:", typeof onRecordingComplete);
+      onRecordingComplete(finalAudioInfo);
     }
   }, [onRecordingComplete, recordingSlot]);
+
 
   return (
     <div className={isVisible ? 'audio-recording-manager  border-2 border-blue-200 p-2' : 'audio-recording-manager p-2'}>
