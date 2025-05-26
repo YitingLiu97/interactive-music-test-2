@@ -24,7 +24,7 @@ interface AudioSection {
 type Props = {
     trackListName: string;
     authorName: string;
-    onPlayAll: () => void;
+    onPlayAll: (time: number) => void;
     onPauseAll: () => void;
     onToggleAll: () => void;
     isPlaying: boolean;
@@ -109,7 +109,8 @@ export default function AudioInterface({
         if (isPlaying) {
             onPauseAll();
         } else {
-            onPlayAll();
+            onPlayAll(currentTime);
+
         }
     };
 

@@ -80,6 +80,7 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
 
     const updatedAudioInfo: AudioInfo = {
       ...createdAudioInfoRef.current,
+      // audioParams: {pan:recordingSlot?.audioParams!.pan, volume: recordingSlot?.audioParams!.volume},
       audioUrl: blobUrl
     }
 

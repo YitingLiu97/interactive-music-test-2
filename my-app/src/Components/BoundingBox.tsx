@@ -358,14 +358,15 @@ export default function BoundingBox() {
     [recordingAudioInfo]
   );
 
-// only remove the circle when the audio is null
-// when the recording is cancelled 
-  const cancelRecording=useCallback(()=>{
-
-   setAudioInfos(prev=>prev.filter(info=>info.id!=='vocal-recording'));
-   setRecordingAudioInfo(null);
-   setIsRecorderVisible(false);
-  },[]);
+  // only remove the circle when the audio is null
+  // when the recording is cancelled
+  const cancelRecording = useCallback(() => {
+    setAudioInfos((prev) =>
+      prev.filter((info) => info.id !== "vocal-recording")
+    );
+    setRecordingAudioInfo(null);
+    setIsRecorderVisible(false);
+  }, []);
 
   // Handle recording start
   const handleRecordingStart = useCallback(() => {
@@ -587,20 +588,20 @@ export default function BoundingBox() {
   }, [isPlaying, isLooping, totalDuration]);
 
   // Play all audio circles
-  function playAll(startTimeSeconds?: number) {
+  function playAll(startTimeSeconds: number) {
     console.log(
       "Playing all tracks",
       startTimeSeconds !== undefined ? `at ${startTimeSeconds}s` : ""
     );
 
     setIsPlaying(true);
-    setCurrentTrack("All instruments");
-
     // If time is specified, update UI time
     if (startTimeSeconds !== undefined) {
       setCurrentTime(startTimeSeconds);
     }
-
+    if (!isSeekingRef.current) {
+      setCurrentTrack("All instruments");
+    }
     // Call play on all audio circles
     let successCount = 0;
     audioRefs.current.forEach((ref) => {
@@ -654,29 +655,7 @@ export default function BoundingBox() {
       }
     });
 
-    // 1) Stop everything first
-    // audioRefs.current.forEach(r => r.current?.stop())
-
-    // // 2) Jump each track to the right spot
-    // audioRefs.current.forEach(r => r.current?.seekTo?.(timeSec))
-
-    // // 3) Restart playback
-    // audioRefs.current.forEach(r => {
-    //   const ok = r.current?.play(timeInSeconds)
-    //   // 4) Re-assert loop flag on each
-    //   if (isLooping) {
-    //     r.current?.setLooping?.(true)
-    //   }
-    //   r.current?.play()
-
-    // })
-
-    // 5) Update your UI
-    // setCurrentTime(timeInSeconds)
-    // setIsPlaying(true)
-
-    // Start playback again
-    playAll();
+    playAll(timeInSeconds);
 
     if (isLooping) {
       audioRefs.current.forEach((ref) => {
@@ -688,13 +667,9 @@ export default function BoundingBox() {
 
     // Use a small delay to ensure all tracks are properly positioned
     setTimeout(() => {
-      // Start playback at the new position
-      console.log("Starting playback at new position:", timeInSeconds);
-
       // Clear the seeking flag after everything is done
-      setTimeout(() => {
-        isSeekingRef.current = false;
-      }, 50);
+      isSeekingRef.current = false;
+      console.log("Seeking complete, playback resumed at:", timeInSeconds);
     }, 50);
   }
 
@@ -917,7 +892,7 @@ export default function BoundingBox() {
           <div className="absolute top-4 left-4 z-20">
             <Button
               onClick={() => {
-               cancelRecording();
+                cancelRecording();
               }}
               variant="outline"
               className="mt-2"
