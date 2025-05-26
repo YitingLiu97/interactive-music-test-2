@@ -407,21 +407,6 @@ const LoopVisualizer: React.FC<LoopVisualizerProps> = ({
           </Flex>
         </div>
 
-        {/* Control buttons */}
-        {/* <Flex gap="2" justify="center">
-          <Button
-            color={isLoopPlaybackActive ? "red" : "green"}
-            onClick={onPlayPause}
-          >
-            {isLoopPlaybackActive ? <StopIcon /> : <PlayIcon />}
-            {isLoopPlaybackActive ? "Stop" : "Play"}
-          </Button>
-
-          <Button color={isLoopRecording ? "red" : "blue"} onClick={onRecord}>
-            {isLoopRecording ? <StopIcon /> : <RecordButtonIcon />}
-            {isLoopRecording ? "Stop Recording" : "Record"}
-          </Button>
-        </Flex> */}
       </Flex>
     </div>
   );
