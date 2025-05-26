@@ -3,8 +3,8 @@
   "title": "Air Traffic - The Magician's Wife",
   "author": "Clara Berry and Wooldog",
   "description": "A beautiful ambient track featuring layered instruments and atmospheric vocals",
-  "imageUrl": "/content/air-traffic/Image/bg.jpg",
-  "folderUrl": "/content/air-traffic/Sounds/",
+  "imageUrl": "/content/air-traffic/image/bg.jpg",
+  "folderUrl": "/content/air-traffic/sounds/",
   "sections": [
     {
       "id": "1",
@@ -45,7 +45,7 @@
   "audioInfos": [
     {
       "id": "baritone-guitar",
-      "audioUrl": "/content/air-traffic/Sounds/ATCBaritoneGuitar_03.mp3",
+      "audioUrl": "/content/air-traffic/sounds/baritoneguitar.mp3",
       "instrumentName": "Baritone Guitar",
       "circleColor": "red",
       "audioSource": "file",
@@ -60,7 +60,7 @@
     },
     {
       "id": "bass",
-      "audioUrl": "/content/air-traffic/Sounds/ATCBass_03.mp3", 
+      "audioUrl": "/content/air-traffic/sounds/bass.mp3", 
       "instrumentName": "Bass",
       "circleColor": "orange",
       "audioSource": "file",
@@ -75,7 +75,7 @@
     },
     {
       "id": "bg-vocals",
-      "audioUrl": "/content/air-traffic/Sounds/ATCBGVocals_03.mp3",
+      "audioUrl": "/content/air-traffic/sounds/bgvocal.mp3",
       "instrumentName": "BG Vocals", 
       "circleColor": "yellow",
       "audioSource": "file",
@@ -90,7 +90,7 @@
     },
     {
       "id": "drums",
-      "audioUrl": "/content/air-traffic/Sounds/ATCDrums_03.mp3",
+      "audioUrl": "/content/air-traffic/sounds/drums.mp3",
       "instrumentName": "Drums",
       "circleColor": "green", 
       "audioSource": "file",
@@ -105,7 +105,7 @@
     },
     {
       "id": "lead-vocals", 
-      "audioUrl": "/content/air-traffic/Sounds/ATCLeadVocals_03.mp3",
+      "audioUrl": "/content/air-traffic/sounds/leadvocal.mp3",
       "instrumentName": "Lead Vocals",
       "circleColor": "teal",
       "audioSource": "file",
@@ -120,7 +120,7 @@
     },
     {
       "id": "pedal-steel",
-      "audioUrl": "/content/air-traffic/Sounds/ATCPedalSteel_03.mp3",
+      "audioUrl": "/content/air-traffic/sounds/pedalsteel.mp3",
       "instrumentName": "Pedal Steel",
       "circleColor": "blue",
       "audioSource": "file", 
@@ -135,7 +135,7 @@
     },
     {
       "id": "piano",
-      "audioUrl": "/content/air-traffic/Sounds/ATCPiano_03.mp3",
+      "audioUrl": "/content/air-traffic/sounds/piano.mp3",
       "instrumentName": "Piano",
       "circleColor": "purple",
       "audioSource": "file",
@@ -150,7 +150,7 @@
     },
     {
       "id": "timpani",
-      "audioUrl": "/content/air-traffic/Sounds/ATCTimpani_03.mp3", 
+      "audioUrl": "/content/air-traffic/sounds/timpani.mp3", 
       "instrumentName": "Timpani",
       "circleColor": "pink",
       "audioSource": "file",
