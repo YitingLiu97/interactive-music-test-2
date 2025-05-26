@@ -52,7 +52,6 @@ console.log("🔧 AudioRecordingManager rendered with props:", {
     // Store it in the ref so handleRecordingUpdate can use it
     createdAudioInfoRef.current = newAudioInfo;
     
-    
     if (onRecordingStart && typeof onRecordingStart === 'function') {
       onRecordingStart();
       console.log("✅ AudioRecordingManager: onRecordingStart callback executed");
