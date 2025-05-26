@@ -57,42 +57,42 @@ export default function BoundingBox() {
   const [audioInfos, setAudioInfos] = useState<AudioInfo[]>([
     {
       id: "erhu",
-      audioUrl: "/resources/Justin/cx.ai_ Erhu_1.mp3",
+      audioUrl: "/Media/Justin/Sounds/cx.ai_ Erhu_1.mp3",
       circleColor: "red",
       instrumentName: "Erhu",
       audioSource: "file",
     },
     {
       id: "forest",
-      audioUrl: "/resources/Justin/cx.ai_ Forest_1.mp3",
+      audioUrl: "/Media/Justin/Sounds/cx.ai_ Forest_1.mp3",
       circleColor: "orange",
       instrumentName: "Forest",
       audioSource: "file",
     },
     {
       id: "main",
-      audioUrl: "/resources/Justin/cx.ai_ Main_1.mp3",
+      audioUrl: "/Media/Justin/Sounds/cx.ai_ Main_1.mp3",
       circleColor: "yellow",
       instrumentName: "Main",
       audioSource: "file",
     },
     {
       id: "xiao",
-      audioUrl: "/resources/Justin/cx.ai_ Xiao_1.mp3",
+      audioUrl: "/Media/Justin/Sounds/cx.ai_ Xiao_1.mp3",
       circleColor: "green",
       instrumentName: "Xiao",
       audioSource: "file",
     },
     {
       id: "xun",
-      audioUrl: "/resources/Justin/cx.ai_ Xun_1.mp3",
+      audioUrl: "/Media/Justin/Sounds/cx.ai_ Xun_1.mp3",
       circleColor: "teal",
       instrumentName: "Xun",
       audioSource: "file",
     },
     {
       id: "zheng",
-      audioUrl: "/resources/Justin/cx.ai_ Zheng_1.mp3",
+      audioUrl: "/Media/Justin/Sounds/cx.ai_ Zheng_1.mp3",
       circleColor: "blue",
       instrumentName: "Zheng",
       audioSource: "file",
@@ -764,7 +764,7 @@ export default function BoundingBox() {
           />
           {!isHandDetectionActive && (
             <image
-              href="/image/guilin-mountain.jpg"
+              href="/Media/Justin/Image/guilin-mountain.jpg"
               opacity="0.5"
               width="100%"
               height="100%"
