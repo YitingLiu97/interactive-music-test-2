@@ -21,17 +21,32 @@ async function generateJsonFromFolder(
   slug: string
 ): Promise<JsonInfo> {
   try {
-    const files = await fs.readdir(folderPath);
+    // Check both sounds and image folders
+    const soundsPath = path.join(folderPath, "sounds");
+    const imagePath = path.join(folderPath, "image");
+    
+    let audioFiles: string[] = [];
+    let imageFile: string | undefined;
 
-    // Filter audio files
-    const audioFiles = files.filter((file) =>
-      file.toLowerCase().match(/\.(mp3|wav|ogg|m4a)$/i)
-    );
+    // Try to read sounds folder
+    try {
+      const soundFiles = await fs.readdir(soundsPath);
+      audioFiles = soundFiles.filter((file) =>
+        file.toLowerCase().match(/\.(mp3|wav|ogg|m4a)$/i)
+      );
+    } catch (error) {
+      console.warn(`Could not read sounds folder: ${soundsPath}: `+ error);
+    }
 
-    // Find image file
-    const imageFile = files.find((file) =>
-      file.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i)
-    );
+    // Try to read image folder
+    try {
+      const imageFiles = await fs.readdir(imagePath);
+      imageFile = imageFiles.find((file) =>
+        file.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i)
+      );
+    } catch (error) {
+      console.warn(`Could not read image folder: ${imagePath}, error: `+error);
+    }
 
     // Generate AudioInfo array
     const audioInfos: AudioInfo[] = audioFiles.map((file, index) => {
@@ -44,11 +59,11 @@ async function generateJsonFromFolder(
         .trim();
 
       return {
-        id: instrumentName || `Track ${index + 1}`,
-        audioUrl: `/content/${slug}/Sounds/${file}`,
+        id: instrumentName.toLowerCase().replace(/\s+/g, "-") || `track-${index + 1}`,
+        audioUrl: `/content/${slug}/sounds/${file}`, // Fixed: lowercase 'sounds'
         circleColor: COLORS[index % COLORS.length],
         instrumentName: instrumentName || `Track ${index + 1}`,
-        audioSource: "file",
+        audioSource: "file" as const,
       };
     });
 
@@ -56,9 +71,17 @@ async function generateJsonFromFolder(
       projectName: slug,
       title: slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " "),
       author: "Unknown Artist", // Default, can be overridden by manual JSON
-      imageUrl: imageFile ? `/content/${slug}/Image/${imageFile}` : "",
-      folderUrl: `/content/${slug}/Sounds/`,
+      imageUrl: imageFile ? `/content/${slug}/image/${imageFile}` : "", // Fixed: lowercase 'image'
+      folderUrl: `/content/${slug}/sounds/`, // Fixed: lowercase 'sounds'
       audioInfos,
+      sections: [
+        {
+          id: "1",
+          name: "Full Track",
+          startTime: 0,
+          endTime: 180
+        }
+      ]
     };
   } catch (error) {
     console.error("Error generating JSON from folder:", error);

@@ -62,42 +62,42 @@ export default function BoundingBox({ contentData }: Props) {
   const defaultAudioInfos: AudioInfo[] = [
     {
       id: "erhu",
-      audioUrl: "/content/Justin/Sounds/cx.ai_ Erhu_1.mp3",
+      audioUrl: "/content/justin/sounds/erhu.mp3",
       circleColor: "red",
       instrumentName: "Erhu",
       audioSource: "file",
     },
     {
       id: "forest",
-      audioUrl: "/content/Justin/Sounds/cx.ai_ Forest_1.mp3",
+      audioUrl: "/content/justin/sounds/forest.mp3",
       circleColor: "orange",
       instrumentName: "Forest",
       audioSource: "file",
     },
     {
       id: "main",
-      audioUrl: "/content/Justin/Sounds/cx.ai_ Main_1.mp3",
+      audioUrl: "/content/justin/sounds/main.mp3",
       circleColor: "yellow",
       instrumentName: "Main",
       audioSource: "file",
     },
     {
       id: "xiao",
-      audioUrl: "/content/Justin/Sounds/cx.ai_ Xiao_1.mp3",
+      audioUrl: "/content/justin/sounds/xiao.mp3",
       circleColor: "green",
       instrumentName: "Xiao",
       audioSource: "file",
     },
     {
       id: "xun",
-      audioUrl: "/content/Justin/Sounds/cx.ai_ Xun_1.mp3",
+      audioUrl: "/content/justin/sounds/xun.mp3",
       circleColor: "teal",
       instrumentName: "Xun",
       audioSource: "file",
     },
     {
       id: "zheng",
-      audioUrl: "/content/Justin/Sounds/cx.ai_ Zheng_1.mp3",
+      audioUrl: "/content/justin/sounds/zheng.mp3",
       circleColor: "blue",
       instrumentName: "Zheng",
       audioSource: "file",
@@ -106,7 +106,7 @@ export default function BoundingBox({ contentData }: Props) {
 
   const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
   const [trackListName, setTrackListName] = useState("Chinese Instrumental");
-  const [authorName, setAuthorName] = useState("Justin Scholar 玉刻");
+  const [authorName, setAuthorName] = useState("justin Scholar 玉刻");
   const [backgroundUrl, setBackgroundUrl] = useState<string>();
   const [sections, setSections] = useState([
     { id: "1", name: "Intro", startTime: 0, endTime: 3 },
@@ -135,8 +135,8 @@ export default function BoundingBox({ contentData }: Props) {
         console.log("Using default data");
         setAudioInfos(defaultAudioInfos);
         setTrackListName("Chinese Instrumental");
-        setAuthorName("Justin Scholar 玉刻");
-        setBackgroundUrl("/content/Justin/Image/bg.jpg");
+        setAuthorName("justin Scholar 玉刻");
+        setBackgroundUrl("/content/justin/image/bg.jpg");
       }
     } catch (error) {
       console.error("content data fetching error: " + error);
