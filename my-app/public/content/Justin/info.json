@@ -1,0 +1,89 @@
+{
+  "projectName": "justin",
+  "title": "Chinese Instruments",
+  "author": "Justin",
+  "description": "A beautiful ambient track featuring layered instruments and atmospheric vocals",
+  "imageUrl": "/content/justin/Image/bg.jpg",
+  "folderUrl": "/content/justin/Sounds/",
+  "sections": [
+    {
+     "id": "1",
+      "name": "Intro",
+      "startTime": 0,
+      "endTime": 3
+    },
+    {
+     "id": "2", 
+      "name": "Verse 1",
+      "startTime": 3,
+      "endTime": 8
+    },
+    {
+     "id": "3",
+      "name": "Chorus", 
+      "startTime": 8,
+      "endTime": 15    },
+    {
+     "id": "4",
+      "name": "Verse 2",
+      "startTime": 15, 
+      "endTime": 22
+    },
+    {
+     "id": "5",
+      "name": "Bridge",
+      "startTime": 22,
+      "endTime": 30
+    },
+    {
+     "id": "6",
+      "name": "Outro",
+      "startTime": 30,
+      "endTime": 38
+    }
+  ],
+  "audioInfos": [
+    {
+      "id": "erhu",
+      "audioUrl": "/content/Justin/Sounds/cx.ai_ Erhu_1.mp3",
+      "circleColor": "red",
+      "instrumentName": "Erhu",
+      "audioSource": "file"
+    },
+    {
+      "id": "forest",
+      "audioUrl": "/content/Justin/Sounds/cx.ai_ Forest_1.mp3",
+      "circleColor": "orange",
+      "instrumentName": "Forest",
+      "audioSource": "file"
+    },
+    {
+      "id": "main",
+      "audioUrl": "/content/Justin/Sounds/cx.ai_ Main_1.mp3",
+      "circleColor": "yellow",
+      "instrumentName": "Main",
+      "audioSource": "file"
+    },
+    {
+      "id": "xiao",
+      "audioUrl": "/content/Justin/Sounds/cx.ai_ Xiao_1.mp3",
+      "circleColor": "green",
+      "instrumentName": "Xiao",
+      "audioSource": "file"
+    },
+    {
+      "id": "xun",
+      "audioUrl": "/content/Justin/Sounds/cx.ai_ Xun_1.mp3",
+      "circleColor": "teal",
+      "instrumentName": "Xun",
+      "audioSource": "file"
+    },
+    {
+      "id": "zheng",
+      "audioUrl": "/content/Justin/Sounds/cx.ai_ Zheng_1.mp3",
+      "circleColor": "blue",
+      "instrumentName": "Zheng",
+      "audioSource": "file"
+    }
+  ]
+}
