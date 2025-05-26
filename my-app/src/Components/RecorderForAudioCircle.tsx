@@ -366,10 +366,6 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
     }
   };
 
-  // Toggle loop mode
-  // const handleToggleLoopMode = () => {
-  //   setLoopMode((prev) => !prev);
-  // };
 
   // Start loop recording
   const handleStartLoopRecording = async () => {
@@ -676,6 +672,11 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
     return <Badge color="amber">Not Initialized</Badge>;
   };
 
+  useEffect(()=>{
+    initializeLoopBuffer(loopDurationInput);
+    console.log("update loop duration when changed")
+  }, [loopDurationInput]);
+
   // Add this useEffect to debug position updates:
   useEffect(() => {
     console.log("AudioRecorder received position update:", {
@@ -783,7 +784,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
 
                     {/* Loop Duration Input */}
                     <Flex gap="2" align="center">
-                      <Text size="2">Duration:</Text> {loopDurationInput}
+                      <Text size="2">Duration:</Text> {loopDurationInput.toFixed(2)}
                       <Text size="2">seconds</Text>
                       <Button
                         variant="soft"
@@ -791,7 +792,7 @@ const RecorderForAudioCircle: React.FC<RecorderForAudioCircleComponentsProp> = (
                         onClick={() => initializeLoopBuffer(loopDurationInput)}
                         disabled={isLoopRecording || isLoopPlaybackActive}
                       >
-                        <ReloadIcon /> Current Audio Length
+                        <ReloadIcon /> Reset Clip
                       </Button>
                     </Flex>
 
