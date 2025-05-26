@@ -1,4 +1,3 @@
-// Place this file in a shared location, like @/app/types/audioTypes.ts
 export interface AudioControlRef {
   isPlaying?: boolean;
   play: (startTime?: number) => boolean | void;
@@ -43,4 +42,22 @@ export interface HandState {
   y: number;
   handedness: "Left" | "Right";
   grabbing: boolean;
+}
+
+export interface AudioSection {
+  id: string;
+  name: string;
+  startTime: number; // Start time in seconds
+  endTime: number;   // End time in seconds
+  description?: string; // Optional description of the section
+}
+
+export interface JsonInfo{
+  projectName:string; 
+  title: string;
+  author: string; 
+  imageUrl: string,
+  folderUrl: string; // this contains a group of content 
+  audioInfos: AudioInfo[],
+  sections?: AudioSection[]; // Add sections to JsonInfo
 }
