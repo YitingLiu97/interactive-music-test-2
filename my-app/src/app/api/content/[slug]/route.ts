@@ -75,12 +75,14 @@ async function loadManualJson(jsonPath: string): Promise<JsonInfo> {
   }
 }
 
+// Updated function signature for Next.js 15
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params;
+    // Await the params Promise
+    const { slug } = await params;
 
     // Define paths
     const contentDir = path.join(process.cwd(), "public", "content");
