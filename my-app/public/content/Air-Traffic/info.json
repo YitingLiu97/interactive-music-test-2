@@ -4,7 +4,7 @@
   "author": "Clara Berry and Wooldog",
   "description": "A beautiful ambient track featuring layered instruments and atmospheric vocals",
   "imageUrl": "/content/air-traffic/image/bg.jpg",
-  "folderUrl": "/content/air-traffic/",
+  "folderUrl": "/content/air-traffic/sounds/",
   "sections": [
     {
       "id": "1",
@@ -22,7 +22,8 @@
       "id": "3",
       "name": "Chorus", 
       "startTime": 60,
-      "endTime": 90    },
+      "endTime": 90
+    },
     {
       "id": "4",
       "name": "Verse 2",
