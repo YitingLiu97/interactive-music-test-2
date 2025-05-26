@@ -3,14 +3,19 @@ import React from "react";
 import AudioCircle from "./AudioCircle";
 import { useRef, useEffect, useState, useCallback } from "react";
 import AudioInterface from "./AudioInterface";
-import { AudioControlRef } from "@/app/types/audioType";
+import { AudioControlRef, JsonInfo } from "@/app/types/audioType";
 import { useHandDetection } from "@/app/utils/useHandDetection";
 import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Trapezoid } from "@/app/types/audioType";
 import { AudioInfo, HandState } from "@/app/types/audioType";
 import { AudioRecordingManager } from "./AudioRecordingManager";
-export default function BoundingBox() {
+
+interface Props {
+  contentData?: JsonInfo;
+}
+
+export default function BoundingBox({ contentData }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ x: 100, y: 100 });
   const [trapezoid, setTrapezoid] = useState<Trapezoid>({
@@ -54,50 +59,89 @@ export default function BoundingBox() {
   const [recordingAudioInfo, setRecordingAudioInfo] =
     useState<AudioInfo | null>(null);
 
-  const [audioInfos, setAudioInfos] = useState<AudioInfo[]>([
+  const defaultAudioInfos: AudioInfo[] = [
     {
       id: "erhu",
-      audioUrl: "/Media/Justin/Sounds/cx.ai_ Erhu_1.mp3",
+      audioUrl: "/content/Justin/Sounds/cx.ai_ Erhu_1.mp3",
       circleColor: "red",
       instrumentName: "Erhu",
       audioSource: "file",
     },
     {
       id: "forest",
-      audioUrl: "/Media/Justin/Sounds/cx.ai_ Forest_1.mp3",
+      audioUrl: "/content/Justin/Sounds/cx.ai_ Forest_1.mp3",
       circleColor: "orange",
       instrumentName: "Forest",
       audioSource: "file",
     },
     {
       id: "main",
-      audioUrl: "/Media/Justin/Sounds/cx.ai_ Main_1.mp3",
+      audioUrl: "/content/Justin/Sounds/cx.ai_ Main_1.mp3",
       circleColor: "yellow",
       instrumentName: "Main",
       audioSource: "file",
     },
     {
       id: "xiao",
-      audioUrl: "/Media/Justin/Sounds/cx.ai_ Xiao_1.mp3",
+      audioUrl: "/content/Justin/Sounds/cx.ai_ Xiao_1.mp3",
       circleColor: "green",
       instrumentName: "Xiao",
       audioSource: "file",
     },
     {
       id: "xun",
-      audioUrl: "/Media/Justin/Sounds/cx.ai_ Xun_1.mp3",
+      audioUrl: "/content/Justin/Sounds/cx.ai_ Xun_1.mp3",
       circleColor: "teal",
       instrumentName: "Xun",
       audioSource: "file",
     },
     {
       id: "zheng",
-      audioUrl: "/Media/Justin/Sounds/cx.ai_ Zheng_1.mp3",
+      audioUrl: "/content/Justin/Sounds/cx.ai_ Zheng_1.mp3",
       circleColor: "blue",
       instrumentName: "Zheng",
       audioSource: "file",
     },
+  ];
+
+  const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
+  const [trackListName, setTrackListName] = useState("Chinese Instrumental");
+  const [authorName, setAuthorName] = useState("Justin Scholar 玉刻");
+  const [backgroundUrl, setBackgroundUrl] = useState<string>();
+  const [sections, setSections] = useState([
+    { id: "1", name: "Intro", startTime: 0, endTime: 3 },
+    { id: "2", name: "Verse 1", startTime: 3, endTime: 8 },
+    { id: "3", name: "Chorus", startTime: 8, endTime: 15 },
+    { id: "4", name: "Verse 2", startTime: 15, endTime: 22 },
+    { id: "5", name: "Bridge", startTime: 22, endTime: 30 },
+    { id: "6", name: "Outro", startTime: 30, endTime: 38 },
   ]);
+
+  useEffect(() => {
+    try {
+      if (contentData) {
+        console.log("Updating with contentData:", contentData);
+        setAudioInfos(contentData.audioInfos);
+        setTrackListName(contentData.title);
+        setAuthorName(contentData.author);
+        setBackgroundUrl(contentData.imageUrl);
+
+        // Update sections if provided
+        if (contentData.sections && contentData.sections.length > 0) {
+          setSections(contentData.sections);
+          console.log("Updated sections:", contentData.sections);
+        }
+      } else {
+        console.log("Using default data");
+        setAudioInfos(defaultAudioInfos);
+        setTrackListName("Chinese Instrumental");
+        setAuthorName("Justin Scholar 玉刻");
+        setBackgroundUrl("/content/Justin/Image/bg.jpg");
+      }
+    } catch (error) {
+      console.error("content data fetching error: " + error);
+    }
+  }, [contentData]);
 
   // Initialize the refs array with the correct length first
   const audioRefs = useRef<React.RefObject<AudioControlRef | null>[]>(
@@ -272,7 +316,7 @@ export default function BoundingBox() {
           }
         }, RELEASE_DEBOUNCE_TIME);
       } else {
-        // Hand wasn't controlling anything, update state immediately
+        // Hand wasn't controlling anything, update state imcontenttely
         setHandStates((prev) => {
           const state = prev[handIdx];
           if (!state) return prev;
@@ -287,7 +331,7 @@ export default function BoundingBox() {
   );
 
   const handleHandLost = useCallback((handIdx: number) => {
-    // 1) If that hand was controlling a circle, drop it immediately:
+    // 1) If that hand was controlling a circle, drop it imcontenttely:
     if (handToCircle.current[handIdx] !== undefined) {
       // if no more hands are controlling anything, clear your track label
       if (Object.keys(handToCircle.current).length === 0) {
@@ -639,7 +683,7 @@ export default function BoundingBox() {
     // Mark that we're seeking to avoid timer updates
     isSeekingRef.current = true;
 
-    // Update UI time immediately
+    // Update UI time imcontenttely
     setCurrentTime(timeInSeconds);
 
     // Always pause first to avoid conflicts
@@ -764,7 +808,7 @@ export default function BoundingBox() {
           />
           {!isHandDetectionActive && (
             <image
-              href="/Media/Justin/Image/guilin-mountain.jpg"
+              href={backgroundUrl}
               opacity="0.5"
               width="100%"
               height="100%"
@@ -941,8 +985,8 @@ export default function BoundingBox() {
         {/* Audio interface outside the bounding box */}
         <AudioInterface
           setting={{ width: window.innerWidth, height: 150 }}
-          trackListName="Chinese Instrumental"
-          authorName="Justin Scholar 玉刻"
+          trackListName={trackListName}
+          authorName={authorName}
           onPlayAll={playAll}
           onPauseAll={pauseAll}
           onToggleAll={toggleAll}
@@ -952,14 +996,7 @@ export default function BoundingBox() {
           currentTime={currentTime}
           totalDuration={totalDuration}
           onSeekTo={seekTo}
-          sections={[
-            { id: "1", name: "Intro", startTime: 0, endTime: 3 },
-            { id: "2", name: "Verse 1", startTime: 3, endTime: 8 },
-            { id: "3", name: "Chorus", startTime: 8, endTime: 15 },
-            { id: "4", name: "Verse 2", startTime: 15, endTime: 22 },
-            { id: "5", name: "Bridge", startTime: 22, endTime: 30 },
-            { id: "6", name: "Outro", startTime: 30, endTime: 38 },
-          ]}
+          sections={sections}
         />
       </div>
     </div>
