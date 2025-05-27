@@ -51,12 +51,13 @@ async function generateJsonFromFolder(
     // Generate AudioInfo array
     const audioInfos: AudioInfo[] = audioFiles.map((file, index) => {
       // Extract instrument name from filename (remove extension and common prefixes)
-      const instrumentName = file
+     const instrumentName = file
         .replace(/\.(mp3|wav|ogg|m4a)$/i, "")
         .replace(/^(ATC|atc|track|Track)_?/i, "")
-        .replace(/_?\d+$/, "") // Remove trailing numbers like _03
+        .replace(/_?\d+$/, "") // Remove trailing numbers
         .replace(/[_-]/g, " ")
         .trim();
+
 
       return {
         id: instrumentName.toLowerCase().replace(/\s+/g, "-") || `track-${index + 1}`,
@@ -104,17 +105,29 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    // Await the params Promise
     const { slug } = await params;
+    
+    // Validate slug
+    if (!slug || typeof slug !== 'string') {
+      return NextResponse.json(
+        { error: "Invalid slug parameter" },
+        { status: 400 }
+      );
+    }
 
+    console.log(`Loading content for slug: ${slug}`);
     // Define paths
     const contentDir = path.join(process.cwd(), "public", "content");
     const folderPath = path.join(contentDir, slug);
     const manualJsonPath = path.join(folderPath, "info.json");
+    console.log(`Checking folder: ${folderPath}`);
 
-    // Check if folder exists
+   // Check if folder exists
     try {
-      await fs.access(folderPath);
+      const stats = await fs.stat(folderPath);
+      if (!stats.isDirectory()) {
+        throw new Error("Not a directory");
+      }
     } catch {
       return NextResponse.json(
         { error: `Content folder '${slug}' not found` },
@@ -124,20 +137,36 @@ export async function GET(
 
     let jsonInfo: JsonInfo;
 
-    // Try to load manual JSON first, fallback to auto-generation
+     // Try to load manual JSON first
     try {
       jsonInfo = await loadManualJson(manualJsonPath);
-      console.log(`Loaded manual JSON for ${slug}`);
-    } catch {
-      jsonInfo = await generateJsonFromFolder(folderPath, slug);
-      console.log(`Auto-generated JSON for ${slug}`);
+      console.log(`✓ Loaded manual JSON for ${slug}`);
+    } catch (manualError) {
+      console.log(`Manual JSON not found, auto-generating for ${slug}`);
+      console.error(`Manual error ${manualError}`);
+      try {
+        jsonInfo = await generateJsonFromFolder(folderPath, slug);
+        console.log(`✓ Auto-generated JSON for ${slug}`);
+      } catch (autoError) {
+        console.error("Auto-generation failed:", autoError);
+        return NextResponse.json(
+          { error: "Failed to load or generate content" },
+          { status: 500 }
+        );
+      }
     }
 
-    return NextResponse.json(jsonInfo);
+    // Add CORS headers for development
+    const response = NextResponse.json(jsonInfo);
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET');
+    
+    return response;
+
   } catch (error) {
     console.error("API Error:", error);
     return NextResponse.json(
-      { error: "Failed to load content" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
