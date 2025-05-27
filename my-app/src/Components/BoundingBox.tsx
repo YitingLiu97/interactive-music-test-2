@@ -123,7 +123,7 @@ export default function BoundingBox({ contentData }: Props) {
     { id: "5", name: "Bridge", startTime: 22, endTime: 30 },
     { id: "6", name: "Outro", startTime: 30, endTime: 38 },
   ]);
-  const masterMixerRef = useRef<Tone.Gain | null>(null);
+  const masterMixerRef = useRef<Tone.Gain | undefined>(undefined);
   const masterRecorderRef = useRef<Tone.Recorder | null>(null);
   const [isMixRecording, setIsMixRecording] = useState(false);
   const [finalMixBlob, setFinalMixBlob] = useState<{
