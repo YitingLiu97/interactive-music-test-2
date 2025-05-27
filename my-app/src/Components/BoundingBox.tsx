@@ -1,15 +1,19 @@
 "use client";
-import React from "react";
-import AudioCircle from "./AudioCircle";
-import { useRef, useEffect, useState, useCallback } from "react";
-import AudioInterface from "./AudioInterface";
-import { AudioControlRef, JsonInfo } from "@/app/types/audioType";
+import {
+  AudioControlRef,
+  AudioInfo,
+  HandState,
+  JsonInfo,
+  Trapezoid,
+} from "@/app/types/audioType";
 import { useHandDetection } from "@/app/utils/useHandDetection";
-import { Button } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
-import { Trapezoid } from "@/app/types/audioType";
-import { AudioInfo, HandState } from "@/app/types/audioType";
+import { Button } from "@radix-ui/themes";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import AudioCircle from "./AudioCircle";
+import AudioInterface from "./AudioInterface";
 import { AudioRecordingManager } from "./AudioRecordingManager";
+import * as Tone from "tone";
 
 interface Props {
   contentData?: JsonInfo;
@@ -104,11 +108,13 @@ export default function BoundingBox({ contentData }: Props) {
     },
   ];
 
-  // set justin's info to be the default 
+  // set justin's info to be the default
   const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
   const [trackListName, setTrackListName] = useState("Chinese Instrumental");
   const [authorName, setAuthorName] = useState("justintest Scholar 玉刻");
-  const [backgroundUrl, setBackgroundUrl] = useState<string>("/content/justintest/image/bg.jpg");
+  const [backgroundUrl, setBackgroundUrl] = useState<string>(
+    "/content/justintest/image/bg.jpg"
+  );
   const [sections, setSections] = useState([
     { id: "1", name: "Intro", startTime: 0, endTime: 3 },
     { id: "2", name: "Verse 1", startTime: 3, endTime: 8 },
@@ -117,6 +123,92 @@ export default function BoundingBox({ contentData }: Props) {
     { id: "5", name: "Bridge", startTime: 22, endTime: 30 },
     { id: "6", name: "Outro", startTime: 30, endTime: 38 },
   ]);
+  const masterMixerRef = useRef<Tone.Gain | null>(null);
+  const masterRecorderRef = useRef<Tone.Recorder | null>(null);
+  const [isMixRecording, setIsMixRecording] = useState(false);
+  const [finalMixBlob, setFinalMixBlob] = useState<{
+    blob: Blob;
+    url: string;
+  } | null>(null);
+
+  // Initialize master recorder when audio system is ready
+ // Initialize master mixer and recorder when audio system is ready
+useEffect(() => {
+  if (audioRefsCreated && !masterMixerRef.current) {
+    try {
+      // Create master mixer that all audio circles will connect to
+      const masterMixer = new Tone.Gain(1).toDestination();
+      masterMixerRef.current = masterMixer;
+      
+      // Create recorder connected to the master mixer
+      const recorder = new Tone.Recorder({
+        mimeType: "audio/webm"
+      });
+      
+      // Connect master mixer to both destination AND recorder
+      masterMixer.connect(recorder);
+      masterRecorderRef.current = recorder;
+      
+      console.log("Master mixer and recorder created successfully");
+    } catch (error) {
+      console.error("Error creating master mixer/recorder:", error);
+    }
+  }
+}, [audioRefsCreated]);
+
+// Start recording the final mix
+const startFinalMixRecording = async () => {
+  if (!masterRecorderRef.current) {
+    console.error("Master recorder not available");
+    return false;
+  }
+
+  try {
+    // Make sure Tone.js is running
+    if (Tone.context.state !== "running") {
+      await Tone.start();
+    }
+
+    // Start recording the master mix
+    masterRecorderRef.current.start();
+    setIsMixRecording(true);
+    
+    console.log("Started recording final mix with all effects");
+    return true;
+  } catch (error) {
+    console.error("Error starting mix recording:", error);
+    return false;
+  }
+};
+  // Stop recording and get the final mix
+const stopFinalMixRecording = async () => {
+  if (!masterRecorderRef.current || !isMixRecording) {
+    console.error("Not recording or no recorder");
+    return null;
+  }
+
+  try {
+    // Stop recording and get the blob
+    const blob = await masterRecorderRef.current.stop();
+    
+    if (blob && blob.size > 0) {
+      const url = URL.createObjectURL(blob);
+      const result = { blob, url };
+      
+      setFinalMixBlob(result);
+      setIsMixRecording(false);
+      
+      console.log("Final mix recorded successfully:", blob.size, "bytes");
+      return result;
+    } else {
+      throw new Error("Empty recording");
+    }
+  } catch (error) {
+    console.error("Error stopping mix recording:", error);
+    setIsMixRecording(false);
+    return null;
+  }
+};
 
   useEffect(() => {
     try {
@@ -139,7 +231,7 @@ export default function BoundingBox({ contentData }: Props) {
         setAuthorName("justintest Scholar 玉刻");
         setBackgroundUrl("/content/justintest/image/bg.jpg");
         setSections(sections);
-        setTotalDuration(sections[sections.length-1].endTime);
+        setTotalDuration(sections[sections.length - 1].endTime);
       }
     } catch (error) {
       console.error("content data fetching error: " + error);
@@ -749,6 +841,27 @@ export default function BoundingBox({ contentData }: Props) {
     }
   }, [audioRefsCreated]);
 
+    // Cleanup master recorder on unmount
+useEffect(() => {
+  return () => {
+    if (masterRecorderRef.current) {
+      try {
+        if (isMixRecording) {
+          masterRecorderRef.current.stop();
+        }
+        masterRecorderRef.current.dispose();
+      } catch (error) {
+        console.warn("Error cleaning up master recorder:", error);
+      }
+    }
+    
+    // Cleanup blob URL
+    if (finalMixBlob?.url) {
+      URL.revokeObjectURL(finalMixBlob.url);
+    }
+  };
+}, []);
+
   // Don't render anything on the server, only render on client
   if (!mounted) return null;
 
@@ -844,6 +957,7 @@ export default function BoundingBox({ contentData }: Props) {
                 audioRef={audioRefs.current[index]}
                 instrumentName={info.instrumentName}
                 masterIsPlaying={isPlaying}
+                masterMixer={masterMixerRef.current}
                 onTrackSelect={() => {
                   setCurrentTrack(info.instrumentName || `Track ${index + 1}`);
                 }}
@@ -1000,6 +1114,10 @@ export default function BoundingBox({ contentData }: Props) {
           totalDuration={totalDuration}
           onSeekTo={seekTo}
           sections={sections}
+          onStartMixRecording={startFinalMixRecording}
+          onStopMixRecording={stopFinalMixRecording}
+          isMixRecording={isMixRecording}
+          finalMixBlob={finalMixBlob}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useAudioCircle } from "@/app/utils/useAudioCircle";
 import { mapRange } from "@/app/utils/math";
 import CircleUI from "./CircleUI";
 import { BoundingBox, AudioControlRef, StartPoint, Trapezoid } from "@/app/types/audioType";
+import * as Tone from "tone";
 
 type Props = {
     startPoint: StartPoint;
@@ -17,6 +18,7 @@ type Props = {
     onTrackSelect?: () => void; // Callback when circle is clicked
     isHandControlled?: boolean; // Flag when this circle is being controlled by hand
     onPositionChange?: (xPercent: number, yPercent: number) => void; // Callback to notify position changes
+    masterMixer?: Tone.Gain | undefined; // Remove | null, use only undefined
 }
 
 export default function AudioCircle({
@@ -30,7 +32,8 @@ export default function AudioCircle({
     masterIsPlaying = false,
     onTrackSelect,
     isHandControlled = false,
-    onPositionChange
+    onPositionChange,
+    masterMixer
 }: Props) {
     const {
         play,
@@ -47,8 +50,8 @@ export default function AudioCircle({
         currentVolume,
         currentPan,
         isMuted,
-        audioData
-    } = useAudioCircle(audioUrl);
+        audioData,
+    } = useAudioCircle(audioUrl, masterMixer);
 
     const [dragging, setDragging] = useState<boolean>(false);
     const [position, setPosition] = useState<{ xPercent: number, yPercent: number }>({

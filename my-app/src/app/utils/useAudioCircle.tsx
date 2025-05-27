@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as Tone from "tone";
 
-export function useAudioCircle(audioUrl: string) {
+export function useAudioCircle(audioUrl: string,masterMixer?: Tone.Gain) {
   const [loaded, setLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
@@ -112,12 +112,26 @@ export function useAudioCircle(audioUrl: string) {
     
     // Create new audio components
     try {
-      // Create volume node
-      const volumeNode = new Tone.Volume(0).toDestination();
+        // Create volume node
+      const volumeNode = new Tone.Volume(0);
       volumeRef.current = volumeNode;
 
       // Create panner node
-      const pannerNode = new Tone.Panner(0).connect(volumeNode);
+      const pannerNode = new Tone.Panner(0);
+      pannerRef.current = pannerNode;
+      
+      // CRITICAL: Connect panner to volume, then volume to masterMixer OR destination
+      pannerNode.connect(volumeNode);
+      
+      if (masterMixer) {
+        console.log("🔗 Connecting to master mixer for recording");
+        volumeNode.connect(masterMixer);
+      } else {
+        console.log("🔊 Connecting directly to destination");
+        volumeNode.toDestination();
+      }
+
+      volumeRef.current = volumeNode;
       pannerRef.current = pannerNode;
 
       // Create analysis nodes
@@ -136,7 +150,7 @@ export function useAudioCircle(audioUrl: string) {
         url: audioUrl,
         loop: false,
         autostart: false,
-        fadeIn: 0.005,  // Tiny fade in to prevent clicks
+        fadeIn: 0.005, // Tiny fade in to prevent clicks
         fadeOut: 0.005, // Tiny fade out to prevent clicks
         onload: () => {
           if (isMountedRef.current) {
@@ -146,7 +160,9 @@ export function useAudioCircle(audioUrl: string) {
       }).connect(pannerNode);
 
       playerRef.current = player;
-      
+
+ 
+
     } catch (error) {
       console.error("Error initializing audio:", error);
     }
@@ -157,7 +173,7 @@ export function useAudioCircle(audioUrl: string) {
       isAnalyzingRef.current = false;
       cleanup();
     };
-  }, [audioUrl]);
+  }, [audioUrl, masterMixer]);
 
   // Sync isPlayingRef with isPlaying state
   useEffect(() => {
