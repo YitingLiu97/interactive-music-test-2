@@ -138,6 +138,7 @@ export default function BoundingBox({ contentData }: Props) {
         setAuthorName("justintest Scholar 玉刻");
         setBackgroundUrl("/content/justintest/image/bg.jpg");
         setSections(sections);
+        setTotalDuration(sections[sections.length-1].endTime);
       }
     } catch (error) {
       console.error("content data fetching error: " + error);
