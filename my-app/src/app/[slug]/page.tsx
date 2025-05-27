@@ -8,6 +8,8 @@ import { JsonInfo } from '@/app/types/audioType';
 export default function DynamicContentPage() {
   const params = useParams();
   const slug = params.slug as string;
+
+  console.log("slug is "+slug);
   
   const [contentData, setContentData] = useState<JsonInfo | null>(null);
   const [loading, setLoading] = useState(true);
