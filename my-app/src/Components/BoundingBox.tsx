@@ -104,6 +104,7 @@ export default function BoundingBox({ contentData }: Props) {
     },
   ];
 
+  // set justin's info to be the default 
   const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
   const [trackListName, setTrackListName] = useState("Chinese Instrumental");
   const [authorName, setAuthorName] = useState("justintest Scholar 玉刻");
