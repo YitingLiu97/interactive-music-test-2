@@ -48,42 +48,90 @@
       "audioUrl": "/content/justin/sounds/erhu.mp3",
       "circleColor": "red",
       "instrumentName": "Erhu",
-      "audioSource": "file"
+      "audioSource": "file",
+         "position": {
+        "x": 70,
+        "y": 30
+      },
+      "audioParams": {
+        "pan": 0,
+        "volume": 0.8
+      }
     },
     {
       "id": "forest",
       "audioUrl": "/content/justin/sounds/forest.mp3",
       "circleColor": "orange",
       "instrumentName": "Forest",
-      "audioSource": "file"
+      "audioSource": "file",
+         "position": {
+        "x": 70,
+        "y": 30
+      },
+      "audioParams": {
+        "pan": 0,
+        "volume": 0.8
+      }
     },
     {
       "id": "main",
       "audioUrl": "/content/justin/sounds/main.mp3",
       "circleColor": "yellow",
       "instrumentName": "Main",
-      "audioSource": "file"
+      "audioSource": "file",
+         "position": {
+        "x": 70,
+        "y": 30
+      },
+      "audioParams": {
+        "pan": 0,
+        "volume": 0.8
+      }
     },
     {
       "id": "xiao",
       "audioUrl": "/content/justin/sounds/xiao.mp3",
       "circleColor": "green",
       "instrumentName": "Xiao",
-      "audioSource": "file"
+      "audioSource": "file",
+         "position": {
+        "x": 70,
+        "y": 30
+      },
+      "audioParams": {
+        "pan": 0,
+        "volume": 0.8
+      }
     },
     {
       "id": "xun",
       "audioUrl": "/content/justin/sounds/xun.mp3",
       "circleColor": "teal",
       "instrumentName": "Xun",
-      "audioSource": "file"
+      "audioSource": "file",
+         "position": {
+        "x": 70,
+        "y": 30
+      },
+      "audioParams": {
+        "pan": 0,
+        "volume": 0.8
+      }
     },
     {
       "id": "zheng",
       "audioUrl": "/content/justin/sounds/zheng.mp3",
       "circleColor": "blue",
       "instrumentName": "Zheng",
-      "audioSource": "file"
+      "audioSource": "file",
+         "position": {
+        "x": 70,
+        "y": 30
+      },
+      "audioParams": {
+        "pan": 0,
+        "volume": 0.8
+      }
     }
   ]
 }
