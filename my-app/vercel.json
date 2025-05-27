@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 10
+    }
+  },
+  "outputFileTracing": true,
+  "cleanUrls": true,
+  "trailingSlash": false
+}
