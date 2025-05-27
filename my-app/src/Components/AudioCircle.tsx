@@ -327,8 +327,8 @@ export default function AudioCircle({
             );
 
             // Update audio parameters
-            setPan(panValue);
-            setVolume(volumeValue);
+           if(panValue) setPan(panValue);
+           if(volumeValue) setVolume(volumeValue);
             
             // Store the values
             lastPanValue.current = panValue;
