@@ -107,7 +107,7 @@ export default function BoundingBox({ contentData }: Props) {
   const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
   const [trackListName, setTrackListName] = useState("Chinese Instrumental");
   const [authorName, setAuthorName] = useState("justin Scholar 玉刻");
-  const [backgroundUrl, setBackgroundUrl] = useState<string>();
+  const [backgroundUrl, setBackgroundUrl] = useState<string>("/content/justin/image/bg.jpg");
   const [sections, setSections] = useState([
     { id: "1", name: "Intro", startTime: 0, endTime: 3 },
     { id: "2", name: "Verse 1", startTime: 3, endTime: 8 },
