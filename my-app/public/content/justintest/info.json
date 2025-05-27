@@ -1,10 +1,10 @@
 {
-  "projectName": "justin",
+  "projectName": "justintest",
   "title": "Chinese Instruments",
-  "author": "justin",
+  "author": "justintest",
   "description": "A beautiful ambient track featuring layered instruments and atmospheric vocals",
-  "imageUrl": "/content/justin/image/bg.jpg",
-  "folderUrl": "/content/justin/sounds/",
+  "imageUrl": "/content/justintest/image/bg.jpg",
+  "folderUrl": "/content/justintest/sounds/",
   "sections": [
     {
      "id": "1",
@@ -45,7 +45,7 @@
   "audioInfos": [
     {
       "id": "erhu",
-      "audioUrl": "/content/justin/sounds/erhu.mp3",
+      "audioUrl": "/content/justintest/sounds/erhu.mp3",
       "circleColor": "red",
       "instrumentName": "Erhu",
       "audioSource": "file",
@@ -60,7 +60,7 @@
     },
     {
       "id": "forest",
-      "audioUrl": "/content/justin/sounds/forest.mp3",
+      "audioUrl": "/content/justintest/sounds/forest.mp3",
       "circleColor": "orange",
       "instrumentName": "Forest",
       "audioSource": "file",
@@ -75,7 +75,7 @@
     },
     {
       "id": "main",
-      "audioUrl": "/content/justin/sounds/main.mp3",
+      "audioUrl": "/content/justintest/sounds/main.mp3",
       "circleColor": "yellow",
       "instrumentName": "Main",
       "audioSource": "file",
@@ -90,7 +90,7 @@
     },
     {
       "id": "xiao",
-      "audioUrl": "/content/justin/sounds/xiao.mp3",
+      "audioUrl": "/content/justintest/sounds/xiao.mp3",
       "circleColor": "green",
       "instrumentName": "Xiao",
       "audioSource": "file",
@@ -105,7 +105,7 @@
     },
     {
       "id": "xun",
-      "audioUrl": "/content/justin/sounds/xun.mp3",
+      "audioUrl": "/content/justintest/sounds/xun.mp3",
       "circleColor": "teal",
       "instrumentName": "Xun",
       "audioSource": "file",
@@ -120,7 +120,7 @@
     },
     {
       "id": "zheng",
-      "audioUrl": "/content/justin/sounds/zheng.mp3",
+      "audioUrl": "/content/justintest/sounds/zheng.mp3",
       "circleColor": "blue",
       "instrumentName": "Zheng",
       "audioSource": "file",

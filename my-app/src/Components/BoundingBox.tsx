@@ -62,42 +62,42 @@ export default function BoundingBox({ contentData }: Props) {
   const defaultAudioInfos: AudioInfo[] = [
     {
       id: "erhu",
-      audioUrl: "/content/justin/sounds/erhu.mp3",
+      audioUrl: "/content/justintest/sounds/erhu.mp3",
       circleColor: "red",
       instrumentName: "Erhu",
       audioSource: "file",
     },
     {
       id: "forest",
-      audioUrl: "/content/justin/sounds/forest.mp3",
+      audioUrl: "/content/justintest/sounds/forest.mp3",
       circleColor: "orange",
       instrumentName: "Forest",
       audioSource: "file",
     },
     {
       id: "main",
-      audioUrl: "/content/justin/sounds/main.mp3",
+      audioUrl: "/content/justintest/sounds/main.mp3",
       circleColor: "yellow",
       instrumentName: "Main",
       audioSource: "file",
     },
     {
       id: "xiao",
-      audioUrl: "/content/justin/sounds/xiao.mp3",
+      audioUrl: "/content/justintest/sounds/xiao.mp3",
       circleColor: "green",
       instrumentName: "Xiao",
       audioSource: "file",
     },
     {
       id: "xun",
-      audioUrl: "/content/justin/sounds/xun.mp3",
+      audioUrl: "/content/justintest/sounds/xun.mp3",
       circleColor: "teal",
       instrumentName: "Xun",
       audioSource: "file",
     },
     {
       id: "zheng",
-      audioUrl: "/content/justin/sounds/zheng.mp3",
+      audioUrl: "/content/justintest/sounds/zheng.mp3",
       circleColor: "blue",
       instrumentName: "Zheng",
       audioSource: "file",
@@ -106,8 +106,8 @@ export default function BoundingBox({ contentData }: Props) {
 
   const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
   const [trackListName, setTrackListName] = useState("Chinese Instrumental");
-  const [authorName, setAuthorName] = useState("justin Scholar 玉刻");
-  const [backgroundUrl, setBackgroundUrl] = useState<string>("/content/justin/image/bg.jpg");
+  const [authorName, setAuthorName] = useState("justintest Scholar 玉刻");
+  const [backgroundUrl, setBackgroundUrl] = useState<string>("/content/justintest/image/bg.jpg");
   const [sections, setSections] = useState([
     { id: "1", name: "Intro", startTime: 0, endTime: 3 },
     { id: "2", name: "Verse 1", startTime: 3, endTime: 8 },
@@ -135,8 +135,9 @@ export default function BoundingBox({ contentData }: Props) {
         console.log("Using default data");
         setAudioInfos(defaultAudioInfos);
         setTrackListName("Chinese Instrumental");
-        setAuthorName("justin Scholar 玉刻");
-        setBackgroundUrl("/content/justin/image/bg.jpg");
+        setAuthorName("justintest Scholar 玉刻");
+        setBackgroundUrl("/content/justintest/image/bg.jpg");
+        setSections(sections);
       }
     } catch (error) {
       console.error("content data fetching error: " + error);
