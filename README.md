@@ -1,6 +1,11 @@
 # Introduction 
 An interactive web application for spatial audio processing and visualization that allows users to manipulate microphone input and audio tracks in a two-dimensional space, creating immersive sonic landscapes with real-time visual feedback.
 
+
+# Demo 
+You can go to the [website](https://interactive-music-test-2.vercel.app/) to try it out yourself. Feel free to try the following websites for two different audio mixes:
+[Air Traffic](https://interactive-music-test-2.vercel.app/airtraffic)[Justin's music](https://interactive-music-test-2.vercel.app/justintest)
+
 # Overview 
 This application creates an interactive audio-visual environment where:
 - Live microphone input is processed in real-time with dynamic visualizations
