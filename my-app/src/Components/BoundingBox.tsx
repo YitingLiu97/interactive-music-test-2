@@ -241,8 +241,8 @@ const stopFinalMixRecording = async () => {
     Array(audioInfos.length)
       .fill(null)
       .map((_, index) => ({
-        x: (0.3 + index * 0.1) * 100, // Convert to percentage
-        y: 0.3 * 100,
+        x: 15 + index * (70 / Math.max(audioInfos.length - 1, 1)),
+        y: 44 + (index % 2) * 14,
       }))
   );
   const compactLayoutRef = useRef<boolean | null>(null);
@@ -498,8 +498,8 @@ const stopFinalMixRecording = async () => {
             }));
           } else if (compactLayoutRef.current !== null) {
             audioCirclePositions.current = audioInfos.map((_, index) => ({
-              x: 30 + index * (40 / Math.max(audioInfos.length - 1, 1)),
-              y: 30,
+              x: 15 + index * (70 / Math.max(audioInfos.length - 1, 1)),
+              y: 44 + (index % 2) * 14,
             }));
           }
           compactLayoutRef.current = compact;

@@ -59,7 +59,11 @@ export default function AudioCircle({
         yPercent: startPoint.y * 100
     });
 
-    const [circleSize, setCircleSize] = useState<number>(50);
+    // Keep each sound legible at every stage size, including on first render.
+    // The shorter stage dimension prevents oversized circles in tall windows.
+    const stageUnit = Math.min(boundingBox.x, boundingBox.y);
+    const baseCircleSize = Math.max(82, Math.min(146, stageUnit * 0.15));
+    const circleSize = baseCircleSize * mapRange(position.yPercent, 0, 100, 0.9, 1.1);
     const marginPercent = 5; // Reduced margin to allow more movement space
     const silentVolume = -20;
     
@@ -262,10 +266,6 @@ export default function AudioCircle({
                         // Update circle position
                         setPosition({ xPercent, yPercent });
                         
-                        // Update circle size based on Y position
-                        const newCircleSize = mapRange(yPercent, 0, 100, 20, 80);
-                        setCircleSize(newCircleSize);
-                        
                         // Get trapezoid dimensions at this y position
                         const { leftOffset, width } = getWidthAtYPosition(yPercent);
                         
@@ -282,7 +282,7 @@ export default function AudioCircle({
                         const volumeValue = mapRange(
                             yPercent, 
                             marginPercent, 
-                            100 - marginPercent - (newCircleSize / boundingBox.y) * 100, 
+                            100 - marginPercent - (circleSize / boundingBox.y) * 100, 
                             silentVolume, 
                             0
                         );
@@ -445,10 +445,6 @@ export default function AudioCircle({
         // Calculate new position based on mouse coordinates and trapezoid shape
         const newPosition = calculateTrapezoidPosition(e.clientX, e.clientY);
         
-        // Update the circle size based on vertical position (larger at bottom)
-        const newCircleSize = mapRange(newPosition.yPercent, 0, 100, 20, 80);
-        setCircleSize(newCircleSize);
-      
         // Update position state for UI
         setPosition(newPosition);
         
@@ -473,7 +469,7 @@ export default function AudioCircle({
         const volumeValue = mapRange(
             newPosition.yPercent, 
             marginPercent, 
-            100 - marginPercent - (newCircleSize / boundingBox.y) * 100, 
+            100 - marginPercent - (circleSize / boundingBox.y) * 100, 
             silentVolume, 
             0
         );
@@ -513,7 +509,7 @@ export default function AudioCircle({
             <CircleUI
                 xPercent={position.xPercent}
                 yPercent={position.yPercent}
-                circleSize={isHandControlled? circleSize*3: circleSize}
+                circleSize={isHandControlled ? circleSize * 1.2 : circleSize}
                 onMouseDown={onMouseDown}
                 isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback
                 boundingBox={boundingBox}
