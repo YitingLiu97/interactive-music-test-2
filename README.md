@@ -1,118 +1,59 @@
-# Introduction 
-An interactive web application for spatial audio processing and visualization that allows users to manipulate microphone input and audio tracks in a two-dimensional space, creating immersive sonic landscapes with real-time visual feedback.
+# Spatial Music Lab
 
+An interactive spatial-audio study built for the NYU Shanghai Creative Innovation Lab. Learners move sound sources across a visual stage and hear how position changes a mix: left and right control stereo pan; up and down control level. Yiting Liu designed and developed the browser experience as an Adjunct Researcher in Music and AI.
 
-# Demo 
-You can go to the [website](https://interactive-music-test-2.vercel.app/) to try it out yourself. Feel free to try the following websites for two different audio mixes:
-[Air Traffic](https://interactive-music-test-2.vercel.app/airtraffic)[Justin's music](https://interactive-music-test-2.vercel.app/justintest)
+**[Try the live demo](https://interactive-music-test-2.vercel.app/)** · [Watch the silent interaction clip](my-app/public/demo/spatial-music-lab-demo.mp4) · [Read the system architecture](docs/architecture.md)
 
-# Overview 
-This application creates an interactive audio-visual environment where:
-- Live microphone input is processed in real-time with dynamic visualizations
-- Users can position different audio sources in a 2D environment:
-  - Horizontal position (X-axis) controls stereo panning (left to right)
-  - Vertical position (Y-axis) controls volume level
-- Visual feedback shows audio spectrum and waveform data in real-time
-- Interactive transport controls make navigating through pre-recorded audio sections intuitive
-- Global transport controls: Play, pause, and loop functionality for pre-recorded tracks
-- Precise time scrubbing: Seek to any point in pre-recorded audio with the timeline slider
-- Multi-source mixing: Combine live microphone input with pre-recorded tracks
+The clip shows playback, dragging an instrument, and jumping between song sections. Open the live demo to hear the mix.
 
-# Technical Implementation
-## Technology Stack
-- **Frontend Framework**: [Next.js](https://nextjs.org/) (v15.2)
-- **UI Library**: [React](https://reactjs.org/) (v19)
-- **Audio Engine**: [Tone.js](https://tonejs.github.io/) (v15.0)
-- **UI Components**: [Radix UI](https://www.radix-ui.com/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) (v4)
-- **TypeScript**: For type safety and improved developer experience
+## What you can do
 
-## Audio Processing Architecture
-The application uses a custom React hook (`useAudioCircle`) that encapsulates Tone.js audio nodes in a component-friendly API:
-Each audio source is processed through:
-1. **Panner node**: Controls the stereo position (left/right)
-2. **Volume node**: Controls amplitude levels
-3. **Analyzer nodes**: Generate real-time FFT and waveform data for visualizations
+1. Press **Play** to hear the prepared stems together.
+2. Drag a colored instrument circle horizontally to change its stereo position, or vertically to change its level. Circle size adapts to the stage so the sources remain visible at different window sizes.
+3. Use the timeline or section buttons to move through the composition. Turn looping on when comparing a passage.
+4. Use **Record mix** to capture and download the current browser mix as a WebM file.
+5. Optionally enable **hand control**. The browser requests camera access, and MediaPipe hand landmarks support grab, move, and release gestures.
 
-### Component Structure
-- `BoundingBox`: Main container managing all audio sources
-- `AudioCircle`: Draggable component representing a single audio source (mic or track)
-- `CircleUI`: Visual representation of audio with real-time visualizations
-- `AudioInterface`: Transport controls and input management
-- `HandDetection`: Computer vision component for gesture recognition and control
-- Custom hooks: `useAudioCircle` for audio processing and `useAudioRecorder` for audio recording and `useHandDetection` for hand detection using MediaPipe's tasks-vision. 
+The home route loads Justin Scholar's Chinese instrumental example. The `/airtraffic` route demonstrates another prepared mix. Camera control is optional; mouse interaction works without it.
 
-# Getting Started
-## Prerequisites
+## How it works
 
-- Node.js 18+
-- npm or yarn
-
-## Installation
-
-1. Clone the repository:
-
-bashgit clone https://github.com/YitingLiu97/interactive-music-test-2 
-cd my-app
-
-2. Install dependencies:
-
-```bash
-npm install
+```mermaid
+flowchart LR
+  A[Prepared audio stems and section data] --> B[Next.js and React stage]
+  B --> C[One AudioCircle per stem]
+  C --> D[Tone.js player]
+  D --> E[Pan from horizontal position]
+  E --> F[Level from vertical position]
+  F --> G[Master mix]
+  G --> H[Browser output]
+  G --> I[Downloadable recording]
+  D --> J[FFT and waveform analysis]
+  J --> K[Reactive circle display]
+  L[Optional camera and MediaPipe] --> B
 ```
-# or
-```bash
-yarn
-```
-3. Start the development server:
+
+See [the architecture notes](docs/architecture.md) for the component and interaction flow. The current public demo mixes prepared audio stems. Older microphone-loop components remain in the repository but are outside the current demo flow.
+
+## Run locally
+
+Requires Node.js 20 or newer and npm.
 
 ```bash
+git clone https://github.com/YitingLiu97/interactive-music-test-2.git
+cd interactive-music-test-2/my-app
+npm ci
 npm run dev
 ```
-# or
-```bash
-yarn dev
-```
 
-4. Open http://localhost:3000 to view the application in your browser
+Open `http://localhost:3000`. Run `npm run build` to check the production build.
 
-# To update the media content 
-1. Create a folder under `public/content` with the project name [Project-Name] and put audio files in the` public/content/[Project Name]/Sounds` folder and put background image in the `public/content/[Prject Name]/Image` folder and name the background image to be `bg.jpg`
-2. Create an `info.json` in the folder of [Project Name]. Please update all the necessary information by referencing the exisiting example in the two folders: Air-Traffic or Justin. 
-- `Sections` means the division of time based on intro, verse, chorus, bridge, and outro. 
-- `AudioInfos` are must to fill with correct file addresses and specific id and circle color. 
+## Add a composition
 
-Each project folder maintains its own:
-- Audio source configurations
-- Spatial positioning settings
-- Effect chain parameters
-- Session info
+Create `my-app/public/content/<slug>/` with an `info.json`, an `image/bg.jpg`, and audio files under `sounds/`. Use [`justintest/info.json`](my-app/public/content/justintest/info.json) or [`airtraffic/info.json`](my-app/public/content/airtraffic/info.json) as the schema reference. The metadata supplies audio paths, circle colors, track names, and section timings. The composition becomes available at `/<slug>`.
 
-## 📚 Developer Notes
+## Stack and credits
 
-- The `BoundingBox` component handles the overall layout and manages all audio sources
-- `useAudioRecorder` component handles requesting microphone permissions and capturing audio and visualization 
-- `useAudioRecorder` is made up with two parts: `useAudioSystem` which requests the microphone permissions and capturing audio and `useLoopBuffer` which creates audio loop and canvas visualization for the captured audio
-- Each `AudioCircle` has its own isolated audio processing chain via the `useAudioCircle` hook
-- The `CircleUI` component visualizes audio properties including FFT data and waveform
-- Audio parameters (pan and volume) are mapped to spatial coordinates with smooth transitions
-- The app uses throttled parameter updates during dragging to prevent audio artifacts
-- It also 
+Next.js, React, TypeScript, Tailwind CSS, Tone.js, and MediaPipe Tasks Vision. The project was created for the NYU Shanghai Creative Innovation Lab led by Alex Ruthmann. Demo music: **Chinese Instruments Music** by Justin Scholar 玉刻 and **The Magician's Wife** by Clara Berry and Wooldog (Air Traffic example).
 
-## 🔮 Future Enhancements
-
-- Expand audio effect options (convolution reverb, pitch shifting, etc.)
-- Add support for multiple simultaneous microphone inputs
-- Implement audio recording and export functionality
-- Create preset effect chains and positions for quick access
-- Add machine learning-based audio analysis for more advanced visualizations
-- Implement WebRTC for collaborative remote audio sessions
-- Add multi-touch support for mobile devices
-- Integrate with MIDI controllers for external parameter control
-
-# Acknowledgements
-- Tone.js for the audio processing capabilities
-- Radix UI for accessible UI components
-- Demo music tracks used: Air Traffic - The Magician's Wife (Clara Berry and Wooldog) and Chinese Instruments Music by Justin Scholar 玉刻
-- This project was created for NYU Shanghai Creative Innovation Lab led by Alex Ruthmann 
-
+This is a research prototype. It demonstrates browser-based spatial mixing and optional gesture input; it does not include collaborative sessions, MIDI control, or machine-learning audio analysis.
