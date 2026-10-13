@@ -34,6 +34,7 @@ export function useAudioCircle(audioUrl: string,masterMixer?: Tone.Gain) {
   const waveformRef = useRef<Tone.Waveform | null>(null);
   const meterRef = useRef<Tone.Meter | null>(null);
   const analysisFrameRef = useRef<number | null>(null);
+  const lastAnalysisUpdateRef = useRef(0);
   
   // Track if mounted and playing state
   const isMountedRef = useRef(true);
@@ -198,7 +199,8 @@ export function useAudioCircle(audioUrl: string,masterMixer?: Tone.Gain) {
       const amplitudeValue = Array.isArray(rawAmp) ? Math.max(...rawAmp) : rawAmp;
       const isQuietValue = amplitudeValue < quietThreshold;
     
-      if (isMountedRef.current) {
+      if (isMountedRef.current && performance.now() - lastAnalysisUpdateRef.current >= 125) {
+        lastAnalysisUpdateRef.current = performance.now();
         setAudioData({
           fftData,
           waveformData,

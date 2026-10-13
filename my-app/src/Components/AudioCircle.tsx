@@ -518,7 +518,7 @@ export default function AudioCircle({
                 isDragging={dragging || isHandControlled} // Consider hand control as dragging for visual feedback
                 boundingBox={boundingBox}
                 color={color}
-                opacity={position.yPercent / 100 + 0.2}
+                opacity={Math.max(0.92, position.yPercent / 100 + 0.2)}
                 instrumentName={instrumentName}
                 isPlaying={masterIsPlaying}  // Use master playing state
                 isMuted={isMuted}

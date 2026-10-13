@@ -235,7 +235,8 @@ export default function CircleUI({
                 width: circleSize,
                 height: circleSize,
                 borderRadius: "50%",
-                backgroundColor: audioData?.isQuiet? "gray" : dynamicColor,
+                backgroundColor: isMuted ? "#526d73" : dynamicColor,
+                border: "2px solid rgba(255,255,255,.88)",
                 position: "absolute",
                 left: 0,
                 top: 0,
@@ -457,8 +458,8 @@ export default function CircleUI({
                     <div style={{
                         fontSize: Math.max(10, circleSize * 0.25),
                         fontWeight: "bold",
-                        color: "#000",
-                        textShadow: "0 0 2px rgba(255,255,255,0.7)",
+                        color: "#fff",
+                        textShadow: "0 1px 5px rgba(0,0,0,0.85)",
                         lineHeight: 1
                     }}>
                         {instrumentName}

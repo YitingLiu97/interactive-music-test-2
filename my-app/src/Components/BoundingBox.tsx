@@ -8,11 +8,9 @@ import {
 } from "@/app/types/audioType";
 import { useHandDetection } from "@/app/utils/useHandDetection";
 import { VideoIcon } from "@radix-ui/react-icons";
-import { Button } from "@radix-ui/themes";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import AudioCircle from "./AudioCircle";
 import AudioInterface from "./AudioInterface";
-import { AudioRecordingManager } from "./AudioRecordingManager";
 import * as Tone from "tone";
 
 interface Props {
@@ -55,13 +53,6 @@ export default function BoundingBox({ contentData }: Props) {
   const releaseDebounceRef = useRef<Record<number, number>>({});
   const RELEASE_DEBOUNCE_TIME = 300; // ms to delay release to prevent accidental drops
   const raf = useRef<number | null>(null);
-  const [isRecorderVisible, setIsRecorderVisible] = useState(false);
-  const [isRecorderPanelVisible, setIsRecorderPanelVisible] = useState(true);
-  const [recordingSlotIndex, setRecordingSlotIndex] = useState<number | null>(
-    null
-  );
-  const [recordingAudioInfo, setRecordingAudioInfo] =
-    useState<AudioInfo | null>(null);
 
   const defaultAudioInfos: AudioInfo[] = [
     {
@@ -111,7 +102,7 @@ export default function BoundingBox({ contentData }: Props) {
   // set justin's info to be the default
   const [audioInfos, setAudioInfos] = useState(defaultAudioInfos);
   const [trackListName, setTrackListName] = useState("Chinese Instrumental");
-  const [authorName, setAuthorName] = useState("justintest Scholar 玉刻");
+  const [authorName, setAuthorName] = useState("Justin Scholar 玉刻");
   const [backgroundUrl, setBackgroundUrl] = useState<string>(
     "/content/justintest/image/bg.jpg"
   );
@@ -228,7 +219,7 @@ const stopFinalMixRecording = async () => {
         console.log("Using default data");
         setAudioInfos(defaultAudioInfos);
         setTrackListName("Chinese Instrumental");
-        setAuthorName("justintest Scholar 玉刻");
+        setAuthorName("Justin Scholar 玉刻");
         setBackgroundUrl("/content/justintest/image/bg.jpg");
         setSections(sections);
         setTotalDuration(sections[sections.length - 1].endTime);
@@ -254,6 +245,7 @@ const stopFinalMixRecording = async () => {
         y: 0.3 * 100,
       }))
   );
+  const compactLayoutRef = useRef<boolean | null>(null);
 
   // Hand grab event handler - optimized version
   const handleHandGrab = useCallback(
@@ -459,111 +451,6 @@ const stopFinalMixRecording = async () => {
       handleHandLost
     );
 
-  // Modified handleRecordingComplete to properly integrate with audioInfos
-  const handleRecordingComplete = useCallback(
-    (newAudioInfo: AudioInfo) => {
-      console.log(
-        "🎉 BoundingBox: handleRecordingComplete called with:",
-        newAudioInfo
-      );
-
-      // Update the recording audio info
-      const updatedRecording = {
-        ...newAudioInfo,
-        id: "vocal-recording", // Ensure consistent ID
-        position: recordingAudioInfo?.position || { x: 50, y: 70 },
-      };
-
-      setRecordingAudioInfo(updatedRecording);
-
-      // Update in audioInfos array
-      setAudioInfos((prev) => {
-        const index = prev.findIndex((info) => info.id === "vocal-recording");
-        if (index >= 0) {
-          const updated = [...prev];
-          updated[index] = updatedRecording;
-          console.log("📝 BoundingBox: Updated existing recording circle");
-          return updated;
-        } else {
-          // This shouldn't happen, but fallback to add
-          console.log("📝 BoundingBox: Added new recording circle");
-          return [...prev, updatedRecording];
-        }
-      });
-
-      // Keep recorder visible so user can see the result and record again
-      setRecordingSlotIndex(null);
-    },
-    [recordingAudioInfo]
-  );
-
-  // only remove the circle when the audio is null
-  // when the recording is cancelled
-  const cancelRecording = useCallback(() => {
-    setAudioInfos((prev) =>
-      prev.filter((info) => info.id !== "vocal-recording")
-    );
-    setRecordingAudioInfo(null);
-    setIsRecorderVisible(false);
-  }, []);
-
-  // Handle recording start
-  const handleRecordingStart = useCallback(() => {
-    console.log("🎬 BoundingBox: handleRecordingStart called");
-    setCurrentTrack("Recording in progress...");
-  }, []);
-
-  // Modified handleRecordingUpdate - same logic as complete for single circle
-  const handleRecordingUpdate = useCallback(
-    (updatedAudioInfo: AudioInfo) => {
-      console.log(
-        "🔄 BoundingBox: handleRecordingUpdate called with:",
-        updatedAudioInfo
-      );
-      handleRecordingComplete(updatedAudioInfo); // Same logic for single circle
-    },
-    [handleRecordingComplete]
-  );
-
-  const createRecordingSlot = useCallback(() => {
-    const newPosition = {
-      x: 50, // Center horizontally
-      y: 70, // Place below other circles
-    };
-
-    const recordingSlot: AudioInfo = {
-      id: `vocal-recording`, // Fixed ID for single recording
-      audioUrl: "", // Empty until recording completes
-      instrumentName: "Recording...",
-      circleColor: "red",
-      audioSource: "recording",
-      isRecording: true,
-      position: newPosition,
-      audioParams: { pan: 0, volume: 0.7 },
-    };
-
-    // Set the recording audio info
-    setRecordingAudioInfo(recordingSlot);
-
-    // Add to audioInfos if not already there
-    setAudioInfos((prev) => {
-      const existingIndex = prev.findIndex(
-        (info) => info.id === "vocal-recording"
-      );
-      if (existingIndex >= 0) {
-        // Replace existing recording
-        const updated = [...prev];
-        updated[existingIndex] = recordingSlot;
-        return updated;
-      } else {
-        // Add new recording
-        return [...prev, recordingSlot];
-      }
-    });
-
-    setIsRecorderVisible(true);
-  }, []);
-
   // Method to rebuild audio refs when audioInfos changes
   const rebuildAudioRefs = useCallback(() => {
     console.log("📝 rebuildAudioRefs");
@@ -574,16 +461,6 @@ const stopFinalMixRecording = async () => {
     setAudioRefsCreated(false);
     setTimeout(() => setAudioRefsCreated(true), 100);
   }, [audioInfos]);
-
-  const toggleVisibility = useCallback(() => {
-    console.log(
-      "👁️ Toggling visibility from",
-      isRecorderPanelVisible,
-      "to",
-      !isRecorderPanelVisible
-    );
-    setIsRecorderPanelVisible((prev) => !prev);
-  }, [isRecorderPanelVisible]);
 
   // Effect to handle audio infos changes
   useEffect(() => {
@@ -612,6 +489,21 @@ const stopFinalMixRecording = async () => {
     function updateSize() {
       if (boxRef.current) {
         const rect = boxRef.current.getBoundingClientRect();
+        const compact = rect.width < 620;
+        if (compactLayoutRef.current !== compact) {
+          if (compact) {
+            audioCirclePositions.current = audioInfos.map((_, index) => ({
+              x: 20 + (index % 3) * 30,
+              y: 37 + Math.floor(index / 3) * 27,
+            }));
+          } else if (compactLayoutRef.current !== null) {
+            audioCirclePositions.current = audioInfos.map((_, index) => ({
+              x: 30 + index * (40 / Math.max(audioInfos.length - 1, 1)),
+              y: 30,
+            }));
+          }
+          compactLayoutRef.current = compact;
+        }
         setSize({
           x: rect.width,
           y: rect.height,
@@ -654,77 +546,32 @@ const stopFinalMixRecording = async () => {
     }
   }, [audioRefsCreated]);
 
-  // Start a timer to update current time when playing (UI only)
+  // Keep the transport display in sync without side effects inside a state updater.
   useEffect(() => {
-    // Clear any existing timer first to prevent multiple timers
-    if (playbackTimerRef.current) {
-      clearInterval(playbackTimerRef.current);
-      playbackTimerRef.current = null;
-    }
-
-    // Only start timer when playing and not seeking
-    if (isPlaying && !isSeekingRef.current) {
-      // Use setTimeout to ensure this code runs AFTER the render completes
-      const timerStartId = setTimeout(() => {
-        // Update time every 100ms
-        playbackTimerRef.current = window.setInterval(() => {
-          // Don't update if actively seeking
-          if (!isSeekingRef.current) {
-            setCurrentTime((prevTime) => {
-              // Loop back to start if we reach the end and looping is enabled
-              if (prevTime >= totalDuration) {
-                if (isLooping) {
-                  // If looping, DON'T call pauseAll here - use an event handler approach instead
-                  const newTime = 0;
-                  // Use setTimeout to avoid calling state setters during render
-                  setTimeout(() => {
-                    // First update the time to 0
-                    setCurrentTime(0);
-                    // Then in another tick, restart playback
-                    setTimeout(() => {
-                      audioRefs.current.forEach((ref) => {
-                        if (ref.current && ref.current.seekTo) {
-                          ref.current.seekTo(0);
-                        }
-                      });
-                    }, 20);
-                  }, 0);
-                  return newTime;
-                } else {
-                  // If not looping, use setTimeout to pause AFTER the render cycle completes
-                  setTimeout(() => {
-                    setIsPlaying(false);
-                    audioRefs.current.forEach((ref) => {
-                      if (ref.current && ref.current.pause) {
-                        ref.current.pause();
-                      }
-                    });
-                  }, 0);
-                  return totalDuration;
-                }
-              }
-              return prevTime + 0.1;
-            });
-          }
-        }, 100);
-      }, 0);
-
-      return () => {
-        clearTimeout(timerStartId);
-        if (playbackTimerRef.current) {
-          clearInterval(playbackTimerRef.current);
-          playbackTimerRef.current = null;
-        }
-      };
-    }
-
+    if (!isPlaying) return;
+    playbackTimerRef.current = window.setInterval(() => {
+      if (!isSeekingRef.current) {
+        setCurrentTime((previous) => Math.min(previous + 0.25, totalDuration));
+      }
+    }, 250);
     return () => {
-      if (playbackTimerRef.current) {
+      if (playbackTimerRef.current !== null) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
     };
-  }, [isPlaying, isLooping, totalDuration]);
+  }, [isPlaying, totalDuration]);
+
+  useEffect(() => {
+    if (!isPlaying || currentTime < totalDuration) return;
+    if (isLooping) {
+      setCurrentTime(0);
+      audioRefs.current.forEach((ref) => ref.current?.seekTo?.(0));
+    } else {
+      setIsPlaying(false);
+      audioRefs.current.forEach((ref) => ref.current?.pause?.());
+    }
+  }, [currentTime, isLooping, isPlaying, totalDuration]);
 
   // Play all audio circles
   function playAll(startTimeSeconds: number) {
@@ -866,29 +713,30 @@ useEffect(() => {
   if (!mounted) return null;
 
   return (
-    <div className="flex flex-col h-screen w-screen">
-      {/* Hand detection toggle button */}
-      <div className="absolute top-4 right-4 z-10">
-        <Button
-          variant={isHandDetectionActive ? "solid" : "outline"}
-          color={isHandDetectionActive ? "green" : "gray"}
+    <div className="lab-shell">
+      <header className="lab-header">
+        <div className="lab-brand">
+          <span className="lab-brand-mark" aria-hidden="true">◉</span>
+          <div>
+            <span className="lab-overline">NYU Shanghai · Creative Innovation Lab</span>
+            <h1>Spatial Music Lab</h1>
+          </div>
+        </div>
+        <button
+          className={`lab-hand-button ${isHandDetectionActive ? "is-active" : ""}`}
+          type="button"
           onClick={toggleHandDetection}
+          aria-pressed={isHandDetectionActive}
         >
-          <VideoIcon /> {isHandDetectionActive ? "Disable" : "Enable"} Hand
-          Control
-        </Button>
-      </div>
+          <VideoIcon aria-hidden="true" />
+          {isHandDetectionActive ? "Turn off hand control" : "Try hand control"}
+        </button>
+      </header>
 
       {/* Main bounding box for audio circles */}
       <div
         ref={boxRef}
-        style={{
-          width: "100%",
-          height: "calc(100vh - 150px)", // Reserve space for audio interface
-          position: "relative",
-          overflow: "hidden",
-          backgroundColor: "#f0f0f0",
-        }}
+        className="lab-stage"
       >
         {/* Trapezoid shape overlay */}
         <svg
@@ -925,13 +773,26 @@ useEffect(() => {
           {!isHandDetectionActive && (
             <image
               href={backgroundUrl}
-              opacity="0.5"
+              opacity="0.85"
               width="100%"
               height="100%"
               preserveAspectRatio="xMidYMid slice"
             />
           )}
         </svg>
+        <div className="lab-stage-wash" aria-hidden="true" />
+        <div className="lab-stage-heading">
+          <span className="lab-overline">An interactive sound study</span>
+          <p>Move the sounds. Hear the space change.</p>
+        </div>
+        <details className="lab-guide">
+          <summary>How to explore <span aria-hidden="true">↗</span></summary>
+          <ol>
+            <li>Press play to hear the full arrangement.</li>
+            <li>Drag a sound left or right to change its stereo position.</li>
+            <li>Move it up or down to change its level, then record your mix.</li>
+          </ol>
+        </details>
 
         {audioRefsCreated &&
           audioInfos.map((info, index) => {
@@ -1048,60 +909,8 @@ useEffect(() => {
         )}
       </div>
 
-      <div className="flex flex-1 overflow-y-auto left-0 top-0 overflow-hidden">
-        {isRecorderVisible && (
-          <div className="absolute top-4 left-4 z-20">
-            <Button
-              onClick={() => {
-                cancelRecording();
-              }}
-              variant="outline"
-              className="mt-2"
-            >
-              Cancel Recording
-            </Button>
-            <Button
-              onClick={() => {
-                toggleVisibility();
-              }}
-              variant="outline"
-              className="mt-2"
-            >
-              {isRecorderPanelVisible ? "Hide " : "Show "} Audio Recorder
-            </Button>
-
-            <AudioRecordingManager
-              width={300}
-              height={500}
-              loopDurationFromStem={totalDuration}
-              onRecordingComplete={handleRecordingComplete}
-              onRecordingUpdate={handleRecordingUpdate}
-              onRecordingStart={handleRecordingStart}
-              recordingSlot={
-                recordingSlotIndex !== null
-                  ? audioInfos[recordingSlotIndex]
-                  : null
-              }
-              toggleVisbiilty={toggleVisibility}
-              isVisible={isRecorderPanelVisible}
-            />
-          </div>
-        )}
-
-        <div className="absolute top-4 left-4 z-10">
-          <Button
-            onClick={createRecordingSlot}
-            color="red"
-            variant={isRecorderVisible ? "outline" : "solid"}
-            disabled={isRecorderVisible}
-          >
-            🎤 WIP {isRecorderVisible ? "Recording..." : "Start Recording"}
-          </Button>
-        </div>
-
-        {/* Audio interface outside the bounding box */}
+      <div className="lab-controls">
         <AudioInterface
-          setting={{ width: window.innerWidth, height: 150 }}
           trackListName={trackListName}
           authorName={authorName}
           onPlayAll={playAll}
