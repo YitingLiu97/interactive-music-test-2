@@ -23,6 +23,9 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
 .lab-overline { display: block; font-size: .67rem; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--accent); }
 .lab-shell { display: flex; flex-direction: column; width: 100%; min-height: 100dvh; }
 .lab-header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 88px; padding: 16px clamp(20px, 3vw, 48px); background: var(--ink); border-bottom: 1px solid var(--line); }
+.lab-header-actions { display: flex; flex: none; align-items: center; gap: 10px; }
+.lab-about-link { display: inline-grid; flex: none; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; color: var(--paper); font-size: 1.1rem; font-weight: 700; text-decoration: none; }
+.lab-about-link:hover { border-color: var(--accent); color: var(--accent); }
 .lab-brand { display: flex; align-items: center; gap: 15px; }
 .lab-brand-mark { display: grid; place-items: center; width: 43px; height: 43px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); font-size: 1.55rem; }
 .lab-brand h1 { margin: 4px 0 0; font-size: clamp(1.3rem, 2.1vw, 1.75rem); font-weight: 650; line-height: 1; letter-spacing: -.04em; }
@@ -80,6 +83,8 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   .lab-brand .lab-overline { font-size: .51rem; letter-spacing: .09em; }
   .lab-brand h1 { font-size: 1.11rem; }
   .lab-hand-button { padding: 9px 10px; font-size: .68rem; white-space: normal; max-width: 128px; line-height: 1.1; }
+  .lab-header-actions { gap: 8px; }
+  .lab-about-link { width: 36px; height: 36px; }
   .lab-hand-button svg { flex: none; }
   .lab-stage { flex: none; height: min(58dvh, 520px); min-height: 370px; }
   .lab-stage-heading { top: 18px; left: 16px; max-width: 230px; }

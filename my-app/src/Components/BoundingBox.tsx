@@ -722,15 +722,18 @@ useEffect(() => {
             <h1>Spatial Music Lab</h1>
           </div>
         </div>
-        <button
-          className={`lab-hand-button ${isHandDetectionActive ? "is-active" : ""}`}
-          type="button"
-          onClick={toggleHandDetection}
-          aria-pressed={isHandDetectionActive}
-        >
-          <VideoIcon aria-hidden="true" />
-          {isHandDetectionActive ? "Turn off hand control" : "Try hand control"}
-        </button>
+        <div className="lab-header-actions">
+          <a className="lab-about-link" href="https://www.yitingliu.com/about/" aria-label="About Yiting Liu" title="About Yiting Liu">?</a>
+          <button
+            className={`lab-hand-button ${isHandDetectionActive ? "is-active" : ""}`}
+            type="button"
+            onClick={toggleHandDetection}
+            aria-pressed={isHandDetectionActive}
+          >
+            <VideoIcon aria-hidden="true" />
+            {isHandDetectionActive ? "Turn off hand control" : "Try hand control"}
+          </button>
+        </div>
       </header>
 
       {/* Main bounding box for audio circles */}
