@@ -24,8 +24,14 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
 .lab-shell { display: flex; flex-direction: column; width: 100%; min-height: 100dvh; }
 .lab-header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 88px; padding: 16px clamp(20px, 3vw, 48px); background: var(--ink); border-bottom: 1px solid var(--line); }
 .lab-header-actions { display: flex; flex: none; align-items: center; gap: 10px; }
-.lab-about-link { display: inline-grid; flex: none; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; color: var(--paper); font-size: 1.1rem; font-weight: 700; text-decoration: none; }
-.lab-about-link:hover { border-color: var(--accent); color: var(--accent); }
+.lab-about { position: relative; z-index: 10; }
+.lab-about-link { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; color: var(--paper); font-size: 1.1rem; font-weight: 700; list-style: none; cursor: pointer; }
+.lab-about-link::-webkit-details-marker { display: none; }
+.lab-about-link:hover, .lab-about[open] .lab-about-link { border-color: var(--accent); color: var(--accent); }
+.lab-about-panel { position: absolute; top: calc(100% + 12px); right: 0; width: min(330px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--ink); box-shadow: 0 20px 55px rgba(0,0,0,.35); }
+.lab-about-panel h2 { margin: 10px 0 12px; font-size: 1.3rem; }
+.lab-about-panel p:not(.lab-overline) { margin: 0 0 18px; color: var(--muted); font-size: .86rem; line-height: 1.55; }
+.lab-about-panel a { color: var(--accent); font-size: .84rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .lab-brand { display: flex; align-items: center; gap: 15px; }
 .lab-brand-mark { display: grid; place-items: center; width: 43px; height: 43px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); font-size: 1.55rem; }
 .lab-brand h1 { margin: 4px 0 0; font-size: clamp(1.3rem, 2.1vw, 1.75rem); font-weight: 650; line-height: 1; letter-spacing: -.04em; }

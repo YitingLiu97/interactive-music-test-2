@@ -723,7 +723,15 @@ useEffect(() => {
           </div>
         </div>
         <div className="lab-header-actions">
-          <a className="lab-about-link" href="https://www.yitingliu.com/about/" aria-label="About Yiting Liu" title="About Yiting Liu">?</a>
+          <details className="lab-about">
+            <summary className="lab-about-link" aria-label="About Spatial Music Lab">?</summary>
+            <div className="lab-about-panel">
+              <p className="lab-overline">About the project</p>
+              <h2>Spatial Music Lab</h2>
+              <p>Created by <strong>Yiting Liu</strong> for the NYU Shanghai Creative Innovation Lab. This research prototype lets people move instrument circles to hear how position changes a music mix. Optional hand tracking adds gesture control.</p>
+              <a href="https://www.yitingliu.com/" target="_blank" rel="noopener noreferrer">Explore Yiting Liu’s portfolio ↗</a>
+            </div>
+          </details>
           <button
             className={`lab-hand-button ${isHandDetectionActive ? "is-active" : ""}`}
             type="button"
